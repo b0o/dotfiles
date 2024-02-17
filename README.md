@@ -14,9 +14,3 @@
 - [alacritty-conf](https://github.com/b0o/alacritty-conf)
 - [xmonad-conf](https://github.com/b0o/xmonad-conf)
 - [wezterm-conf](https://github.com/b0o/wezterm-conf)
-
-#### Past dotfile repos
-
-- [doots](https://github.com/b0o/doots)
-- [dootfiles](https://github.com/b0o/dootfiles)
-
