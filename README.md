@@ -3,6 +3,7 @@
 ### Current
 
 - [kitty-conf](https://github.com/b0o/kitty-conf)
+- [ghostty-conf](https://github.com/b0o/ghostty-conf)
 - [nvim-conf](https://github.com/b0o/nvim-conf)
 - [surfingkeys-conf](https://github.com/b0o/surfingkeys-conf)
 - [tmux-conf](https://github.com/b0o/tmux-conf)
