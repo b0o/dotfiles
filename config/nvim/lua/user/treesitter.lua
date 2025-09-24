@@ -42,6 +42,7 @@ require('nvim-treesitter.configs').setup {
     'jsdoc',
     'json',
     'jsonc',
+    'just',
     'kdl',
     'lua',
     'make',
