@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+prog="$(basename "${BASH_SOURCE[0]}")"
+
+profile="$USER"
+base_dir="$(realpath "$(dirname "${BASH_SOURCE[0]}")/../..")"
+
+function usage() {
+  echo "Usage: $prog [opt] <command>"
+  echo ""
+  echo "Options:"
+  echo "  -h, --help         Show this message"
+  echo "  -p, --profile      Specify the profile name (default: $profile)"
+  echo "  -d, --dir          Specify the base directory (default: $base_dir)"
+  echo ""
+  echo "Commands:"
+  echo "  help                Show this message"
+  echo "  b|build             Build the flakey profile"
+  echo "  sw|switch           Switch to the flakey profile"
+  echo "  rollback            Rollback to the previous profile"
+  echo "  dev|develop         Enter a development shell"
+  echo "  sh|shell            Enter a shell with the profile's environment"
+}
+
+function main() {
+  if [[ $# -eq 0 ]]; then
+    usage
+    exit 0
+  fi
+
+  local command=""
+  while [[ $# -gt 0 ]]; do
+    local opt="$1"
+    shift
+    case "$opt" in
+    -h | --help | help)
+      usage
+      exit 0
+      ;;
+    -p | --profile)
+      if [[ -z "${1-}" ]]; then
+        echo "Error: --profile requires a value" >&2
+        exit 1
+      fi
+      profile="$1"
+      shift
+      ;;
+    -d | --dir)
+      if [[ -z "${1-}" ]]; then
+        echo "Error: --dir requires a value" >&2
+        exit 1
+      fi
+      base_dir="$(realpath "$1")"
+      shift
+      ;;
+    -*)
+      echo "Error: Unknown option: $opt" >&2
+      usage
+      exit 1
+      ;;
+    *)
+      command="$opt"
+      break
+      ;;
+    esac
+  done
+
+  if [[ -z "${command-}" ]]; then
+    echo "Error: No command specified" >&2
+    usage
+    exit 1
+  fi
+
+  if [[ ! -d "$base_dir" ]]; then
+    echo "Error: Base directory does not exist: $base_dir" >&2
+    exit 1
+  fi
+  cd "$base_dir"
+
+  case "$command" in
+  b | build)
+    nix build ".#profile.$profile"
+    ;;
+  sw | switch)
+    nix run ".#profile.$profile.switch"
+    ;;
+  rollback)
+    nix run ".#profile.$profile.rollback"
+    ;;
+  dev | develop)
+    nix develop
+    ;;
+  sh | shell)
+    nix shell
+    ;;
+  *)
+    echo "Error: Unknown command: $command" >&2
+    usage
+    exit 1
+    ;;
+  esac
+}
+
+main "$@"
