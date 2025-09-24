@@ -2,9 +2,8 @@
 set -euo pipefail
 
 prog="$(basename "${BASH_SOURCE[0]}")"
-
-profile="$USER"
 base_dir="$(realpath "$(dirname "${BASH_SOURCE[0]}")/../..")"
+profile="$USER"
 
 function usage() {
   echo "Usage: $prog [opt] <command>"
