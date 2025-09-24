@@ -157,7 +157,7 @@ local servers = function()
       'ruff',
       hover = false,
     },
-    'rnix',
+    'nil_ls',
     {
       'lua_ls',
       settings = {

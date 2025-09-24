@@ -22,7 +22,7 @@ M.formatters_by_ft = {
 
   lua = { 'stylua' },
 
-  nix = { 'nixfmt' },
+  nix = { 'alejandra' },
 
   -- python = { 'isort', 'black' },
 

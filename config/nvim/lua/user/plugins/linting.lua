@@ -10,10 +10,11 @@ local linters_by_ft = {
     -- 'cpplint',
   },
   cmake = { 'cmakelint' },
+  nix = { 'nix', 'statix' },
 }
 
 ---@type LazySpec[]
-local spec = {
+return {
   {
     'mfussenegger/nvim-lint',
     ft = vim.tbl_keys(linters_by_ft),
@@ -66,5 +67,3 @@ local spec = {
     end,
   },
 }
-
-return spec
