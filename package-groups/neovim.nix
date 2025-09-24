@@ -18,4 +18,7 @@ with pkgs; [
   nil # language server
   alejandra # black-inspired formatting
   statix # linter
+
+  # Misc
+  just-lsp # lsp server for just files
 ]

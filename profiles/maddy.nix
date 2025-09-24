@@ -17,5 +17,8 @@ in
     # Specifies things to pin in the flake registry and in NIX_PATH.
     pinned = {nixpkgs = toString inputs.nixpkgs;};
 
-    paths = packageGroups.neovim;
+    paths =
+      packageGroups.base
+      ++ packageGroups.shell
+      ++ packageGroups.neovim;
   }
