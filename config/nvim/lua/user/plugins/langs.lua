@@ -233,6 +233,9 @@ return {
           on_attach = function(client, bufnr) require('user.util.lsp').on_attach(client, bufnr) end,
           settings = {
             ['rust-analyzer'] = {
+              diagnostics = {
+                disabled = { 'inactive-code' },
+              },
               imports = {
                 granularity = {
                   group = 'module',
