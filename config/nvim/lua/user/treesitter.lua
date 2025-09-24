@@ -47,6 +47,7 @@ require('nvim-treesitter.configs').setup {
     'make',
     'markdown',
     'markdown_inline',
+    'nix',
     'python',
     'query',
     'regex',
