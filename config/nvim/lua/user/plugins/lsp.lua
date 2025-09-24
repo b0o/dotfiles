@@ -137,6 +137,7 @@ local servers = function()
         end
       ),
     },
+    'just',
     {
       'ocamllsp',
       root_markers = {
