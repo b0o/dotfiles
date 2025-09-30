@@ -15,13 +15,9 @@ M.formatters = {}
 ---@type table<string, conform.FiletypeFormatterInternal|fun(bufnr: integer):conform.FiletypeFormatterInternal>
 M.formatters_by_ft = {
   cmake = { 'gersemi' },
-
   glsl = { 'clang_format' },
-
   go = { 'gofmt', 'goimports' },
-
   lua = { 'stylua' },
-
   nix = { 'alejandra' },
 
   -- python = { 'isort', 'black' },
