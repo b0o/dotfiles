@@ -50,6 +50,36 @@ $env.config.hooks.pre_prompt = (
   })
 )
 
+# SSH Agent configuration
+$env.SSH_AGENT_PID = ($env.SSH_AGENT_PID? | default "")
+
+if ($env.SSH_AUTH_SOCK? | is-empty) or (not ($env.SSH_AUTH_SOCK? | path exists)) {
+  try {
+    $env.SSH_AUTH_SOCK = (^gpgconf --list-dirs agent-ssh-socket | str trim)
+  } catch {
+    print -e "Failed getting SSH auth socket path from gpgconf"
+  }
+}
+
+# GPG TTY configuration
+$env.GPG_TTY = (^tty | str trim)
+
+$env.FZF_DEFAULT_COMMAND = 'fd --type f --hidden --exclude=.git'
+
+$env.FZF_DEFAULT_OPTS = ([
+    "--preview='bat --color=always {} 2>/dev/null || eza -algF --git --group-directories-first -TL1 --color=always {}'"
+    "--bind=ctrl-p:up"
+    "--bind=ctrl-n:down"
+    "--bind=alt-p:up"
+    "--bind=alt-n:down"
+    "--bind=btab:up"
+    "--bind=tab:down"
+    "--bind=ctrl-j:preview-down"
+    "--bind=ctrl-k:preview-up"
+    "--bind=alt-j:preview-half-page-down"
+    "--bind=alt-k:preview-half-page-up"
+] | str join ' ')
+
 use hooks.nu
 
 hooks use {
