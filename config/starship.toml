@@ -1,0 +1,89 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+
+add_newline = false
+
+format="""
+${username}${hostname} [❤](bold purple) ${directory}${custom.git_dirty}
+"""
+right_format="""
+${cmd_duration}${status}${nix_shell}${python}${rust}${nodejs}${git_metrics}${git_branch}${git_commit}${git_status}${time}
+"""
+
+[username]
+format = '[$user]($style)'
+style_user = 'bold green'
+detect_env_vars = ['SSH_CONNECTION']
+
+[hostname]
+ssh_only = true
+format = '[@$hostname]($style)'
+style = 'bold green'
+
+[directory]
+truncation_length = 3
+style = "cyan"
+truncate_to_repo = false
+
+[git_metrics]
+disabled = false
+format = '([+$added]($added_style) )([-$deleted]($deleted_style) )'
+added_style = 'green'
+deleted_style = 'red'
+ignore_submodules = true
+
+[git_branch]
+format = '[$branch(:$remote_branch)]($style) '
+style = 'purple'
+
+[git_status]
+format = '([$all_status$ahead_behind]($style) )'
+style = 'purple'
+
+[package]
+disabled = false
+
+[status]
+disabled = false
+symbol = "↪ "
+style = "bold yellow"
+
+[time]
+disabled = false
+format = '[$time]($style) '
+style = '242'
+
+[cmd_duration]
+disabled = false
+min_time = 2000
+format = '[$duration]($style) '
+style = 'bold yellow'
+
+[python]
+format = '[$symbol$virtualenv@$version]($style) '
+symbol = ' '
+version_format = '$raw'
+
+[rust]
+format = '[$symbol$version]($style) '
+version_format = '$raw'
+symbol = ' '
+style = 'bold #dea584'
+
+[nodejs]
+format = '[$symbol$version]($style) '
+version_format = '$raw'
+
+[nix_shell]
+format = '[$symbol$state( \($name\))]($style) '
+symbol = ' '
+
+[custom.git_dirty]
+# command = '/usr/bin/git diff --no-ext-diff --quiet HEAD && echo "" || echo "ϟ"'
+command = 'if (/usr/bin/git diff --no-ext-diff --quiet HEAD | complete).exit_code == 0 { echo "" } else { echo "ϟ" }'
+# This version is 2x slower, but it also detects untracked files:
+# command = '/usr/bin/git status --porcelain --ignore-submodules 2>/dev/null | grep -q "." && echo "ϟ" || echo ""'
+shell = 'nu'
+format = '[$output]($style) '
+style = "blue"
+when = true
+require_repo = true
