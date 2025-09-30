@@ -159,6 +159,7 @@ local servers = function()
       hover = false,
     },
     'nil_ls',
+    'nushell',
     {
       'lua_ls',
       settings = {
