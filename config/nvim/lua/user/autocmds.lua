@@ -25,11 +25,9 @@ autocmd('WinEnter', {
   pattern = { '*.c', '*.c++', '*.cc', '*.cpp', '*.cxx', '*.h', '*.h++', '*.hh', '*.hpp', '*.hxx' },
   callback = function(event)
     local curwin = vim.api.nvim_get_current_win()
-    local other = require 'other-nvim'
     local bufname = vim.api.nvim_buf_get_name(event.buf)
-    local others = other.findOther(bufname)
+    local others = require 'other-nvim'.findOther(bufname)
     for _, other in ipairs(others) do
-      ---@cast other { exists: boolean, filename: string }
       if other.exists then
         local bufnr = vim.fn.bufnr(other.filename)
         if bufnr ~= -1 then
@@ -101,6 +99,7 @@ autocmd('FocusGained', {
   group = group,
   callback = function() vim.g.nvim_focused = true end,
 })
+
 autocmd('FocusLost', {
   group = group,
   callback = function() vim.g.nvim_focused = false end,
@@ -113,21 +112,23 @@ autocmd('TextYankPost', {
     -- OSC 52 support
     local ev = vim.v.event
     if
-      -- unnamed register
-      ev.regname ~= ''
-      or ev.operator ~= 'y'
-      or not ev.regcontents
+    -- unnamed register
+        ev.regname ~= ''
+        or ev.operator ~= 'y'
+        or not ev.regcontents
     then
       return
     end
     local lines = ev.regcontents --[[@as string[] ]]
-    require('user.fn').osc52_copy(ev.regname, lines)
+    require('user.fn').osc52_smart_copy(ev.regname, lines)
   end,
 })
+
 autocmd('TermOpen', {
   group = group,
   command = [[setlocal scrolloff=0]],
 })
+
 autocmd('WinEnter', {
   group = group,
   pattern = {
@@ -176,8 +177,8 @@ autocmd('BufEnter', {
   nested = true,
   callback = function()
     if
-      #vim.api.nvim_tabpage_list_wins(0) == 1
-      and vim.fn.bufname() == 'NvimTree_' .. vim.api.nvim_get_current_tabpage()
+        #vim.api.nvim_tabpage_list_wins(0) == 1
+        and vim.fn.bufname() == 'NvimTree_' .. vim.api.nvim_get_current_tabpage()
     then
       vim.api.nvim_win_close(0, false)
     end

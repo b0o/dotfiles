@@ -229,7 +229,7 @@ M.jumplist_jump_buf = function(dir)
     dist = dist - 1
   end
   local keys =
-    vim.api.nvim_replace_termcodes(('%d<C-%s>'):format(math.abs(dist), dir > 0 and 'i' or 'o'), true, false, true)
+      vim.api.nvim_replace_termcodes(('%d<C-%s>'):format(math.abs(dist), dir > 0 and 'i' or 'o'), true, false, true)
   vim.api.nvim_feedkeys(keys, 'n', false)
 end
 
@@ -371,13 +371,13 @@ M.is_normal_win = function(winid)
     return false
   end
   if
-    vim.tbl_contains({
-      'NvimTree',
-      'Trouble',
-      'aerial',
-      'Avante',
-      'AvanteInput',
-    }, vim.bo[bufid].filetype)
+      vim.tbl_contains({
+        'NvimTree',
+        'Trouble',
+        'aerial',
+        'Avante',
+        'AvanteInput',
+      }, vim.bo[bufid].filetype)
   then
     return false
   end
@@ -587,10 +587,15 @@ end
 
 ---@param reg string
 ---@param lines (string|string[])[]
-M.osc52_copy = function(reg, lines)
-  lines = vim.iter(lines):flatten():totable()
+---@param force boolean  @if true, always send osc52 sequence even if a clipboard tool is available
+M.osc52_smart_copy = function(reg, lines, force)
+  lines = vim.iter({ lines, '' }):flatten(math.huge):totable()
   if reg and reg ~= '' then
-    vim.fn.setreg(reg, table.concat(lines, '\n'))
+    vim.fn.setreg(reg, vim.iter(lines):join('\n'))
+  end
+  -- Only send the OSC 52 if connected via SSH
+  if not force and vim.env.SSH_CONNECTION == nil then
+    return
   end
   require('vim.ui.clipboard.osc52').copy(reg)(lines)
 end

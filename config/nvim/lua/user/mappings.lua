@@ -209,7 +209,7 @@ map('n', '<leader>Y', function()
     return
   end
   local lines = file.lines
-  require('user.fn').osc52_copy('+', lines)
+  require('user.fn').osc52_smart_copy('+', lines)
   vim.notify('Copied ' .. #lines .. ' lines to clipboard', vim.log.levels.INFO)
 end, 'Yank file contents')
 
@@ -222,7 +222,7 @@ map('n', '<leader>ym', function()
   local lines = file.lines
   local filetype = file.filetype
   local relative_path = file.relative_path
-  require('user.fn').osc52_copy('+', {
+  require('user.fn').osc52_smart_copy('+', {
     '# ' .. relative_path,
     '```' .. (filetype or ''),
     lines,
@@ -233,13 +233,13 @@ end, 'Yank file as markdown code block')
 
 map('n', '<leader>yp', function()
   local file = vim.fn.expand '%:p'
-  require('user.fn').osc52_copy('+', { file })
+  require('user.fn').osc52_smart_copy('+', { file })
   vim.notify('Copied ' .. file, vim.log.levels.INFO)
 end, 'Yank file path')
 
 map('n', '<leader>yr', function()
   local file = vim.fn.expand '%:.'
-  require('user.fn').osc52_copy('+', { file })
+  require('user.fn').osc52_smart_copy('+', { file })
   vim.notify('Copied ' .. file, vim.log.levels.INFO)
 end, 'Yank relative file path')
 
@@ -258,13 +258,13 @@ map('n', '<localleader>ac', function() require('user.util.aider').clear_cmd() en
 map('n', '<leader>yP', function()
   local line = vim.fn.line '.'
   local file = vim.fn.expand '%'
-  require('user.fn').osc52_copy('+', { file .. ':' .. line })
+  require('user.fn').osc52_smart_copy('+', { file .. ':' .. line })
   vim.notify('Copied ' .. file .. ':' .. line, vim.log.levels.INFO)
 end, 'Yank file path with line number')
 
 map('n', '<leader>y:', function()
   local cmd = vim.fn.getreg '@:'
-  require('user.fn').osc52_copy('+', { cmd })
+  require('user.fn').osc52_smart_copy('+', { cmd })
   vim.notify('Copied ' .. cmd, vim.log.levels.INFO)
 end, 'Yank last command')
 
