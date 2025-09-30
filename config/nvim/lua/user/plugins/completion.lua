@@ -50,7 +50,7 @@ return {
     opts = {
       keymap = {
         preset = 'default',
-        [xk [[<C-S-a>]]] = { 'show', 'hide' },
+        [ xk [[<C-S-a>]] ] = { 'show', 'hide' },
         ['<CR>'] = { 'accept', 'fallback' },
         ['<Tab>'] = { 'snippet_forward', 'fallback' },
         ['<S-Tab>'] = { 'snippet_backward', 'fallback' },
@@ -58,8 +58,8 @@ return {
         ['<Down>'] = { 'select_next', 'fallback' },
         ['<C-p>'] = { 'select_prev', 'show' },
         ['<C-n>'] = { 'select_next', 'show' },
-        [xk [[<C-S-n>]]] = { 'select_next', 'show' },
-        [xk [[<C-S-p>]]] = { 'select_prev', 'show' },
+        [ xk [[<C-S-n>]] ] = { 'select_next', 'show' },
+        [ xk [[<C-S-p>]] ] = { 'select_prev', 'show' },
         ['<C-k>'] = { 'scroll_documentation_up', 'fallback' },
         ['<C-j>'] = { 'scroll_documentation_down', 'fallback' },
       },
@@ -71,7 +71,7 @@ return {
               return true
             end,
           },
-          [xk [[<C-Cr>]]] = {
+          [ xk [[<C-Cr>]] ] = {
             function(cmp)
               return cmp.select_and_accept {
                 callback = function()
@@ -81,7 +81,7 @@ return {
             end,
             'fallback',
           },
-          [xk [[<C-S-a>]]] = { 'show', 'hide' },
+          [ xk [[<C-S-a>]] ] = { 'show', 'hide' },
           ['<Tab>'] = {
             'show',
             function()
@@ -181,33 +181,12 @@ return {
           'snippets',
           'buffer',
           'lazydev',
-          'avante_commands',
-          'avante_mentions',
-          'avante_files',
         },
         providers = {
           lazydev = {
             name = 'LazyDev',
             module = 'lazydev.integrations.blink',
             fallbacks = { 'lsp' },
-          },
-          avante_commands = {
-            name = 'avante_commands',
-            module = 'blink.compat.source',
-            score_offset = 90,
-            opts = {},
-          },
-          avante_files = {
-            name = 'avante_commands',
-            module = 'blink.compat.source',
-            score_offset = 100,
-            opts = {},
-          },
-          avante_mentions = {
-            name = 'avante_mentions',
-            module = 'blink.compat.source',
-            score_offset = 1000,
-            opts = {},
           },
         },
       },

@@ -334,7 +334,7 @@ return {
       require('render-markdown').setup {
         debounce = 50,
         render_modes = { 'n', 'i', 'v', 'V', 'c', 't' },
-        file_types = { 'markdown', 'Avante', 'mdx' },
+        file_types = { 'markdown', 'mdx' },
         code = { language_name = false },
         anti_conceal = { enabled = false },
         win_options = {
@@ -363,7 +363,7 @@ return {
       local maputil = require 'user.util.map'
       local ft = maputil.ft
 
-      ft({ 'markdown', 'Avante', 'mdx' }, function(bufmap)
+      ft({ 'markdown', 'mdx' }, function(bufmap)
         vim.o.wrap = false
 
         bufmap('n', '<localleader>C', function()
@@ -388,7 +388,7 @@ return {
         bufmap('n', '<localleader>M', '<cmd>RenderMarkdown toggle<Cr>', 'Markdown: Toggle')
       end)
     end,
-    ft = { 'markdown', 'Avante', 'mdx' },
+    ft = { 'markdown', 'mdx' },
   },
   {
     '3rd/image.nvim',
@@ -439,7 +439,6 @@ return {
   },
   {
     '3rd/diagram.nvim',
-    dev = true,
     dependencies = {
       '3rd/image.nvim',
     },

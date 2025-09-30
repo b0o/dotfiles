@@ -375,8 +375,6 @@ M.is_normal_win = function(winid)
         'NvimTree',
         'Trouble',
         'aerial',
-        'Avante',
-        'AvanteInput',
       }, vim.bo[bufid].filetype)
   then
     return false
