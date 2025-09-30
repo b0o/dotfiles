@@ -2,10 +2,10 @@
 
 add_newline = false
 
-format="""
+format = """
 ${username}${hostname} [❤](bold purple) ${directory}${custom.git_dirty}
 """
-right_format="""
+right_format = """
 ${cmd_duration}${status}${nix_shell}${python}${rust}${nodejs}${git_metrics}${git_branch}${git_commit}${git_status}${time}
 """
 
