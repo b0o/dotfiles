@@ -4,9 +4,6 @@ alias se = sudo -E
 alias sv = sudoedit
 alias sev = sudoedit
 
-# nix
-alias fp = flakey-profile
-
 # nvim
 alias v = nvim
 alias vs = nvim +SessionLoad

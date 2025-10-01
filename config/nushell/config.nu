@@ -5,7 +5,7 @@ $env.XDG_CONFIG_HOME = $"($nu.home-path)/.config"
 $env.XDG_DATA_HOME = $"($nu.home-path)/.local/share"
 $env.XDG_CACHE_HOME = $"($nu.home-path)/.cache"
 
-let dotfiles = $"($env.XDG_CONFIG_HOME)/dotfiles"
+$env.DOTFILES_HOME = $"($env.XDG_CONFIG_HOME)/dotfiles"
 
 $env.PATH = (
   $env.PATH
@@ -13,7 +13,6 @@ $env.PATH = (
   | append $"($nu.home-path)/.nix-profile/bin"
   | append $"($nu.home-path)/.local/bin"
   | append $"($nu.home-path)/bin"
-  | append $"($dotfiles)/scripts/nix"
 )
 
 $env.config.show_banner = false
