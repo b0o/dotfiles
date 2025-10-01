@@ -16,17 +16,7 @@ def hook-init [name: string, hook: record] {
     }
   }
   (try {
-    let hook_env = $hook | get -o env | default {}
-    mut out = with-env ($hook_env) { ^$hook.cmd }
-    if ($hook_env | is-not-empty) {
-      mut set_env = []
-      for k in ($hook.env | columns) {
-        let v = $hook.env | get $k
-        $set_env = ($set_env | append $"$env.($k) = \"($v)\"")
-      }
-      $out = ($set_env | append $out | str join "\n")
-    }
-    echo $out
+    with-env ($hook | get -o env | default {}) { ^$hook.cmd }
   } catch { |e|
     $"error make -u {\n  msg: \"hooks: ($name): failed to initialize: ($e.msg)\\nFix the issue and then run 'hooks clean ($name)' and restart Nushell, or disable the hook.\"\n}"
   }) | save -f (hook-path $name)
@@ -76,7 +66,7 @@ def hook-enabled [name: string, hook: record] {
 #     env?: record           # Environment variables to set before running the command
 #   }
 # }
-export def use [hooks: record] {
+export def --env use [hooks: record] {
   mkdir $hooks_dir
 
   mut manifest = get-manifest
@@ -105,7 +95,7 @@ export def use [hooks: record] {
     let hash = hook-hash $hook
     let path = hook-path $name
     let current_hash = $manifest | get -o $name | default ""
-    let hook_env = $hook | get -o env | default {}
+    $hook | get -o env | default {} | load-env
 
     if ($current_hash != $hash) or (not ($path | path exists)) {
       hook-init $name $hook
