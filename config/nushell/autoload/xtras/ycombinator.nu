@@ -124,6 +124,19 @@ export def batches [] {
 }
 
 def "complete companies batch" [context: string] {
+  let batch_value = ($context | parse --regex '(?:--batch|-b)[\s=]+(.*)' | get -o 0.capture0 | default "")
+  let all_valid_shorts = (batches | where batch != "Unspecified" | get batch | each {|b| batch-short $b})
+
+  # Only include valid batch codes in selected list
+  let selected = (
+    $batch_value
+    | split row ","
+    | str trim
+    | where {|b| not ($b | is-empty) and ($b in $all_valid_shorts)}
+  )
+
+  let prefix = if ($selected | is-empty) { "" } else { ($selected | str join ",") + "," }
+
   {
     options: {
       sort: false
@@ -134,26 +147,29 @@ def "complete companies batch" [context: string] {
       batches
       | where batch != "Unspecified"
       | get batch
-      | each { |b| {
-          value: (batch-short $b)
-          description: $b
-          style: (match ($b | split row " " | first) {
-            "Fall" => "red"
-            "Summer" => "green"
-            "Winter" => "blue"
-            "Spring" => "magenta"
-          })
+      | each {|b|
+          let short = (batch-short $b)
+          if $short not-in $selected {
+            {
+              value: $"($prefix)($short)"
+              description: $b
+              style: (match ($b | split row " " | first) {
+                "Fall" => "red",
+                "Summer" => "green",
+                "Winter" => "blue",
+                "Spring" => "magenta"
+              })
+            }
+          }
         }
-      }
-      | flatten
     )
- }
+  }
 }
 
 # Get company information from Y Combinator's database
 export def companies [
     --query (-q): string = ""             # Search query
-    --batch (-b): string@"complete companies batch" # Filter by batch(es), e.g., "F25,S25"] or "Fall 2025"
+    --batch (-b): string@"complete companies batch" # Filter by batch(es), comma-separated e.g., "F25,S25,W24"
     --industry (-i): list<string> = []    # Filter by industry
     --subindustry (-s): list<string> = [] # Filter by subindustry
     --region (-r): list<string> = []      # Filter by region
@@ -164,18 +180,14 @@ export def companies [
     --page (-p): int = 0                  # Page number (0-indexed)
     --per-page: int = 1000                # Results per page
 ] {
-    let batch = (if ($batch | describe) == "list<string>" { $batch } else { [$batch] })
-    # Expand batch codes if needed
-    let expanded_batches = (
-        $batch | each {|b| expand-batch $b}
-    )
-
     # Build facet filters as nested arrays
     let facet_filters = (
         [
-            # Batch filter
-            (if ($expanded_batches | is-empty) { null } else {
-                $expanded_batches | each {|b| $"batch:($b)"}
+            # Batch filter - handle comma-separated batches
+            (if ($batch | is-empty) { null } else {
+                $batch
+                | split row ","
+                | each {|b| $"batch:(expand-batch ($b | str trim))"}
             })
             # Industry filter
             (if ($industry | is-empty) { null } else {
