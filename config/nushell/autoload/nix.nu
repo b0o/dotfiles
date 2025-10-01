@@ -47,18 +47,20 @@ export module fp {
   export def develop [
     --profile (-p): string = ""   # Specify the profile name
     --dir (-d): string = ""       # Specify the base directory
+    ...args: string               # Specify additional arguments to pass to nix
   ] {
     init --profile $profile --dir $dir
-    nix develop
+    nix develop ...$args
   }
 
   # Enter a shell with the flakey profile's environment
   export def shell [
     --profile (-p): string = ""   # Specify the profile name
     --dir (-d): string = ""       # Specify the base directory
+    ...args: string               # Specify additional arguments to pass to nix
   ] {
     init --profile $profile --dir $dir
-    nix shell
+    nix shell ...$args
   }
 
   # Update the flake.lock file
