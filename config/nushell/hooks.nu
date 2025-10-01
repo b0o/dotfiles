@@ -16,7 +16,13 @@ def hook-init [name: string, hook: record] {
     }
   }
   (try {
-    with-env ($hook | get -o env | default {}) { ^$hook.cmd }
+    let res = ^$hook.cmd | complete
+    if ($res | get -o exit_code) != 0 {
+      error make -u {
+        msg: $"hooks: ($name): command failed to initialize: ($res.stderr)"
+      }
+    }
+    $res.stdout
   } catch { |e|
     $"error make -u {\n  msg: \"hooks: ($name): failed to initialize: ($e.msg)\\nFix the issue and then run 'hooks clean ($name)' and restart Nushell, or disable the hook.\"\n}"
   }) | save -f (hook-path $name)
