@@ -33,6 +33,15 @@ export def l [
   }
 }
 
+# mkdir and cd
+export def --env mcd [
+  ...args: string
+] {
+  let dir = ($args | path join)
+  mkdir $dir
+  cd $dir
+}
+
 alias l1 = l -L 1
 alias l2 = l -L 2
 alias l3 = l -L 3
@@ -48,3 +57,4 @@ alias tf = tail -f
 alias cat = bat
 alias duh = du -h
 alias dfh = df -h
+alias mcdt = mcd /tmp
