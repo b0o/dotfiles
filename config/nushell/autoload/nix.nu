@@ -77,13 +77,9 @@ export module fp {
   export alias b = build
   export alias sw = switch
   export alias rb = rollback
-  export alias r = rollback
   export alias dev = develop
-  export alias d = develop
   export alias sh = shell
-  export alias upd = update
   export alias up = update
-  export alias u = update
 }
 
 use fp
