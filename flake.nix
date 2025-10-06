@@ -24,7 +24,7 @@
     ];
   in rec {
     overlays = {
-      default = import ./overlays {inherit inputs;};
+      default = import ./nix/overlays {inherit inputs;};
       neovim = inputs.neovim-nightly-overlay.overlays.default;
     };
 
@@ -48,8 +48,18 @@
     packages = forAllSystems (system: let
       pkgs = legacyPackages."${system}";
     in {
-      profile.maddy =
-        pkgs.callPackage ./profiles/maddy.nix {inherit pkgs inputs;};
+      profile.dev =
+        pkgs.callPackage ./nix/profiles/dev.nix {inherit pkgs inputs;};
+      profile.minimal =
+        pkgs.callPackage ./nix/profiles/minimal.nix {inherit pkgs inputs;};
     });
+
+    nixosConfigurations = {
+      nixos-desktop = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = {inherit inputs;};
+        modules = [./nix/hosts/boonix];
+      };
+    };
   };
 }
