@@ -163,6 +163,44 @@ export def f, [query?: string] {
   $sel.stdout | str trim | split row "\t" | first
 }
 
+# Remove bookmarks that point to non-existent files
+export def prune, [
+  --force (-f)  # Skip confirmation prompt
+] {
+  let bookmarks = (
+    ls $comark_dir
+    | where type == symlink
+    | each {|row|
+      let alias = ($row.name | path basename)
+      let target = (resolve-bookmark $alias)
+      if not ($target | path exists) {
+        {name: $alias, target: $target}
+      }
+    }
+    | compact
+    | sort-by name
+  )
+
+  if ($bookmarks | is-empty) {
+    print -e "No bookmarks to prune"
+    return
+  }
+
+  for $bookmark in $bookmarks {
+    let alias = ($bookmark.name | path basename)
+    let target = ($bookmark.target | path expand)
+    if not ($target | path exists) {
+      print -e $"($alias) -> ($target) \(does not exist)"
+      let reply = (input $"Remove bookmark? \(Y/n) " | str trim | str downcase)
+      if $reply not-in ["y", "Y", ""] {
+        continue
+      }
+      r, $alias
+      print -e ""
+    }
+  }
+}
+
 # Helper to insert text at cursor
 def insert-at-cursor [text: string] {
   let before = (commandline | str substring 0..<(commandline get-cursor))
