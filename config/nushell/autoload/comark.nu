@@ -39,7 +39,7 @@ export def r, [alias: string] {
     error make -u {msg: $"bookmark does not exist: ($alias)"}
   }
 
-  let dest = ($bookmark_path | path expand)
+  let dest = (resolve-bookmark $alias)
   rm $bookmark_path
   print $"removed bookmark ($alias) -> ($dest)"
 }
