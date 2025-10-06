@@ -1,63 +1,31 @@
-def gig [
-  --write (-w)     # write to .gitignore
-  ...args: string  # gitignore templates to fetch
-] {
-  # Check if in git repo when writing
-  if $write {
-    let git_check = (do --ignore-errors { ^git status } | complete)
-    if $git_check.exit_code != 0 {
-      error make {msg: "fatal: not a git repository"}
-    }
-  }
+alias git = hub # important: set this before the `use` line so that we always use hub
 
-  # Build query string
-  let q = ($args | str join ",")
+export use ./git *
 
-  # Fetch gitignore rules
-  let result = (
-    ^curl -f -L -s $"https://www.toptal.com/developers/gitignore/api/($q)"
-    | complete
-  )
+# see ~/.config/git/alias.config for git alias definitions
+alias g = git
+alias gl = git ls
+alias gla = git la
+alias gll = git ll
+alias glla = git lla
+alias glg = git lg
 
-  if $result.exit_code != 0 {
-    print -e $"Not found: ($q)"
-    return
-  }
+alias gst = git st
+alias gd = git diff
 
-  let content = $result.stdout
+alias ga = git add
+alias gaa = git add --all
+alias gai = git add --interactive
 
-  if $write {
-    # Append to .gitignore
-    $content | save --append .gitignore
-    print -e $"Updated .gitignore with rules for ($args | str join ' ')"
-  } else {
-    # Print to stdout
-    print $content
-  }
-}
+alias gpa = git pa
+alias gpao = git pao
 
-# see .gitconfig for git alias definitions
-alias g = hub
+alias gc = git commit --verbose
+alias gca = git commit --all --verbose
+alias gcA = git commit --amend --verbose
 
-alias gl = hub ls
-alias gla = hub la
-alias gll = hub ll
-alias glla = hub lla
-alias glg = hub lg
+alias gr = git remote --verbose
 
-alias ga = hub add
-alias gaa = hub add --all
-alias gai = hub add --interactive
-
-alias gpa = hub pa
-alias gpao = hub pao
-
-alias gc = hub commit --verbose
-alias gca = hub commit --all --verbose
-alias gcA = hub commit --amend --verbose
-
-alias gr = hub remote --verbose
-
-alias gtv = hub tag-version
+alias gtv = git tag-version
 
 alias gigg = gig -w
