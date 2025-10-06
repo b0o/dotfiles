@@ -73,20 +73,20 @@ local spec = {
         local update_qflist = function(entries)
           local current_qflist = vim.fn.getqflist()
           local filtered = vim
-            .iter(entries)
-            :filter(function(entry)
-              return not vim
-                .iter(current_qflist)
-                :any(function(qfl) return qfl.bufnr == vim.fn.bufnr(entry.filename) end)
-            end)
-            :totable()
-          if #entries > 0 and #filtered == 0 then
-            local replace = vim
-              .iter(current_qflist)
-              :filter(function(qfl)
-                return not vim.iter(entries):any(function(entry) return qfl.bufnr == vim.fn.bufnr(entry.filename) end)
+              .iter(entries)
+              :filter(function(entry)
+                return not vim
+                    .iter(current_qflist)
+                    :any(function(qfl) return qfl.bufnr == vim.fn.bufnr(entry.filename) end)
               end)
               :totable()
+          if #entries > 0 and #filtered == 0 then
+            local replace = vim
+                .iter(current_qflist)
+                :filter(function(qfl)
+                  return not vim.iter(entries):any(function(entry) return qfl.bufnr == vim.fn.bufnr(entry.filename) end)
+                end)
+                :totable()
             vim.fn.setqflist(replace, 'r')
           else
             vim.fn.setqflist(filtered, 'a')
@@ -107,10 +107,10 @@ local spec = {
             local ok, nodes = pcall(get_visual_nodes)
             if ok and nodes then
               local entries = vim
-                .iter(nodes)
-                :filter(function(node) return node.name ~= '..' and node.type ~= 'directory' end)
-                :map(function(node) return { filename = node.absolute_path, lnum = 1, col = 1 } end)
-                :totable()
+                  .iter(nodes)
+                  :filter(function(node) return node.name ~= '..' and node.type ~= 'directory' end)
+                  :map(function(node) return { filename = node.absolute_path, lnum = 1, col = 1 } end)
+                  :totable()
               update_qflist(entries)
             end
           end)
@@ -224,6 +224,7 @@ local spec = {
           exclude = {
             '[.]env',
             '[.]env[.].*',
+            '[.]gitignore',
           },
         },
         renderer = {
