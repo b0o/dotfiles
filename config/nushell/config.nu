@@ -92,7 +92,7 @@ hooks use {
     depends: carapace
     cmd: [carapace _carapace nushell]
     env: {
-      CARAPACE_BRIDGES: 'zsh,bash'
+      CARAPACE_BRIDGES: 'zsh,fish,bash'
     }
   },
   starship: {
