@@ -12,12 +12,17 @@ def comark-init [] {
 export def m, [
   alias: string
   dest?: string
+  --force (-f)  # Overwrite existing bookmark
 ] {
   comark-init
   let bookmark_path = ($comark_dir | path join $alias)
 
   if ($bookmark_path | path exists) {
-    error make -u {msg: $"bookmark exists: ($alias)"}
+    if $force {
+      r, $alias
+    } else {
+      error make -u {msg: $"bookmark exists: ($alias)"}
+    }
   }
 
   let target = if ($dest | is-empty) { $env.PWD } else { $dest | path expand }
