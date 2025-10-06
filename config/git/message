@@ -1,0 +1,25 @@
+
+
+
+# Types: fix, feat, docs, style, refactor, test, chore, deps, perf, ci, build, revert, lint
+# {{{
+#
+# Examples:
+#
+# fix: check for null before calling method
+# feat: add foobar method to Baz class
+# docs: add example to README
+# style: remove trailing whitespace
+# refactor(foo): extract bar method
+# test(Baz): add unit tests for .qux()
+# chore: reword landing page copy
+#
+# Instructions:
+#
+# After this comment, the rest of this file contains a summary of the changes to be committed.
+# The first line of this file should be the subject of the commit describing the changes.
+# The next line should be blank, optionally followed by a more detailed description.
+# Refer to the rest of this file for the exact changes being made.
+#
+# }}}
+

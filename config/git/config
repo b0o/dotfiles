@@ -1,0 +1,56 @@
+[diff]
+  tool = nvim -d
+  algorithm = histogram
+
+[merge]
+  tool = vimdiff
+  conflictstyle = zdiff3
+
+[rebase]
+  autosquash = true
+
+[core]
+  pager = delta
+
+[interactive]
+  diffFilter = delta
+
+[commit]
+  template = ~/.config/git/message
+  gpgsign = true
+  verbose = true
+
+[rerere]
+  enabled = true
+  autoUpdate = true
+
+[pull]
+	ff = only
+
+[init]
+  defaultBranch = main
+
+[credential]
+  helper = cache
+
+[hub]
+  protocol = https
+
+[filter "lfs"]
+  clean = git-lfs clean -- %f
+  smudge = git-lfs smudge -- %f
+  process = git-lfs filter-process
+  required = true
+
+[status]
+  showUntrackedFiles = all
+
+[includeIf "gitdir:$XDG_CACHE_HOME/paru/**"]
+  path = $XDG_CACHE_HOME/paru/.gitconfig
+
+[include]
+  path = ./local.config
+  path = ./alias.config
+  path = ./delta.config
+
+# vim: ft=gitconfig commentstring=#%s
