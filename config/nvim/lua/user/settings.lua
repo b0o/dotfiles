@@ -21,11 +21,11 @@ vim.o.ignorecase = true
 vim.o.smartcase = true
 
 vim.o.ignorecase = true -- ignore case when searching
-vim.o.smartcase = true  -- don't ignore case if user types an uppercase letter
-vim.o.magic = true      -- change set of special search characters
+vim.o.smartcase = true -- don't ignore case if user types an uppercase letter
+vim.o.magic = true -- change set of special search characters
 
-vim.o.hlsearch = true   -- keep matches highlighted after searching
-vim.o.incsearch = true  -- show matches while typing
+vim.o.hlsearch = true -- keep matches highlighted after searching
+vim.o.incsearch = true -- show matches while typing
 vim.opt.inccommand = 'split'
 
 vim.opt.complete = ''
@@ -48,15 +48,15 @@ vim.o.splitbelow = true -- default horizontal splits to open on bottom
 
 vim.o.eadirection = 'hor'
 
-vim.o.wildchar = 9    -- equivalent to 'set wildchar=<Tab>'
+vim.o.wildchar = 9 -- equivalent to 'set wildchar=<Tab>'
 
 vim.o.modeline = true -- always parse modelines when loading files
-vim.o.exrc = false    -- use jedrzejboczar/exrc.nvim instead
+vim.o.exrc = false -- use jedrzejboczar/exrc.nvim instead
 
 vim.g.mapleader = ' '
 vim.g.maplocalleader = ','
 
-vim.o.splitkeep = 'screen'   -- keep the text on the same screen line when splitting
+vim.o.splitkeep = 'screen' -- keep the text on the same screen line when splitting
 
 vim.opt.shortmess:append 'I' -- Disable intro message
 
