@@ -21,6 +21,9 @@ export def l [
 
   # Process each target
   for $target in $targets {
+    if not ($target | path exists) {
+      error make -u {msg: $"Target does not exist: ($target)"}
+    }
     let expanded = ($target | path expand)
     match ($expanded | path type) {
       "dir" => {
