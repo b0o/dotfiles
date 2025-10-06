@@ -537,9 +537,10 @@ def complete-gh-pr [
         0: $icon
         1: $"#($number)"
         2: $status
-        3: ($pr.title | str trim | str substring 0..40 | str trim)
+        3: ($pr.title | str trim | str substring 0..40 | str trim) # TODO: More intelligent truncation
         4: $createdAgo
       }
+      # HACK: This is a hacky way to generate a plaintext aligned table (similar to the `column` unix command)
     } | table --collapse -t none | ansi strip | lines | skip 1
   )
   {
