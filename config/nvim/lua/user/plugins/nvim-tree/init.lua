@@ -214,14 +214,17 @@ local spec = {
         },
         filters = {
           custom = {
-            '.git',
+            '\\.bruno',
+            '\\.cache',
+            '\\.git',
+            '\\.turbo',
+            '\\.vscode',
             'node_modules',
-            '.cache',
-            '.vscode',
-            '.turbo',
-            '.bruno',
           },
-          exclude = { '[.]env', '[.]env[.].*' },
+          exclude = {
+            '[.]env',
+            '[.]env[.].*',
+          },
         },
         renderer = {
           indent_markers = { enable = true },
