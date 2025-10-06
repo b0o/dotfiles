@@ -1,3 +1,6 @@
+# shell
+alias cdp = cd -
+
 # system
 alias s = sudo
 alias se = sudo -E
