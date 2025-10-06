@@ -65,4 +65,9 @@ def xccl [count: int = 1] {
   xcc $lines
 }
 
+# Copy a file to clipboard
+def xcf [path: path] {
+  open $path | xc
+}
+
 alias xco = xc -o
