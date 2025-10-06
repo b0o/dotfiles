@@ -1,5 +1,5 @@
 # Print git repo and worktree information
-export def gw-parse [path?: string] {
+def gw-parse [path?: string] {
   let dir = $path | default $env.PWD
 
   let result = (do {
@@ -57,7 +57,7 @@ export def gw-parse [path?: string] {
 }
 
 # Select a git worktree (for scripting)
-export def gw-select [
+def gw-select [
   target?: string              # Target worktree or branch name
   --ignore-cwd (-c)            # Don't ignore current worktree in candidates
   --prefill-cwd (-C)           # Prefill fzf with current worktree
@@ -244,6 +244,43 @@ export def --env gw [
 # Switch to the root of the git repo
 export def --env gwr [] {
   cd -P (gw-parse | get git_root)
+}
+
+# Execute git command in worktree
+export def gwx [
+  ...git_args               # Git command and arguments
+  --current (-c)            # Use current worktree
+  --worktree (-w): string   # Use specified worktree
+] {
+  let w = if $current {
+    # Note: This requires gwc (get worktree current) to be implemented
+    # gwc -p should return the path of the current worktree
+    let result = (gwc -p | complete)
+    if $result.exit_code != 0 {
+      error make {msg: "failed to get current worktree"}
+    }
+    $result.stdout | str trim
+  } else if $worktree != null {
+    let selection = (gw-select $worktree)
+    if $selection == null {
+      error make {msg: "failed to select worktree"}
+    }
+    $selection.path
+  } else {
+    # Interactive selection
+    let selection = (gw-select)
+    if $selection == null {
+      error make {msg: "no worktree selected"}
+    }
+    $selection.path
+  }
+
+  if ($w | is-empty) {
+    error make {msg: "no worktree path determined"}
+  }
+
+  # Execute git command in worktree directory
+  git -C $w ...$git_args
 }
 
 # Add a new worktree
@@ -445,7 +482,7 @@ export def --env gwcc [
   ln -sv $target_relative $current_link
 }
 
-export def complete-gh-pr [
+def complete-gh-pr [
   # context: string = ""
 ] {
   # let context = ($context | split words | skip 1 | str join " ")
