@@ -1,4 +1,6 @@
 # shell
+alias core-cd = cd
+alias cd = core-cd --physical
 alias cdp = cd -
 
 # system
