@@ -1,10 +1,10 @@
-const COMARK_DIR = ($nu.home-path | path join ",")
+let comark_dir = $env | get -o COMARK_DIR | default ($nu.home-path | path join ",")
 
 # Initialize comark directory
 def comark-init [] {
-  if not ($COMARK_DIR | path exists) {
-    print $"Creating comark directory: ($COMARK_DIR)"
-    mkdir $COMARK_DIR
+  if not ($comark_dir | path exists) {
+    print $"Creating comark directory: ($comark_dir)"
+    mkdir $comark_dir
   }
 }
 
@@ -14,10 +14,10 @@ export def m, [
   dest?: string
 ] {
   comark-init
-  let bookmark_path = ($COMARK_DIR | path join $alias)
+  let bookmark_path = ($comark_dir | path join $alias)
 
   if ($bookmark_path | path exists) {
-    error make {msg: $"bookmark exists: ($alias)"}
+    error make -u {msg: $"bookmark exists: ($alias)"}
   }
 
   let target = if ($dest | is-empty) { $env.PWD } else { $dest | path expand }
@@ -28,10 +28,10 @@ export def m, [
 # Remove a bookmark
 export def r, [alias: string] {
   comark-init
-  let bookmark_path = ($COMARK_DIR | path join $alias)
+  let bookmark_path = ($comark_dir | path join $alias)
 
-  if not ($bookmark_path | path exists) {
-    error make {msg: $"bookmark does not exist: ($alias)"}
+  if not ($bookmark_path | path exists --no-symlink) {
+    error make -u {msg: $"bookmark does not exist: ($alias)"}
   }
 
   let dest = ($bookmark_path | path expand)
@@ -42,32 +42,42 @@ export def r, [alias: string] {
 # Rename a bookmark
 export def rename, [old: string, new: string] {
   comark-init
-  let old_path = ($COMARK_DIR | path join $old)
-  let new_path = ($COMARK_DIR | path join $new)
+  let old_path = ($comark_dir | path join $old)
+  let new_path = ($comark_dir | path join $new)
 
-  if not ($old_path | path exists) {
-    error make {msg: $"bookmark does not exist: ($old)"}
+  if not ($old_path | path exists --no-symlink) {
+    error make -u {msg: $"bookmark does not exist: ($old)"}
   }
 
-  if ($new_path | path exists) {
-    error make {msg: $"bookmark exists: ($new)"}
+  if ($new_path | path exists --no-symlink) {
+    error make -u {msg: $"bookmark exists: ($new)"}
   }
 
   mv $old_path $new_path
   print $"bookmark ($old) renamed to ($new)"
 }
 
+def resolve-bookmark [bookmark: string] {
+  let bookmark_path = ($comark_dir | path join $bookmark)
+  if not ($bookmark_path | path exists --no-symlink ) {
+    error make -u {msg: $"bookmark does not exist: ($bookmark)"}
+  }
+  # symlink exists but points to a non-existent file
+  # use realpath to resolve the symlink
+  if not ($bookmark_path | path exists) {
+    return (realpath -m $bookmark_path)
+  }
+  let target = ($bookmark_path | path expand)
+  if ($target | path type) == "dir" {
+    return $"($target)/"
+  }
+  $target
+}
+
 # Print bookmark destination path
 export def p, [alias: string] {
   comark-init
-  let bookmark_path = ($COMARK_DIR | path join $alias)
-
-  if not ($bookmark_path | path exists) {
-    error make {msg: $"bookmark does not exist: ($alias)"}
-  }
-
-  let target = ($bookmark_path | path expand)
-  if ($target | path type) == "dir" { $"($target)/" } else { $target }
+  resolve-bookmark $alias
 }
 
 # List all bookmarks
@@ -75,11 +85,11 @@ export def l, [pattern?: string] {
   comark-init
 
   let bookmarks = (
-    ls $COMARK_DIR
+    ls $comark_dir
     | where type == symlink
-    | each {|row|
+    | par-each {|row|
       let alias = ($row.name | path basename)
-      let target = ($row.name | path expand)
+      let target = (resolve-bookmark $alias)
       if ($pattern | is-empty) or ($alias | str contains $pattern) {
         {name: $alias, target: $target}
       }
@@ -99,10 +109,14 @@ export def l, [pattern?: string] {
 # Change directory to bookmark
 export def --env cd, [alias: string] {
   comark-init
-  let bookmark_path = ($COMARK_DIR | path join $alias)
+  let bookmark_path = ($comark_dir | path join $alias)
 
+  if not ($bookmark_path | path exists --no-symlink) {
+    error make -u {msg: $"bookmark does not exist: ($alias)"}
+  }
+  # symlink exists but points to a non-existent file
   if not ($bookmark_path | path exists) {
-    error make {msg: $"bookmark does not exist: ($alias)"}
+    error make -u  {msg: $"bookmark destination does not exist: ($alias)"}
   }
 
   cd ($bookmark_path | path expand)
@@ -113,11 +127,11 @@ export def f, [query?: string] {
   comark-init
 
   let bookmark_list = (
-    ls $COMARK_DIR
+    ls $comark_dir
     | where type == symlink
-    | each {|row|
+    | par-each {|row|
       let alias = ($row.name | path basename)
-      let target = ($row.name | path expand)
+      let target = (resolve-bookmark $alias)
       $"($alias)\t($target)"
     }
     | str join "\n"
@@ -129,9 +143,11 @@ export def f, [query?: string] {
 
   let sel = (
     echo $bookmark_list
-    | ^fzf --layout=reverse --delimiter='\t' --with-nth=1,2
-           --query ($query | default "") --tiebreak=begin
+    | ^fzf --layout=reverse --delimiter='\t' --nth='1' --with-nth=1,2
+           --query ($query | default "") --tiebreak=begin,chunk
            --preview $"eza -TlaF -L1 --group-directories-first --color=always --git --extended --follow-symlinks {2}"
+           --bind 'alt-,:change-nth(1,2|1)'
+           --preview-border=none --separator='─' --scrollbar='▌'
     | complete
   )
 
