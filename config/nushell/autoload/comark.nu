@@ -273,19 +273,3 @@ export def --env fzf,smart [] {
     insert-at-cursor (p, $bookmark)
   }
 }
-
-# FZF insert (always insert path)
-export def --env fzf,insert [] {
-  let bookmark = (f,)
-  if not ($bookmark | is-empty) {
-    insert-at-cursor (p, $bookmark)
-  }
-}
-
-# FZF cd (always change directory)
-export def --env fzf,cd [] {
-  let bookmark = (f,)
-  if not ($bookmark | is-empty) {
-    cd, $bookmark
-  }
-}
