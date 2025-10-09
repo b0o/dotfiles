@@ -17,6 +17,7 @@ alias ga = git add
 alias gaa = git add --all
 alias gai = git add --interactive
 
+alias gp = git p
 alias gpa = git pa
 alias gpao = git pao
 
