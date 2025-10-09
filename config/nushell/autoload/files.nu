@@ -1,7 +1,7 @@
 # Smart & pretty file and directory lister using eza and bat
 export def l [
   --levels (-L): int = 1  # Levels of depth to display (for directories)
-  ...args: string         # Target files or directories to list
+  ...args: path           # Target files or directories to list
 ] {
   # Collect all targets from args and pipeline
   let targets = (
