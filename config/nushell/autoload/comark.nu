@@ -164,6 +164,8 @@ export def f, [query?: string] {
            --query ($query | default "") --tiebreak=begin,chunk
            --preview $"eza -TlaF -L1 --group-directories-first --color=always --git --extended --follow-symlinks {2}"
            --bind 'alt-,:change-nth(1,2|1)'
+           --bind 'ctrl-i:accept'
+           --expect='ctrl-i'
            --preview-border=none --separator='─' --scrollbar='▌'
     | complete
   )
@@ -172,7 +174,41 @@ export def f, [query?: string] {
     return ""
   }
 
-  $sel.stdout | str trim | split row "\t" | first
+  let lines = ($sel.stdout | str trim | split row "\n")
+  let key = ($lines | first)
+  let selection = ($lines | get 1? | default "" | split row "\t")
+
+  if ($selection | is-empty) {
+    return ""
+  }
+
+  let bookmark_name = ($selection | first)
+  let bookmark_path = ($selection | get 1? | default "")
+
+  # If Ctrl-i was pressed, search for files in the bookmark directory
+  if $key == "ctrl-i" {
+    # If bookmark points to a file, just return it
+    if not ($bookmark_path | str ends-with '/') {
+      return $bookmark_path
+    }
+
+    # Search for files in the directory
+    let file_sel = (
+      ^fd --type f --hidden --exclude .git . $bookmark_path
+      | ^fzf --layout=reverse
+             --preview 'bat --color=always --style=numbers {}'
+             --preview-border=none --separator='─' --scrollbar='▌'
+      | complete
+    )
+
+    if $file_sel.exit_code != 0 or ($file_sel.stdout | is-empty) {
+      return ""
+    }
+
+    return ($file_sel.stdout | str trim)
+  }
+
+  $bookmark_name
 }
 
 # Remove bookmarks that point to non-existent files
@@ -232,14 +268,21 @@ export def --env fzf,smart [] {
 
   # Empty buffer: cd to dir bookmark, insert file bookmark
   if ($line_buffer | str trim | is-empty) {
-    let bookmark = (f,)
-    if ($bookmark | is-empty) { return }
+    let result = (f,)
+    if ($result | is-empty) { return }
 
-    let path = ($bookmark | p, $in)
-    if ($path | str ends-with '/') {
-      cd, $bookmark
+    # Check if result is already a full path (from Ctrl-i) or a bookmark name
+    if ($result | str starts-with '/') {
+      # Direct path from Ctrl-i - insert it
+      insert-at-cursor $result
     } else {
-      insert-at-cursor $path
+      # Bookmark name - resolve and handle
+      let path = (p, $result)
+      if ($path | str ends-with '/') {
+        cd, $result
+      } else {
+        insert-at-cursor $path
+      }
     }
     return
   }
@@ -261,9 +304,14 @@ export def --env fzf,smart [] {
     }
 
     # Try fuzzy search with query
-    let selected = (f, $bookmark_name)
-    if not ($selected | is-empty) {
-      let path = (p, $selected)
+    let result = (f, $bookmark_name)
+    if not ($result | is-empty) {
+      # Check if result is already a full path (from Ctrl-i) or a bookmark name
+      let path = if ($result | str starts-with '/') {
+        $result
+      } else {
+        p, $result
+      }
       commandline edit --replace ($prefix + $path + $after_cursor)
       commandline set-cursor (($prefix | str length) + ($path | str length))
     }
@@ -271,8 +319,14 @@ export def --env fzf,smart [] {
   }
 
   # Default: insert at cursor
-  let bookmark = (f,)
-  if not ($bookmark | is-empty) {
-    insert-at-cursor (p, $bookmark)
+  let result = (f,)
+  if not ($result | is-empty) {
+    # Check if result is already a full path (from Ctrl-i) or a bookmark name
+    let path = if ($result | str starts-with '/') {
+      $result
+    } else {
+      p, $result
+    }
+    insert-at-cursor $path
   }
 }
