@@ -495,7 +495,7 @@ def get-icon [
 
 # Completer for GitHub PRs using the new @complete attribute
 # Takes spans and filters PRs by title or number based on user input
-def gh-pr-completer [spans: list<string>] {
+def complete-gh-pr [spans: list<string>] {
   # Extract the search term from all argument spans (join multi-word searches)
   let search_term = if ($spans | length) > 1 {
     $spans | skip 1 | str join " "
@@ -571,7 +571,7 @@ def gh-pr-completer [spans: list<string>] {
 }
 
 # Create worktree for a GitHub PR
-@complete gh-pr-completer
+@complete complete-gh-pr
 export def --env gwpr [
   pr?: string  # PR number or search term
 ] {
@@ -621,7 +621,7 @@ export def --env gwpr [
 }
 
 # Pull latest changes from a GitHub PR to the current branch
-@complete gh-pr-completer
+@complete complete-gh-pr
 export def gppr [
   pr?: string  # PR number or search term
 ] {
