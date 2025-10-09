@@ -1,0 +1,509 @@
+# Theming
+font: Pragmasevka Nerd Font 16
+background: "#25213B"
+color: "#DFD9FB"
+border: "#8466E4"
+separator: " ➜ "
+border_width: 3
+corner_r: 6
+padding: 15
+rows_per_column: 5
+column_padding: 25
+anchor: center
+inhibit_compositor_keyboard_shortcuts: true
+
+menu:
+  - key: "Mod4+space"
+    desc: Launcher
+    cmd: rofi -show drun -modi drun
+  - key: "o"
+    desc: Open
+    submenu:
+      - key: "c"
+        desc: Color Picker
+        cmd: color-picker
+      - key: "C"
+        desc: Color Picker (Copy)
+        cmd: color-picker --copy
+      - key: "o"
+        desc: Open
+        cmd: xdg-open $(wl-paste)
+      - key: "Mod4+o"
+        desc: Open
+        cmd: xdg-open $(wl-paste)
+        hide: true
+      - key: "z"
+        desc: Zathura
+        cmd: zathura $(wl-paste)
+      - key: "q"
+        desc: QR
+        submenu:
+          - key: "q"
+            desc: QR
+            cmd: gqr
+  - key: "s"
+    desc: Systemd
+    submenu:
+      - key: "Mod4+s"
+        desc: All Units
+        cmd: rofi-systemd all
+        hide: true
+      - key: "s"
+        desc: System Units
+        cmd: rofi-systemd system
+      - key: "a"
+        desc: All Units
+        cmd: rofi-systemd all
+      - key: "f"
+        desc: Failed Units
+        cmd: rofi-systemd -f all
+      - key: "u"
+        desc: User Units
+        cmd: rofi-systemd user
+      - key: "U"
+        desc: User Units (Failed)
+        cmd: rofi-systemd -f user
+      - key: "S"
+        desc: System Units (Failed)
+        cmd: rofi-systemd -f system
+  - key: "b"
+    desc: Brightness
+    submenu:
+      - key: "?"
+        alias: "q"
+        desc: "Query"
+        cmd: brightness -q
+      - key: "j"
+        desc: "-5"
+        cmd: brightness -5
+        keep_open: true
+      - key: "k"
+        desc: "+5"
+        cmd: brightness +5
+        keep_open: true
+      - key: "ctrl+j"
+        desc: "-1"
+        cmd: brightness -1
+        keep_open: true
+      - key: "ctrl+k"
+        desc: "+1"
+        cmd: brightness +1
+        keep_open: true
+      - key: "J"
+        desc: "-10"
+        cmd: brightness -10
+        keep_open: true
+      - key: "K"
+        desc: "+10"
+        cmd: brightness +10
+        keep_open: true
+      - key: "1"
+        desc: "10"
+        cmd: brightness 10
+      - key: "2"
+        desc: "20"
+        cmd: brightness 20
+      - key: "3"
+        desc: "30"
+        cmd: brightness 30
+      - key: "4"
+        desc: "40"
+        cmd: brightness 40
+      - key: "5"
+        desc: "50"
+        cmd: brightness 50
+      - key: "6"
+        desc: "60"
+        cmd: brightness 60
+      - key: "7"
+        desc: "70"
+        cmd: brightness 70
+      - key: "8"
+        desc: "80"
+        cmd: brightness 80
+      - key: "9"
+        desc: "90"
+        cmd: brightness 90
+      - key: "0"
+        desc: "100"
+        cmd: brightness 100
+  - key: "t"
+    desc: Transcribe
+    submenu:
+      - key: "z"
+        desc: ""
+        hide: true
+        submenu:
+          - key: "Return"
+            desc: End Transcription
+            cmd: whispertool --end
+          - key: "Escape"
+            desc: Cancel Transcription
+            cmd: whispertool --cancel
+      - key: "x"
+        alias: "Mod4+x"
+        desc: Transcribe (Copy)
+        cmd: |
+          zsh -c '
+            wlr-which-key -k "t z" &
+            whispertool --exec "wl-copy"
+          '
+      - key: "t"
+        alias: "Mod4+t"
+        desc: Transcribe (Type)
+        cmd: |
+          zsh -c '
+            wlr-which-key -k "t z" &
+            whispertool --exec "paste -sd \" \" | tr -d \"\\n\" | ydotool type -d5 -H5 --file=-"
+          '
+  - key: "x"
+    desc: Command Center
+    submenu:
+      - key: "x"
+        alias: "Mod4+x"
+        desc: Transcribe (Command Center)
+        cmd: |
+          zsh -c '
+            wlr-which-key -k "t z" &
+            whispertool --exec "{ paste -sd \" \" | tr -d \"\\n\" && echo \". Respond with concise speech messages. If possible, split response into multiple calls to speak tool, and make sure to give status updates using speak tool before long-running actions.\"; } | /home/maddy/proj/command-center/bin/tmux-cmd.py send-msg"
+          '
+      - key: "c"
+        desc: Clear Command Center
+        cmd: /home/maddy/proj/command-center/bin/tmux-cmd.py clear
+      - key: "Ctrl+c"
+        desc: Send /clear
+        cmd: echo "/clear" | /home/maddy/proj/command-center/bin/tmux-cmd.py send-msg
+      - key: "Ctrl+Return"
+        desc: Send Enter
+        cmd: /home/maddy/proj/command-center/bin/tmux-cmd.py send-keys Enter
+      - key: "v"
+        desc: Transcribe + Clipboard
+        cmd: |
+          zsh -c '
+            wlr-which-key -k "t z" &
+            whispertool --exec "{ paste -sd \" \" | tr -d \"\\n\"; echo; echo \"Here is the clipboard content in backticks:\"; echo \"\\\`\\\`\\\`\"; wl-paste; echo \"\\\`\\\`\\\`\"; echo; echo \"Respond with concise speech messages. If possible, split response into multiple calls to speak tool, and make sure to give status updates using speak tool before long-running actions.\"; } | /home/maddy/proj/command-center/bin/tmux-cmd.py send-msg"
+          '
+      - key: "/"
+        desc: Transcribe + Clipboard
+        submenu:
+          - key: "c"
+            desc: Send /clear
+            cmd: echo "/clear" | /home/maddy/proj/command-center/bin/tmux-cmd.py send-msg
+  - key: "z"
+    desc: Z
+    submenu:
+      - key: "d"
+        desc: Toggle Dark Mode
+        cmd: darkmode toggle
+      - key: "i"
+        desc: Copy window info
+        cmd: |
+          zsh -c '
+            info="$(niri msg --json pick-window)"
+            if [[ "$info" == "null" ]]; then
+              exit
+            fi
+            id=$(jq -r .id <<< "$info")
+            title=$(jq -r .title <<< "$info")
+            app_id=$(jq -r .app_id <<< "$info")
+            pid=$(jq -r .pid <<< "$info")
+            workspace_id=$(jq -r .workspace_id <<< "$info")
+            is_focused=$(jq -r .is_focused <<< "$info")
+            is_floating=$(jq -r .is_floating <<< "$info")
+            is_urgent=$(jq -r .is_urgent <<< "$info")
+            shell="$([[ /proc/$pid/exe -ef $(command -v xwayland-satellite) ]] && echo xwayland || echo wayland)"
+            # msg="id: $id\ntitle: $title\napp_id: $app_id\npid: $pid\nworkspace_id: $workspace_id\nis_focused: $is_focused\nis_floating: $is_floating\nis_urgent: $is_urgent\nshell: $shell"
+            msg=(
+              "id: $id"
+              "   title: $title"
+              "   app_id: $app_id"
+              "   pid: $pid"
+              "   workspace_id: $workspace_id"
+              "   is_focused: $is_focused"
+              "   is_floating: $is_floating"
+              "   is_urgent: $is_urgent"
+              "   shell: $shell"
+            )
+            notify-send -t 0 "$app_id" "$(printf "%s\n" "${msg[@]}")"
+            wl-copy <<< "$msg"
+          '
+      - key: "w"
+        desc: Window/Workspace
+        submenu:
+          - key: "n"
+            desc: "Rename Workspace"
+            cmd: |
+              zsh -c '
+                name=$(rofi -dmenu -kb-custom-1 "Ctrl+x" -p "Workspace Name" -i -l 0 -mesg "ctrl+x: unset name" -filter "$(niri msg -j workspaces | jq "map(select(.is_focused))[0].name // \" \"")" )
+                code=$?
+                # if user hit ctrl+x to unset name, rofi will return code 10
+                # if code is 10 or name is empty (either empty string or all whitespace)
+                if [[ $code -eq 10 || $name =~ ^[[:space:]]*$ ]]; then
+                  niri msg action unset-workspace-name
+                elif [[ $code -eq 0 ]]; then
+                  # trim leading and trailing whitespace
+                  name=${name#"${name%%[![:space:]]*}"}
+                  name=${name%"${name##*[![:space:]]}"}
+                  # set workspace name
+                  niri msg action set-workspace-name "$name"
+                fi
+              '
+          # TODO: move to workspace
+          - key: "r"
+            desc: Resize
+            submenu:
+              - key: "e"
+                desc: "Expand Width"
+                cmd: niri msg action expand-column-to-available-width
+              - key: "1"
+                alias: ["Mod4+1"]
+                desc: Width 10%
+                cmd: niri msg action set-window-width 10%
+              - key: "2"
+                alias: ["Mod4+2"]
+                desc: Width 20%
+                cmd: niri msg action set-window-width 20%
+              - key: "3"
+                alias: ["Mod4+3"]
+                desc: Width 30%
+                cmd: niri msg action set-window-width 30%
+              - key: "4"
+                alias: ["Mod4+4"]
+                desc: Width 40%
+                cmd: niri msg action set-window-width 40%
+              - key: "5"
+                alias: ["Mod4+5"]
+                desc: Width 50%
+                cmd: niri msg action set-window-width 50%
+              - key: "6"
+                alias: ["Mod4+6"]
+                desc: Width 60%
+                cmd: niri msg action set-window-width 60%
+              - key: "7"
+                alias: ["Mod4+7"]
+                desc: Width 70%
+                cmd: niri msg action set-window-width 70%
+              - key: "8"
+                alias: ["Mod4+8"]
+                desc: Width 80%
+                cmd: niri msg action set-window-width 80%
+              - key: "9"
+                alias: ["Mod4+9"]
+                desc: Width 90%
+                cmd: niri msg action set-window-width 90%
+              - key: "0"
+                alias: ["Mod4+0"]
+                desc: Width 100%
+                cmd: niri msg action set-window-width 100%
+              - key: "Ctrl+3"
+                alias: ["Mod4+Ctrl+3"]
+                desc: Width 33%
+                cmd: niri msg action set-window-width 33%
+              - key: "Ctrl+4"
+                alias: ["Mod4+Ctrl+4"]
+                desc: Width 25%
+                cmd: niri msg action set-window-width 25%
+              - key: "Alt+3"
+                alias: ["Mod4+Alt+3", "t"]
+                desc: Width 66%
+                cmd: niri msg action set-window-width 66%
+              - key: "Alt+4"
+                alias: ["Mod4+Alt+4"]
+                desc: Width 75%
+                cmd: niri msg action set-window-width 75%
+              - key: "h"
+                alias: ["Mod4+r", "r"]
+                desc: Resize Height
+                submenu:
+                  - key: "1"
+                    alias: ["Mod4+1"]
+                    desc: Height 10%
+                    cmd: niri msg action set-window-height 10%
+                  - key: "2"
+                    alias: ["Mod4+2"]
+                    desc: Height 20%
+                    cmd: niri msg action set-window-height 20%
+                  - key: "3"
+                    alias: ["Mod4+3"]
+                    desc: Height 30%
+                    cmd: niri msg action set-window-height 30%
+                  - key: "4"
+                    alias: ["Mod4+4"]
+                    desc: Height 40%
+                    cmd: niri msg action set-window-height 40%
+                  - key: "5"
+                    alias: ["Mod4+5"]
+                    desc: Height 50%
+                    cmd: niri msg action set-window-height 50%
+                  - key: "6"
+                    alias: ["Mod4+6"]
+                    desc: Height 60%
+                    cmd: niri msg action set-window-height 60%
+                  - key: "7"
+                    alias: ["Mod4+7"]
+                    desc: Height 70%
+                    cmd: niri msg action set-window-height 70%
+                  - key: "8"
+                    alias: ["Mod4+8"]
+                    desc: Height 80%
+                    cmd: niri msg action set-window-height 80%
+                  - key: "9"
+                    alias: ["Mod4+9"]
+                    desc: Height 90%
+                    cmd: niri msg action set-window-height 90%
+                  - key: "0"
+                    alias: ["Mod4+0"]
+                    desc: Height 100%
+                    cmd: niri msg action set-window-height 100%
+                  - key: "Ctrl+3"
+                    alias: ["Mod4+Ctrl+3"]
+                    desc: Height 33%
+                    cmd: niri msg action set-window-height 33%
+                  - key: "Ctrl+4"
+                    alias: ["Mod4+Ctrl+4"]
+                    desc: Height 25%
+                    cmd: niri msg action set-window-height 25%
+                  - key: "Alt+3"
+                    alias: ["Mod4+Alt+3"]
+                    desc: Height 66%
+                    cmd: niri msg action set-window-height 66%
+                  - key: "Alt+4"
+                    alias: ["Mod4+Alt+4"]
+                    desc: Height 75%
+                    cmd: niri msg action set-window-height 75%
+                  - key: "w"
+                    alias: ["r", "Mod4+r"]
+                    desc: "Resize Width "
+                    cmd: wlr-which-key -k r
+      - key: "W"
+        desc: Workspace
+        submenu:
+          - key: "r"
+            desc: "Rename Workspace"
+            cmd: |
+              zsh -c '
+                name=$(rofi -dmenu -kb-custom-1 "Ctrl+x" -p "Rename Workspace" -i -l 0 -mesg "ctrl+x: unset name" -filter "$(niri msg -j workspaces | jq "map(select(.is_focused))[0].name // \" \"")" )
+                code=$?
+                # if user hit ctrl+x to unset name, rofi will return code 10
+                # if code is 10 or name is empty (either empty string or all whitespace)
+                if [[ $code -eq 10 || $name =~ ^[[:space:]]*$ ]]; then
+                  niri msg action unset-workspace-name
+                elif [[ $code -eq 0 ]]; then
+                  # trim leading and trailing whitespace
+                  name=${name#"${name%%[![:space:]]*}"}
+                  name=${name%"${name##*[![:space:]]}"}
+                  # set workspace name
+                  niri msg action set-workspace-name "$name"
+                fi
+              '
+      - key: "b"
+        desc: Bluetooth
+        submenu:
+          - key: "a"
+            desc: Connect Airpods
+            cmd: airpods -n connect
+          - key: "A"
+            desc: Disconnect Airpods
+            cmd: airpods -n disconnect
+          - key: "f"
+            desc: Connect Fosi
+            cmd: fosi -n connect
+          - key: "F"
+            desc: Disconnect Fosi
+            cmd: fosi -n disconnect
+      - key: "s"
+        desc: Scratchpads
+        submenu:
+          - key: "s"
+            alias: "Mod4+S"
+            desc: "Toggle"
+            cmd: niri-tools scratchpad toggle
+          - key: "b"
+            alias: "Mod4+B"
+            desc: "Books"
+            cmd: niri-tools scratchpad toggle books
+          - key: "c"
+            alias: "Mod4+C"
+            desc: "Calendar"
+            cmd: niri-tools scratchpad toggle calendar
+          - key: "d"
+            alias: "Mod4+D"
+            desc: "Discord"
+            cmd: nope niri-tools scratchpad toggle discord
+          - key: "m"
+            alias: "Mod4+M"
+            desc: "Web"
+            cmd: niri-tools scratchpad toggle web-m
+          - key: "n"
+            alias: "Mod4+N"
+            desc: "Nest"
+            cmd: niri-tools scratchpad toggle web-t
+      - key: "t"
+        desc: Toggle Tabbed
+        cmd: niri msg action toggle-column-tabbed-display
+      - key: "f"
+        desc: Toggle Floating
+        cmd: niri msg action toggle-window-floating
+      - key: "Q"
+        desc: Quit
+        cmd: niri msg action quit
+      - key: "?"
+        desc: Show Bindings
+        cmd: niri msg action show-hotkey-overlay
+      - key: "n"
+        desc: "Nope: Enable"
+        cmd: nope --enable
+      - key: "N"
+        desc: "Nope: Disable"
+        submenu:
+          - key: "O"
+            desc: "Nope: Disable"
+            submenu:
+              - key: "P"
+                desc: "Nope: Disable"
+                submenu:
+                  - key: "E"
+                    desc: "Nope: Disable"
+                    cmd: nope --disable
+  - key: "n"
+    desc: Notifications
+    submenu:
+      - key: "d"
+        alias: ["Mod4+n", "n"]
+        desc: Dismiss
+        cmd: makoctl dismiss
+        keep_open: true
+      - key: "D"
+        alias: "Mod4+N"
+        desc: Dismiss All
+        cmd: makoctl dismiss --all
+      - key: "r"
+        desc: Restore
+        cmd: makoctl restore
+        keep_open: true
+      - key: "a"
+        desc: Action
+        cmd: "makoctl menu -- rofi -dmenu -p 'Choose Action: '"
+  - key: "Print"
+    desc: Screenshot
+    submenu:
+      # TODO: Screen Recording
+      # TODO: Window Selection
+      - key: "Print"
+        desc: Screenshot Region
+        alias: "r"
+        cmd: |
+          zsh -c '
+            region=$(slurp)
+            if [[ -z "$region" ]]; then
+              exit
+            fi
+            out="$HOME/Documents/screenshots/$(date +%Y-%m-%d_%H-%M-%S).png"
+            grim -g "$region" "$out" || {
+              notify-send -a screenshot -u critical "Screenshot Failed" "Failed to save screenshot"
+              exit
+            }
+            notify-send -a screenshot -i "$out" "Screenshot Saved" "Saved to $out"
+            wl-copy -t image/png < "$out"
+            wl-copy -p -t text/plain "$out"
+          '
