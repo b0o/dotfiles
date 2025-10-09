@@ -1,0 +1,178 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/lavi-project/vivid/main/themes/schema.json
+
+colors:
+  # Lavi colorscheme
+  # Based on the Lavi Neovim theme
+  # https://github.com/b0o/lavi.nvim
+
+  # Background shades
+  dark_bg: '25213B'
+  dark_bg_dark: '1A1729'
+  dark_bg_med: '2D2846'
+  black: '2F2A38'
+  black_med: '4C435C'
+  black_bright: '8977A8'
+
+  # Foreground shades
+  dark_fg: 'FFF1E0'
+  white: 'EEE6FF'
+  white_bright: 'FFFFFF'
+
+  # Accent colors
+  cyan: '2BEDC0'
+  skyblue: '3FC4C4'
+  green: '7CF89C'
+  yellow: 'FFD080'
+  orange: 'FF9969'
+  pumpkin: 'FF9969'
+  red: 'F2637E'
+  red_bright: 'FF87A5'
+
+  # Purples and violets
+  violet: 'DC91FF'
+  violet_bright: 'B891FF'
+  indigo: '9074FF'
+  blue: '7583FF'
+  oceanblue: '80BDFF'
+  lavender: 'A872FB'
+  velvet: 'B29EED'
+  anise: '7F7DEE'
+  anise_dark: '7E7490'
+
+  # Pinks
+  blush: 'EBBBF9'
+  powder: 'EAC6F5'
+  dust: 'EAD2F1'
+
+  # Earth tones
+  matcha: '9FDFB4'
+  mint: 'A2E0CA'
+
+  # Adjusted colors
+  file_normal: 'C5C3F4'     # anise.lighten(50).desaturate(10)
+  dir_normal: 'E0CFF9'      # violet_bright.lighten(30).desaturate(10)
+  config_modified: 'FFE6B3' # yellow.lighten(30)
+  source_added: 'E4FCE9'    # green.lighten(60)
+  archive_staged: 'A3DCFF'  # oceanblue.lighten(10)
+  file_ignored: '9A9AC0'    # anise.lighten(20).desaturate(50)
+
+core:
+  normal_text:
+    foreground: dark_fg
+
+  regular_file:
+    foreground: file_normal
+
+  reset_to_normal: {}
+
+  directory:
+    foreground: dir_normal
+
+  symlink:
+    foreground: cyan
+
+  multi_hard_link: {}
+
+  fifo:
+    foreground: dark_bg
+    background: cyan
+
+  socket:
+    foreground: dark_bg
+    background: violet
+
+  door:
+    foreground: dark_bg
+    background: violet
+
+  block_device:
+    foreground: oceanblue
+    background: black
+
+  character_device:
+    foreground: blush
+    background: black
+
+  broken_symlink:
+    foreground: white_bright
+    background: red
+
+  missing_symlink_target:
+    foreground: white_bright
+    background: red
+
+  setuid:
+    foreground: white_bright
+    background: red_bright
+
+  setgid:
+    foreground: white_bright
+    background: orange
+
+  file_with_capability:
+    foreground: white_bright
+    background: red
+
+  sticky_other_writable:
+    foreground: dark_bg
+    background: green
+
+  other_writable:
+    foreground: violet_bright
+    font-style: bold
+
+  sticky:
+    foreground: white_bright
+    background: violet
+
+  executable_file:
+    foreground: orange
+    font-style: bold
+
+text:
+  special:
+    foreground: dark_bg
+    background: yellow
+
+  todo:
+    foreground: yellow
+    font-style: bold
+
+  licenses:
+    foreground: anise_dark
+
+  configuration:
+    foreground: config_modified
+
+  other:
+    foreground: file_normal
+
+markup:
+  foreground: dust
+
+programming:
+  source:
+    foreground: source_added
+
+  tooling:
+    foreground: cyan
+
+    continuous-integration:
+      foreground: matcha
+
+media:
+  foreground: blush
+
+office:
+  foreground: red_bright
+
+archives:
+  foreground: archive_staged
+  font-style: underline
+
+executable:
+  foreground: orange
+  font-style: bold
+
+unimportant:
+  foreground: file_ignored

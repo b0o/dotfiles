@@ -7,10 +7,6 @@ $env.XDG_CACHE_HOME = $"($nu.home-path)/.cache"
 
 $env.DOTFILES_HOME = $"($env.XDG_CONFIG_HOME)/dotfiles"
 
-# TODO: use a hook
-# TODO: make vivid theme for lavi
-$env.LS_COLORS = (vivid generate catppuccin-mocha)
-
 $env.PATH = (
   $env.PATH
   | split row (char esep)
@@ -116,5 +112,10 @@ hooks use {
     overlay: true
     depends: mise
     cmd: [mise activate nu]
+  }
+  ls_colors: {
+    enabled: true
+    depends: vivid
+    cmd: { || $"$env.LS_COLORS = '(vivid generate lavi)'" }
   }
 }
