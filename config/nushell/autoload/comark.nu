@@ -1,3 +1,6 @@
+# Comark (Comma Bookmark) for Nushell
+# Shell bookmark manager for quick navigation and file management
+
 let comark_dir = (
   $env
   | get -o COMARK_DIR
