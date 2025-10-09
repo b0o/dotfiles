@@ -11,7 +11,7 @@ def module-path [name: string] {
 
 def hook-hash [hook: record] {
   let date = date now | format date '%Y-%m-%d'
-  {hook: $hook, date: $date} | to json | hash md5
+  {hook: $hook, date: $date} | to json --serialize  | hash md5
 }
 
 def hook-init [name: string, hook: record] {
@@ -29,7 +29,26 @@ def hook-init [name: string, hook: record] {
   }
 
   (try {
-    let res = ^$hook.cmd | complete
+    # Check if cmd is a closure or a command
+    let is_closure = ($hook.cmd | describe) =~ '^closure'
+
+    let res = if $is_closure {
+      # Invoke the closure and capture output
+      let output = do $hook.cmd
+      {
+        stdout: (if ($output | describe) =~ '^list' {
+          $output | str join "\n"
+        } else {
+          $output | into string
+        })
+        stderr: ""
+        exit_code: 0
+      }
+    } else {
+      # Execute as external command
+      ^$hook.cmd | complete
+    }
+
     if ($res | get -o exit_code) != 0 {
       error make -u {
         msg: $"hooks: ($name): command failed to initialize: ($res.stderr)"
@@ -86,11 +105,14 @@ def hook-enabled [name: string, hook: record] {
     return false
   }
 
-  # Check if main command exists
-  let cmd = $hook.cmd | first
-  if (which $cmd | is-empty) {
-    print -e $"Warning: Hook '($name)': command '($cmd)' not found. Disabling hook."
-    return false
+  # Check if main command exists (only for external commands, not closures)
+  let is_closure = ($hook.cmd | describe) =~ '^closure'
+  if not $is_closure {
+    let cmd = $hook.cmd | first
+    if (which $cmd | is-empty) {
+      print -e $"Warning: Hook '($name)': command '($cmd)' not found. Disabling hook."
+      return false
+    }
   }
 
   true
@@ -101,7 +123,7 @@ def hook-enabled [name: string, hook: record] {
 # {
 #   hook_name: {
 #     enabled?: bool = true           # Whether to enable the hook
-#     cmd: list<string>               # Command to run to initialize the hook
+#     cmd: list<string> | closure     # Command to run to initialize the hook, or a closure that returns a string/list of lines
 #     depends?: string                # Command that must be installed; if not found, hook is quietly disabled
 #     env?: record                    # Environment variables to set before running the command
 #     module?: bool = false           # If true, save as a module
@@ -168,8 +190,12 @@ export def --env use [hooks: record] {
   $manifest | save-manifest
 }
 
+def complete-hook-names [] {
+  get-manifest | columns
+}
+
 # Clean up a hook by name
-export def clean [name: string] {
+export def clean [name: string@complete-hook-names] {
   let manifest = get-manifest
   let manifest_entry = $manifest | get -o $name
 
