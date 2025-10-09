@@ -15,5 +15,6 @@ in
     paths =
       packageGroups.base
       ++ packageGroups.shell
-      ++ packageGroups.neovim;
+      ++ packageGroups.neovim
+      ++ packageGroups.niri;
   }

@@ -7,8 +7,23 @@
     flakey-profile.url = "github:lf-/flakey-profile";
 
     # Neovim
-    neovim-nightly-overlay.url = "github:nix-community/neovim-nightly-overlay";
-    neovim-nightly-overlay.inputs.nixpkgs.follows = "nixpkgs";
+    neovim-nightly-overlay = {
+      url = "github:nix-community/neovim-nightly-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Niri
+    niri = {
+      url = "github:sodiboo/niri-flake";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # wlr-which-key
+    wlr-which-key-b0o = {
+      # on branch b0o
+      url = "github:b0o/wlr-which-key/b0o";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
@@ -26,6 +41,7 @@
     overlays = {
       default = import ./nix/overlays {inherit inputs;};
       neovim = inputs.neovim-nightly-overlay.overlays.default;
+      inherit (inputs.niri.overlays) niri;
     };
 
     devShells = forAllSystems (system: {

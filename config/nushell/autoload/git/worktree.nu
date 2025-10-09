@@ -482,16 +482,34 @@ export def --env gwcc [
   ln -sv $target_relative $current_link
 }
 
-def complete-gh-pr [
-  # context: string = ""
+def get-icon [
+  state: string
+  isDraft: bool
 ] {
-  # let context = ($context | split words | skip 1 | str join " ")
+  match $state {
+    "OPEN" => (if $isDraft { "" } else { "" }),
+    "CLOSED" => "",
+    "MERGED" => "󰘭",
+  }
+}
+
+# Completer for GitHub PRs using the new @complete attribute
+# Takes spans and filters PRs by title or number based on user input
+def gh-pr-completer [spans: list<string>] {
+  # Extract the search term from all argument spans (join multi-word searches)
+  let search_term = if ($spans | length) > 1 {
+    $spans | skip 1 | str join " "
+  } else {
+    ""
+  }
+
+  # Fetch PRs from GitHub (filtering is done by gh API via --search)
   let prs = do {(
     gh pr list
       --state all
-      --limit 100
+      --limit 20
       --json number,state,title,createdAt,isDraft
-      # --search $context # TODO: revist once https://github.com/nushell/nushell/issues/15479 is fixed
+      --search $search_term
   )} | from json | sort-by -c {|a, b|
     let state_priority = {|state|
       match $state {
@@ -511,67 +529,51 @@ def complete-gh-pr [
       $a.number < $b.number
     }
   }
-  if ($prs | length) == 0 {
-    return []
+
+  # Build help completions (filtered by search term)
+  let help_completions = [
+    { value: "-h", description: "Display help message" }
+    { value: "--help", description: "Display help message" }
+  ] | where {|item|
+    if ($search_term | is-empty) {
+      true
+    } else {
+      $item.value | str contains $search_term
+    }
   }
 
-  let descriptions = (
-    $prs
-    | each {|pr|
-      use ../xtras
-      let number = ($pr.number | into int)
-      let isDraft = ($pr.isDraft | into bool)
-      let state = ($pr.state | str trim)
-      let createdAgo = ((date now) - ($pr.createdAt | into datetime)) | xtras format duration human
-      let icon = (match $state {
-        "OPEN" => (if $isDraft { "" } else { "" }),
-        "CLOSED" => "",
-        "MERGED" => "󰘭",
-      })
-      let status = (match $state {
-        "OPEN" => (if $isDraft { "Draft" } else { "Open" }),
-        "CLOSED" => "Closed",
-        "MERGED" => "Merged",
-      })
-      {
-        0: $icon
-        1: $"#($number)"
-        2: $status
-        3: ($pr.title | str trim | str substring 0..40 | str trim) # TODO: More intelligent truncation
-        4: $createdAgo
-      }
-      # HACK: This is a hacky way to generate a plaintext aligned table (similar to the `column` unix command)
-    } | table --collapse -t none | ansi strip | lines | skip 1
-  )
-  {
-    options: {
-      sort: false
-      case_sensitive: false
-      completion_algorithm: fuzzy
-    },
-    completions: ($prs | enumerate | each {|e|
-      let i = $e.index
-      let pr = $e.item
-      let number = ($pr.number | into int)
-      let state = ($pr.state | str trim)
-      let isDraft = ($pr.isDraft | into bool)
-      let description = ($descriptions | get $i | to text)
-      {
-        value: $number
-        description: $description
-        style: (match $state {
-          "OPEN" => (if $isDraft { "gray" } else { "green" }),
-          "CLOSED" => "red",
-          "MERGED" => "magenta",
-        })
-      }
+  # Return completions directly (no wrapping in options/completions structure)
+  let pr_completions = $prs | par-each {|pr|
+    use ../xtras
+    let number = ($pr.number | into int)
+    let isDraft = ($pr.isDraft | into bool)
+    let state = ($pr.state | str trim)
+    let createdAgo = ((date now) - ($pr.createdAt | into datetime)) | xtras format duration human
+    let icon = (get-icon $state $isDraft)
+    let status = (match $state {
+      "OPEN" => (if $isDraft { "Draft" } else { "Open" }),
+      "CLOSED" => "Closed",
+      "MERGED" => "Merged",
     })
+
+    {
+      value: ($number | into string)
+      description: $"($icon) #($number) ($status) - ($pr.title | str trim | str substring 0..60 | str trim) ($createdAgo)"
+      style: (match $state {
+        "OPEN" => (if $isDraft { "gray" } else { "green" }),
+        "CLOSED" => "red",
+        "MERGED" => "magenta",
+      })
+    }
   }
+
+  $help_completions | append $pr_completions
 }
 
 # Create worktree for a GitHub PR
+@complete gh-pr-completer
 export def --env gwpr [
-  pr?: string@complete-gh-pr  # PR number
+  pr?: string  # PR number or search term
 ] {
   let git_info = (gw-parse)
   let git_root = $git_info.git_root
@@ -619,8 +621,9 @@ export def --env gwpr [
 }
 
 # Pull latest changes from a GitHub PR to the current branch
+@complete gh-pr-completer
 export def gppr [
-  pr?: string@complete-gh-pr  # PR number
+  pr?: string  # PR number or search term
 ] {
   # Get PR number from argument, current branch, or fzf selection
   let pr_num = if $pr != null {

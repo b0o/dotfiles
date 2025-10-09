@@ -14,6 +14,7 @@
     # example = prev.example.overrideAttrs (oldAttrs: rec {
     # ...
     # });
+    wlr-which-key-b0o = inputs.wlr-which-key-b0o.packages.${final.system}.default;
   };
 in
   inputs.nixpkgs.lib.composeManyExtensions [
