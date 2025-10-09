@@ -1,0 +1,80 @@
+/* Lavi Palette */
+
+@define-color black #2F2A38;
+@define-color black_med #4C435C;
+@define-color black_bright #8977A8;
+
+@define-color white #EEE6FF;
+@define-color white_bright #ffffff;
+
+@define-color bg #1d1834;
+@define-color dark_bg #191627;
+@define-color med_bg #39335c;
+@define-color bright_bg #574e8e;
+
+@define-color dark_fg #FFF1E0;
+@define-color dark_fg_dim #DED4FD;
+@define-color dark_fg_nc #A89CCF;
+@define-color skyblue #3FC4C4;
+@define-color cyan #2BEDC0;
+
+@define-color red #F2637E;
+@define-color orange #ff9969;
+@define-color yellow #FFD080;
+@define-color green #7CF89C;
+@define-color blue #7583FF;
+@define-color indigo #9074FF;
+@define-color violet #DC91FF;
+
+@define-color oceanblue #80BDFF;
+@define-color magenta #B98AFF;
+@define-color red_bright #FF87A5;
+@define-color violet_bright #B891FF;
+@define-color violet_med #9385F8;
+
+@define-color straw #fffacf;
+
+@define-color tofu #fdf6e3;
+@define-color cashew #e6dac3;
+@define-color walnut #CEB999;
+@define-color almond #a6875a;
+@define-color cocoa #3b290e;
+
+@define-color licorice #483270;
+@define-color lavender #A872FB;
+@define-color velvet #B29EED;
+@define-color anise #7F7DEE;
+@define-color anise_dark #7E7490;
+@define-color hydrangea #fb72fa;
+@define-color blush #EBBBF9;
+@define-color powder #EAC6F5;
+@define-color dust #EAD2F1;
+@define-color mistyrose #ffe4e1;
+@define-color rebeccapurple #3C2C74;
+
+@define-color matcha #9fdfb4;
+
+@define-color snow #e4fffe;
+@define-color ice #a4e2e0;
+@define-color mint #a2e0ca;
+
+@define-color nectar #f0f070;
+@define-color cayenne #FF7D90;
+@define-color yam #e86f54;
+@define-color pumpkin #ff9969;
+@define-color rose #b32e29;
+
+@define-color grey2 #222222;
+@define-color grey5 #777777;
+@define-color grey6 #aaaaaa;
+@define-color grey7 #cccccc;
+@define-color grey8 #dddddd;
+
+@define-color mid_velvet #6E6EA3;
+
+@define-color deep_lavender #38265A;
+@define-color deep_licorice #564D82;
+@define-color deep_anise #8F8FB3;
+@define-color deep_velvet #B7BDF8;
+
+@define-color light_lavender #EAD6FF;

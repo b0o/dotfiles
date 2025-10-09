@@ -1,0 +1,237 @@
+@import "colors.css";
+
+* {
+  font-family:
+    Pragmasevka Nerd Font,
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  font-size: 16px;
+}
+
+window#waybar {
+  /* background-color: rgba(0, 0, 0, 0); */
+  background-color: @bg;
+  border-radius: 0;
+  transition-property: background-color;
+  transition-duration: 0.5s;
+}
+
+/* https://github.com/Alexays/Waybar/wiki/FAQ#the-workspace-buttons-have-a-strange-hover-effect */
+button:hover {
+  /* background: inherit; */
+  box-shadow: inset 0 -3px #fb72fa;
+}
+
+tooltip {
+  background-color: @dark_bg;
+  border-radius: 8px;
+  border: 2px solid @indigo;
+  padding: 16px;
+}
+#workspaces button {
+  padding: 0 10px;
+  /* background: @med_bg; */
+  background: transparent;
+  color: @white;
+  border: none;
+  /* margin-right: 6px; */
+  border-radius: 0;
+}
+
+#workspaces button#niri-workspace-1,
+#workspaces button#niri-workspace-2,
+#workspaces button#niri-workspace-3,
+#workspaces button#niri-workspace-4,
+#workspaces button#niri-workspace-5,
+#workspaces button#niri-workspace-6,
+#workspaces button#niri-workspace-7,
+#workspaces button#niri-workspace-8,
+#workspaces button#niri-workspace-9 {
+  /* This is a hacky way to hide the trailing space after the workspace number for unnamed workspaces */
+  /* By setting the right padding to 0, the trailing space looks like the padding */
+  padding-right: 0px;
+}
+
+#workspaces button:hover {
+  background: @bright_bg;
+}
+
+#workspaces button.focused,
+#workspaces button.active {
+  background-color: @bright_bg;
+}
+
+#workspaces button.focused {
+  box-shadow: inset 0 -3px @indigo;
+}
+
+#workspaces button.urgent {
+  background-color: #ff7d90;
+}
+
+#workspaces button#niri-workspace-1.empty,
+#workspaces button#niri-workspace-2.empty,
+#workspaces button#niri-workspace-3.empty,
+#workspaces button#niri-workspace-4.empty,
+#workspaces button#niri-workspace-5.empty,
+#workspaces button#niri-workspace-6.empty,
+#workspaces button#niri-workspace-7.empty,
+#workspaces button#niri-workspace-8.empty,
+#workspaces button#niri-workspace-9.empty {
+  opacity: 0;
+}
+#workspaces button#niri-workspace-1.empty.active,
+#workspaces button#niri-workspace-2.empty.active,
+#workspaces button#niri-workspace-3.empty.active,
+#workspaces button#niri-workspace-4.empty.active,
+#workspaces button#niri-workspace-5.empty.active,
+#workspaces button#niri-workspace-6.empty.active,
+#workspaces button#niri-workspace-7.empty.active,
+#workspaces button#niri-workspace-8.empty.active,
+#workspaces button#niri-workspace-9.empty.active,
+#workspaces button#niri-workspace-1.empty:hover,
+#workspaces button#niri-workspace-2.empty:hover,
+#workspaces button#niri-workspace-3.empty:hover,
+#workspaces button#niri-workspace-4.empty:hover,
+#workspaces button#niri-workspace-5.empty:hover,
+#workspaces button#niri-workspace-6.empty:hover,
+#workspaces button#niri-workspace-7.empty:hover,
+#workspaces button#niri-workspace-8.empty:hover,
+#workspaces button#niri-workspace-9.empty:hover {
+  opacity: 1;
+}
+
+#mode {
+  background-color: #64727d;
+  box-shadow: inset 0 -3px #ffffff;
+}
+
+#custom-linear,
+#custom-command-center,
+#custom-claude-time,
+#idle_inhibitor,
+#systemd-failed-units,
+#mpris,
+#window,
+#clock,
+#pulseaudio {
+  padding: 0 10px;
+  transition-duration: 0.2s;
+  transition-property: background-color;
+}
+
+#custom-linear:hover,
+#custom-command-center:hover,
+#custom-claude-time:hover,
+#idle_inhibitor:hover,
+#systemd-failed-units:hover,
+#mpris:hover,
+#window:hover,
+#clock:hover,
+#pulseaudio:hover {
+  background-color: @med_bg;
+}
+
+#idle_inhibitor,
+#systemd-failed-units,
+#pulseaudio {
+  color: @velvet;
+}
+
+#custom-linear {
+  color: @dark_fg_dim;
+  margin-right: 20px;
+}
+
+#mpris,
+#clock {
+  color: @dark_fg_dim;
+}
+
+#window {
+  color: @dark_fg_dim;
+}
+
+.modules-right {
+  padding: 0 10px;
+}
+
+.modules-left {
+  padding: 0 20px;
+}
+
+.modules-center {
+  padding: 0 10px;
+}
+
+@keyframes blink {
+  to {
+    color: #000000;
+  }
+}
+
+label:focus {
+  background-color: #000000;
+}
+
+/* #pulseaudio.muted { */
+/*   color: @text; */
+/* } */
+
+/* Linear module state-based icon colors */
+#custom-linear.state-started {
+  color: @yellow;
+}
+
+#custom-linear.state-completed {
+  color: @violet;
+}
+
+/* Gray states (default color handles these) */
+#custom-linear.state-triage,
+#custom-linear.state-backlog,
+#custom-linear.state-unstarted,
+#custom-linear.state-canceled,
+#custom-linear.state-duplicate {
+  color: @dark_fg_dim;
+}
+#custom-linear.error {
+  color: @red;
+}
+
+#custom-claude-time {
+  margin-right: 20px;
+}
+
+#custom-claude-time {
+  color: #fda587;
+}
+
+/* Command Center module styling */
+#custom-command-center {
+  color: #fda587;
+  margin-right: 0px;
+}
+
+#custom-command-center.state-waiting {
+  color: #fda587;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+#custom-command-center.state-error {
+  color: @red;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 1;
+  }
+}

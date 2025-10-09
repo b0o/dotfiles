@@ -1,0 +1,68 @@
+max-visible=5
+sort=-time
+layer=overlay
+anchor=top-right
+
+font=Pragmasevka Nerd Font 15
+
+background-color=#27223edd
+text-color=#eee6ffdd
+
+width=400
+height=400
+
+outer-margin=0
+margin=10,15,15,0
+padding=10,0
+
+border-size=3
+border-radius=6
+
+icons=1
+max-icon-size=64
+
+markup=0
+actions=1
+
+history=1
+max-history=10
+
+default-timeout=5000
+ignore-timeout=0
+
+[group-index=0]
+invisible=0
+
+[urgency=low]
+format=<span color="#6f65aadd"> </span> <b>%s</b>\n   %b
+border-color=#574e8edd
+on-notify=exec mpv /usr/share/sounds/freedesktop/stereo/audio-volume-change.oga
+
+[urgency=normal]
+format=<span color="#9074ffdd"> </span> <b>%s</b>\n   %b
+border-color=#9074ffdd
+on-notify=exec mpv /usr/share/sounds/freedesktop/stereo/audio-volume-change.oga
+
+[actionable]
+format=<span color="#ff9969"> </span> <b>%s</b>\n   %b
+
+[urgency=high !actionable]
+format=<span color="#ff688edd"> </span> <b>%s</b>\n   %b
+border-color=#ff87a5dd
+on-notify=exec mpv --start=5% /usr/share/sounds/deepin/stereo/dialog-error.wav
+
+[urgency=high actionable]
+format=<span color="#ff688edd"> </span> <b>%s</b>\n   %b
+border-color=#ff87a5dd
+on-notify=exec mpv --start=5% /usr/share/sounds/deepin/stereo/dialog-error.wav
+
+[app-name=Claude]
+on-notify=exec mpv --start=5% /usr/share/sounds/Oxygen-Sys-Question.ogg
+
+[app-name=audioctl]
+group-by=app-name
+
+[app-name=brightnessd]
+group-by=app-name
+
+# vim: set ft=dosini:

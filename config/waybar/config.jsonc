@@ -1,0 +1,39 @@
+[
+  {
+    "output": ["DP-2"],
+    "include": [
+      "~/.config/waybar/config.base.jsonc",
+    ],
+    "modules-left": [
+      "niri/workspaces",
+    ],
+    "modules-center": [
+      "niri/window",
+    ],
+    "modules-right": [
+      "custom/linear",
+      "custom/command-center",
+      "custom/claude-time",
+      "mpris",
+      "systemd-failed-units",
+      "pulseaudio",
+      "idle_inhibitor",
+      "clock",
+    ],
+  },
+  {
+    "output": ["DP-1"],
+    "include": [
+      "~/.config/waybar/config.base.jsonc",
+    ],
+    "modules-left": [
+      "niri/workspaces",
+    ],
+    "modules-center": [
+      "niri/window",
+    ],
+    "modules-right": [
+      "clock",
+    ],
+  },
+]
