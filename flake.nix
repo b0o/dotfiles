@@ -12,6 +12,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Nushell
+    nushell-nightly = {
+      url = "github:JoaquinTrinanes/nushell-nightly-flake";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Niri
     niri = {
       url = "github:sodiboo/niri-flake";
@@ -41,6 +47,7 @@
     overlays = {
       default = import ./nix/overlays {inherit inputs;};
       neovim = inputs.neovim-nightly-overlay.overlays.default;
+      nushell = inputs.nushell-nightly.overlays.default;
       inherit (inputs.niri.overlays) niri;
     };
 
