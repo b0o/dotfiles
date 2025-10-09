@@ -1,0 +1,41 @@
+# Background color for the window.
+background = #211D34
+
+# Foreground color for the window.
+foreground = #FFF1E0
+
+# The foreground and background color for selection. If this is not set, then
+# the selection color is just the inverted window background and foreground
+# (note: not to be confused with the cell bg/fg).
+selection-foreground = #000000
+
+selection-background = #FFFFFF
+
+# Color palette for the 256 color form that many terminal applications use.
+# The syntax of this configuration is `N=HEXCODE` where `N` is 0 to 255 (for
+# the 256 colors in the terminal color table) and `HEXCODE` is a typical RGB
+# color code such as `#AABBCC`.
+#
+# For definitions on all the codes [see this cheat
+# sheet](https://www.ditig.com/256-colors-cheat-sheet).
+palette = 0=#282c34
+palette = 1=#e06c75
+palette = 2=#98c379
+palette = 3=#e5c07b
+palette = 4=#61afef
+palette = 5=#c678dd
+palette = 6=#56b6c2
+palette = 7=#abb2bf
+palette = 8=#5c6370
+palette = 9=#e06c75
+palette = 10=#98c379
+palette = 11=#e5c07b
+palette = 12=#61afef
+palette = 13=#c678dd
+palette = 14=#56b6c2
+palette = 15=#ffffff
+
+# The color of the cursor. If this is not set, a default will be chosen.
+cursor-color = #D8DEE9
+
+# vim: set ft=dosini commentstring=#\ %s:
