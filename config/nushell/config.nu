@@ -20,6 +20,11 @@ $env.PATH = (
 )
 
 $env.config.show_banner = false
+$env.config.completions = {
+  algorithm: fuzzy
+  quick: false
+  partial: true
+}
 $env.config.keybindings = $env.config.keybindings ++ [
   {
     name: insert_fzf_result
