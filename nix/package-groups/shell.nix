@@ -27,6 +27,7 @@ with pkgs; [
   starship # customizable shell prompt
   atuin # shell history manager with sync
   carapace # multi-shell completion generator
+  vivid # themeable LS_COLORS generator
 
   # Modern CLI utilities
   bat # cat clone with syntax highlighting and Git integration
