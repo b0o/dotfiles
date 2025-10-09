@@ -176,14 +176,21 @@ export def f, [query?: string] {
 
   let lines = ($sel.stdout | str trim | split row "\n")
   let key = ($lines | first)
-  let selection = ($lines | get 1? | default "" | split row "\t")
 
-  if ($selection | is-empty) {
+  # When --expect is used, fzf outputs the key (or empty line) first, then the selection
+  let selection_line = if ($lines | length) > 1 {
+    $lines | get 1
+  } else {
+    $lines | first
+  }
+
+  if ($selection_line | is-empty) {
     return ""
   }
 
-  let bookmark_name = ($selection | first)
-  let bookmark_path = ($selection | get 1? | default "")
+  let selection_parts = ($selection_line | split row "\t")
+  let bookmark_name = ($selection_parts | first)
+  let bookmark_path = ($selection_parts | get 1? | default "")
 
   # If Ctrl-i was pressed, search for files in the bookmark directory
   if $key == "ctrl-i" {
