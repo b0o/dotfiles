@@ -91,6 +91,7 @@ $env.FZF_DEFAULT_OPTS = ([
 use hooks.nu
 
 hooks use {
+  # TODO: use atuin daemon
   atuin: {
     enabled: true
     depends: atuin
@@ -108,5 +109,12 @@ hooks use {
     enabled: true
     depends: starship
     cmd: [starship init nu]
+  }
+  mise: {
+    enabled: true
+    module: true
+    overlay: true
+    depends: mise
+    cmd: [mise activate nu]
   }
 }
