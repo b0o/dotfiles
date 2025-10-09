@@ -1,4 +1,13 @@
-let comark_dir = $env | get -o COMARK_DIR | default ($env | get -o XDG_CONFIG_HOME | default ($nu.home-path | path join ".config") | path join "comark")
+let comark_dir = (
+  $env
+  | get -o COMARK_DIR
+  | default (
+      $env
+      | get -o XDG_CONFIG_HOME
+      | default ($nu.home-path | path join ".config")
+      | path join "comark"
+    )
+)
 
 # Initialize comark directory
 def comark-init [] {
