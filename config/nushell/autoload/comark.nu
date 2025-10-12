@@ -20,13 +20,21 @@ def comark-init [] {
   }
 }
 
+def validate-alias [alias: string] {
+  if not ($alias =~ '^[a-zA-Z0-9_,.][a-zA-Z0-9_,.-]*$') {
+    error make -u {msg: $"invalid alias: ($alias)"}
+  }
+}
+
 # Make a new bookmark
 export def m, [
   alias: string
   dest?: string
-  --force (-f)  # Overwrite existing bookmark
+  --force (-f)            # Overwrite existing bookmark
+  --expand-symlinks (-e)  # Expand symlinks in destination path (default: false)
 ] {
   comark-init
+  validate-alias $alias
   let bookmark_path = ($comark_dir | path join $alias)
 
   if ($bookmark_path | path exists) {
@@ -45,6 +53,7 @@ export def m, [
 # Remove a bookmark
 export def r, [alias: string] {
   comark-init
+  validate-alias $alias
   let bookmark_path = ($comark_dir | path join $alias)
 
   if not ($bookmark_path | path exists --no-symlink) {
@@ -59,6 +68,8 @@ export def r, [alias: string] {
 # Rename a bookmark
 export def rename, [old: string, new: string] {
   comark-init
+  validate-alias $old
+  validate-alias $new
   let old_path = ($comark_dir | path join $old)
   let new_path = ($comark_dir | path join $new)
 
