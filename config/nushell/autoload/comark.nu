@@ -45,7 +45,7 @@ export def m, [
     }
   }
 
-  let target = if ($dest | is-empty) { $env.PWD } else { $dest | path expand }
+  let target = if ($dest | is-empty) { $env.PWD } else { $dest | path expand --no-symlink=(not $expand_symlinks) }
   ^ln -s $target $bookmark_path
   print $"($alias) -> ($target)"
 }
@@ -85,10 +85,10 @@ export def rename, [old: string, new: string] {
   print $"bookmark ($old) renamed to ($new)"
 }
 
-def resolve-bookmark [bookmark: string] {
-  let bookmark_path = ($comark_dir | path join $bookmark)
+def resolve-bookmark [alias: string] {
+  let bookmark_path = ($comark_dir | path join $alias)
   if not ($bookmark_path | path exists --no-symlink ) {
-    error make -u {msg: $"bookmark does not exist: ($bookmark)"}
+    error make -u {msg: $"bookmark does not exist: ($alias)"}
   }
   # symlink exists but points to a non-existent file
   # use realpath to resolve the symlink
@@ -105,6 +105,7 @@ def resolve-bookmark [bookmark: string] {
 # Print bookmark destination path
 export def p, [alias: string] {
   comark-init
+  validate-alias $alias
   resolve-bookmark $alias
 }
 
@@ -137,6 +138,7 @@ export def l, [pattern?: string] {
 # Change directory to bookmark
 export def --env cd, [alias: string] {
   comark-init
+  validate-alias $alias
   let bookmark_path = ($comark_dir | path join $alias)
 
   if not ($bookmark_path | path exists --no-symlink) {
@@ -151,17 +153,33 @@ export def --env cd, [alias: string] {
 }
 
 # Select bookmark with fzf
-export def f, [query?: string] {
+export def f, [
+  query?: string
+  --directory (-d)  # Only show bookmarks that point to a directory
+  --file (-f)       # Only show bookmarks that point to a file
+] {
   comark-init
+
+  if ($directory and $file) {
+    error make -u {msg: "--directory and --file are mutually exclusive"}
+  }
 
   let bookmark_list = (
     ls $comark_dir
     | where type == symlink
-    | par-each {|row|
-      let alias = ($row.name | path basename)
-      let target = (resolve-bookmark $alias)
-      $"($alias)\t($target)"
+    | par-each {|e|
+      let alias = $e.name | path basename
+      let target = resolve-bookmark $alias
+      let type = $target | path type
+      let entry = $"($alias)\t($target)"
+      { alias: $alias, target: $target, type: $type, entry: $entry }
     }
+    | where { |e|
+      if $directory { ($e.type == "dir")
+      } else if $file { ($e.type == "file")
+      } else { true }
+    }
+    | get entry
     | str join "\n"
   )
 
@@ -278,7 +296,11 @@ def insert-at-cursor [text: string] {
 }
 
 # Smart fzf: cd if empty/dir, insert if file, expand ,bookmark pattern
-export def --env fzf,smart [] {
+export def --env fzf,smart [
+  query?: string    # Initial fzf query
+  --directory (-d)  # Only show bookmarks that point to a directory
+  --file (-f)       # Only show bookmarks that point to a file
+] {
   let line_buffer = (commandline)
   let cursor_pos = (commandline get-cursor)
   let before_cursor = ($line_buffer | str substring 0..<$cursor_pos)
@@ -286,7 +308,7 @@ export def --env fzf,smart [] {
 
   # Empty buffer: cd to dir bookmark, insert file bookmark
   if ($line_buffer | str trim | is-empty) {
-    let result = (f,)
+    let result = (f, --file=$file --directory=$directory $query)
     if ($result | is-empty) { return }
 
     # Check if result is already a full path (from Ctrl-i) or a bookmark name
