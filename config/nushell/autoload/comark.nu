@@ -161,7 +161,7 @@ def parse-fzf-output [output: string] {
 
   # Check if first line is a selection (contains tab) or a key
   let is_selection = ($first_line | str contains "\t")
-  let first_is_key = $first_line in ["alt-d", "alt-f", "ctrl-i"]
+  let first_is_key = $first_line in ["alt-d", "alt-f", "alt-/", "alt-i", "alt-u"]
 
   # Determine query based on line structure
   let query = if $is_selection or ($line_count == 2 and $first_is_key) {
@@ -178,7 +178,7 @@ def parse-fzf-output [output: string] {
   # - ["query", "key"] -> key in line 1, no selection
   # - ["query", "key", "selection"] -> key in line 1, selection in line 2
   let second_line = ($lines | get 1? | default "")
-  let second_is_key = $second_line in ["alt-d", "alt-f", "ctrl-i"]
+  let second_is_key = $second_line in ["alt-d", "alt-f", "alt-/", "alt-i", "alt-u"]
   let second_is_selection = ($second_line | str contains "\t")
 
   let key = if $is_selection {
@@ -206,7 +206,7 @@ def parse-fzf-output [output: string] {
 }
 
 # Generate filtered bookmark list for fzf
-def generate-filtered-bookmarks [filter: string] {
+def generate-filtered-bookmarks [filter: string, parent_path?: oneof<string,nothing>] {
   ls $comark_dir
   | where type == symlink
   | each {|e|
@@ -216,13 +216,23 @@ def generate-filtered-bookmarks [filter: string] {
     {alias: $alias, target: $target, type: $type, entry: $"($alias)\t($target)"}
   }
   | where {|e|
-    if $filter == "dir" {
+    # Apply type filter
+    let type_match = if $filter == "dir" {
       $e.type == "dir"
     } else if $filter == "file" {
       $e.type == "file"
     } else {
       true
     }
+
+    # Apply parent path filter
+    let parent_match = if ($parent_path | is-empty) {
+      true
+    } else {
+      ($e.target | str starts-with $parent_path)
+    }
+
+    $type_match and $parent_match
   }
   | get entry
   | str join "\n"
@@ -242,18 +252,26 @@ export def f, [
 
   mut current_filter = if $directory { "dir" } else if $file { "file" } else { "all" }
   mut current_query = ($query | default "")
+  mut current_parent_path = null  # Filter to bookmarks under this path
+  mut current_parent_alias = null  # Alias of the parent bookmark
 
   while true {
-    let bookmark_list = (generate-filtered-bookmarks $current_filter)
+    let bookmark_list = (generate-filtered-bookmarks $current_filter $current_parent_path)
 
     if ($bookmark_list | is-empty) {
       return ""
     }
 
-    let prompt = match $current_filter {
+    let base_prompt = match $current_filter {
       "dir" => "dirs> ",
       "file" => "files> ",
       _ => "> "
+    }
+
+    let prompt = if ($current_parent_alias | is-not-empty) {
+      $"($current_parent_alias) ($base_prompt)"
+    } else {
+      $base_prompt
     }
 
     let sel = (
@@ -262,8 +280,10 @@ export def f, [
              --query $current_query --tiebreak=begin,chunk
              --preview $"eza -TlaF -L1 --group-directories-first --color=always --git --extended --follow-symlinks {2}"
              --bind 'alt-,:change-nth(1,2|1)'
-             --bind 'ctrl-i:accept'
-             --expect='ctrl-i,alt-d,alt-f'
+             --bind 'alt-/:accept'
+             --bind 'alt-i:accept'
+             --bind 'alt-u:accept'
+             --expect='alt-/,alt-d,alt-f,alt-i,alt-u'
              --print-query
              --prompt $prompt
              --no-exit-0
@@ -281,7 +301,7 @@ export def f, [
     if $sel.exit_code != 0 {
       # Check if we have a valid key in the output
       let parsed = (parse-fzf-output $sel.stdout)
-      if $parsed.key not-in ["alt-d", "alt-f", "ctrl-i"] {
+      if $parsed.key not-in ["alt-d", "alt-f", "alt-/", "alt-i", "alt-u"] {
         # User cancelled, exit
         return ""
       }
@@ -301,6 +321,37 @@ export def f, [
       continue
     }
 
+    # Handle alt-i: filter by parent directory
+    if $parsed.key == "alt-i" {
+      # Need a selection to use as parent
+      if ($parsed.selection | is-empty) {
+        continue
+      }
+
+      let selection_parts = ($parsed.selection | split row "\t")
+      let bookmark_alias = ($selection_parts | get 0? | default "")
+      let bookmark_path = ($selection_parts | get 1? | default "")
+
+      # Only works for directories
+      if ($bookmark_path | str ends-with '/') {
+        $current_parent_path = $bookmark_path
+        $current_parent_alias = $bookmark_alias
+        $current_query = ""
+        continue
+      }
+
+      # If not a directory, just ignore
+      continue
+    }
+
+    # Handle alt-u: clear parent filter and return to all bookmarks
+    if $parsed.key == "alt-u" {
+      $current_parent_path = null
+      $current_parent_alias = null
+      $current_query = $parsed.query
+      continue
+    }
+
     # For non-filter keys, we need a selection to proceed
     if ($parsed.selection | is-empty) {
       return ""
@@ -310,8 +361,8 @@ export def f, [
     let bookmark_name = ($selection_parts | first)
     let bookmark_path = ($selection_parts | get 1? | default "")
 
-    # If Ctrl-i was pressed, search for files in the bookmark directory
-    if $parsed.key == "ctrl-i" {
+    # If alt-/ was pressed, search for files in the bookmark directory
+    if $parsed.key == "alt-/" {
       # If bookmark points to a file, just return it
       if not ($bookmark_path | str ends-with '/') {
         return $bookmark_path
@@ -320,42 +371,123 @@ export def f, [
       # Save the current query to restore later
       let saved_query = $parsed.query
 
-      # Search for files in the directory
-      let file_sel = (
-        ^fd --type f --hidden --exclude .git . $bookmark_path
-        | ^fzf --layout=reverse
-               --preview 'bat --color=always --style=numbers {}'
-               --expect='ctrl-i'
-               --preview-border=none --separator='─' --scrollbar='▌'
-        | complete
-      )
+      mut search_depth = 1  # Start with non-recursive (only immediate files)
+      mut go_back_to_bookmarks = false
+      mut file_query = ""
 
-      if $file_sel.exit_code != 0 or ($file_sel.stdout | is-empty) {
-        return ""
-      }
+      while not $go_back_to_bookmarks {
+        # Search for files in the directory with current depth
+        let file_list = (
+          ^fd --type f --hidden --exclude .git --max-depth $search_depth . $bookmark_path
+        )
 
-      let file_lines = ($file_sel.stdout | str trim | split row "\n")
-      let file_key = ($file_lines | get 0? | default "")
+        let depth_indicator = if $search_depth == 999 { "∞" } else { $search_depth }
 
-      # If ctrl-i pressed again, go back to bookmark selection with saved query
-      if $file_key == "ctrl-i" {
+        let file_sel = (
+          $file_list
+          | ^fzf --layout=reverse
+                 --query $file_query
+                 --preview 'bat --color=always --style=numbers {}'
+                 --expect='alt-,,alt-/,alt-.,alt-1,alt-2,alt-3,alt-4,alt-5,alt-6,alt-7,alt-8,alt-9'
+                 --print-query
+                 --prompt $"depth:($depth_indicator) > "
+                 --no-exit-0
+                 --preview-border=none --separator='─' --scrollbar='▌'
+          | complete
+        )
+
+        if ($file_sel.stdout | is-empty) {
+          # User cancelled file search (ESC/Ctrl-C), go back to bookmark selection
+          $current_query = $saved_query
+          $go_back_to_bookmarks = true
+          continue
+        }
+
+        let file_lines = ($file_sel.stdout | str trim | split row "\n")
+        # With --print-query: [query, key/selection, selection?]
+        let file_query_out = ($file_lines | get 0? | default "")
+        let file_key = ($file_lines | get 1? | default "")
+
+        # If alt-, pressed, go back to bookmark selection with saved query
+        if $file_key == "alt-," {
+          $current_query = $saved_query
+          $go_back_to_bookmarks = true
+          continue
+        }
+
+        # Handle depth increase/decrease
+        if $file_key == "alt-/" {
+          # Increase depth and preserve query
+          if $search_depth < 999 {
+            $search_depth = $search_depth + 1
+          }
+          $file_query = $file_query_out
+          continue
+        } else if $file_key == "alt-." {
+          # Decrease depth (minimum 1) and preserve query
+          if $search_depth > 1 {
+            $search_depth = $search_depth - 1
+          }
+          $file_query = $file_query_out
+          continue
+        }
+
+        # Handle absolute depth changes
+        if $file_key == "alt-1" {
+          $search_depth = 1
+          $file_query = $file_query_out
+          continue
+        } else if $file_key == "alt-2" {
+          $search_depth = 2
+          $file_query = $file_query_out
+          continue
+        } else if $file_key == "alt-3" {
+          $search_depth = 3
+          $file_query = $file_query_out
+          continue
+        } else if $file_key == "alt-4" {
+          $search_depth = 4
+          $file_query = $file_query_out
+          continue
+        } else if $file_key == "alt-5" {
+          $search_depth = 5
+          $file_query = $file_query_out
+          continue
+        } else if $file_key == "alt-6" {
+          $search_depth = 6
+          $file_query = $file_query_out
+          continue
+        } else if $file_key == "alt-7" {
+          $search_depth = 7
+          $file_query = $file_query_out
+          continue
+        } else if $file_key == "alt-8" {
+          $search_depth = 8
+          $file_query = $file_query_out
+          continue
+        } else if $file_key == "alt-9" {
+          $search_depth = 999  # Effectively unlimited
+          $file_query = $file_query_out
+          continue
+        }
+
+        # Otherwise return the selected file
+        let file_path = if ($file_lines | length) > 2 {
+          $file_lines | get 2
+        } else {
+          $file_lines | get 1? | default ""
+        }
+
+        if not ($file_path | is-empty) {
+          return $file_path
+        }
+
+        # If no file selected, restore query and continue to bookmark selection
         $current_query = $saved_query
-        continue
+        $go_back_to_bookmarks = true
       }
 
-      # Otherwise return the selected file
-      let file_path = if ($file_lines | length) > 1 {
-        $file_lines | get 1
-      } else {
-        $file_lines | get 0? | default ""
-      }
-
-      if not ($file_path | is-empty) {
-        return $file_path
-      }
-
-      # If no file selected, restore query and continue to bookmark selection
-      $current_query = $saved_query
+      # Continue to outer loop (bookmark selection)
       continue
     }
 
