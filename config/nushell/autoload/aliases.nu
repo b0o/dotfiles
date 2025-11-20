@@ -26,3 +26,4 @@ alias m = man
 
 # utilities
 alias md = gh markdown-preview -p 6419 --disable-auto-open
+alias icat = kitty +kitten icat
