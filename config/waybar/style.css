@@ -11,7 +11,6 @@
 }
 
 window#waybar {
-  /* background-color: rgba(0, 0, 0, 0); */
   background-color: @bg;
   border-radius: 0;
   transition-property: background-color;
@@ -20,7 +19,6 @@ window#waybar {
 
 /* https://github.com/Alexays/Waybar/wiki/FAQ#the-workspace-buttons-have-a-strange-hover-effect */
 button:hover {
-  /* background: inherit; */
   box-shadow: inset 0 -3px #fb72fa;
 }
 
@@ -205,7 +203,6 @@ label:focus {
   background-color: #000000;
 }
 
-/* Linear module state-based icon colors */
 #custom-linear.state-started {
   color: @yellow;
 }
@@ -214,7 +211,6 @@ label:focus {
   color: @violet;
 }
 
-/* Gray states (default color handles these) */
 #custom-linear.state-triage,
 #custom-linear.state-backlog,
 #custom-linear.state-unstarted,
@@ -230,7 +226,6 @@ label:focus {
   color: #fda587;
 }
 
-/* Command Center module styling */
 #custom-command-center {
   color: #fda587;
 }
@@ -252,8 +247,7 @@ label:focus {
   color: @red;
 }
 
-#custom-mullvad.loading,
-#custom-mullvad.stale {
+#custom-mullvad.loading {
   animation: pulse 1.5s ease-in-out infinite;
 }
 

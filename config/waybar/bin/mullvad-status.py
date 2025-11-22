@@ -18,11 +18,9 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 NETWORK_CHECK_INTERVAL = 1.0
 MULLVAD_CHECK_INTERVAL = 30.0
-STALE_DATA_THRESHOLD = 300
 DNS_LEAK_REQUESTS = 6
 REQUEST_TIMEOUT = 6
 
@@ -35,7 +33,7 @@ CACHE_DIR = Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
 CACHE_FILE = CACHE_DIR / "mullvad-waybar-status.json"
 
 
-def check_mullvad_api(endpoint: str, log_errors: bool = True) -> Optional[Dict]:
+def check_ip(endpoint: str, log_errors: bool = True) -> dict | None:
     try:
         response = requests.get(
             f"https://{endpoint}.am.i.mullvad.net/json", timeout=REQUEST_TIMEOUT
@@ -48,7 +46,7 @@ def check_mullvad_api(endpoint: str, log_errors: bool = True) -> Optional[Dict]:
     return None
 
 
-def check_dns_leaks() -> List[Dict]:
+def check_dns() -> list[dict]:
     try:
         dns_servers = []
         for _ in range(DNS_LEAK_REQUESTS):
@@ -87,7 +85,7 @@ def get_network_state_hash() -> str:
         return ""
 
 
-def load_cache_file() -> Optional[Dict]:
+def read_cache() -> dict | None:
     if not CACHE_FILE.exists():
         return None
     try:
@@ -98,10 +96,11 @@ def load_cache_file() -> Optional[Dict]:
         return None
 
 
-def save_cache_file(
-    status: Optional[Dict] = None, approved_dns_ips: Optional[List[str]] = None
+def write_cache(
+    status: dict | None = None,
+    approved_dns_ips: list[str] | None = None,
 ):
-    existing = load_cache_file() or {}
+    existing = read_cache() or {}
     cache_data = {
         "status": status if status is not None else existing.get("status"),
         "approved_dns_ips": (
@@ -115,25 +114,25 @@ def save_cache_file(
         json.dump(cache_data, f, indent=2)
 
 
-def get_approved_dns_ips() -> List[str]:
-    cache = load_cache_file()
+def get_approved_dns_ips() -> list[str]:
+    cache = read_cache()
     return cache.get("approved_dns_ips", []) if cache else []
 
 
-def calculate_security_issues(
-    ipv4_data: Optional[Dict],
-    ipv6_data: Optional[Dict],
-    dns_servers: List[Dict],
-    approved_ips: List[str],
-) -> List[str]:
+def diagnose_issues(
+    ipv4_status: dict | None,
+    ipv6_status: dict | None,
+    dns_servers: list[dict],
+    approved_ips: list[str],
+) -> list[str]:
     issues = []
-    if ipv4_data:
-        if not ipv4_data.get("mullvad_exit_ip", False):
+    if ipv4_status:
+        if not ipv4_status.get("mullvad_exit_ip", False):
             issues.append("IPv4 leak detected - not using Mullvad exit IP")
     else:
         issues.append("IPv4 check failed")
 
-    if ipv6_data and not ipv6_data.get("mullvad_exit_ip", False):
+    if ipv6_status and not ipv6_status.get("mullvad_exit_ip", False):
         issues.append("IPv6 leak detected - not using Mullvad exit IP")
 
     non_approved_servers = [s for s in dns_servers if s.get("ip") not in approved_ips]
@@ -143,48 +142,45 @@ def calculate_security_issues(
     return issues
 
 
-def perform_mullvad_checks() -> Dict:
-    timestamp = time.time()
-    ipv4_data = check_mullvad_api("ipv4")
-    ipv6_data = check_mullvad_api("ipv6", log_errors=False)
-    dns_servers = check_dns_leaks()
-    approved_ips = get_approved_dns_ips()
+def check_security(
+    status: dict | None = None,
+    approved_ips: list[str] | None = None,
+) -> dict:
+    if approved_ips is None:
+        approved_ips = get_approved_dns_ips()
 
-    issues = calculate_security_issues(ipv4_data, ipv6_data, dns_servers, approved_ips)
+    if status is None:
+        status = {
+            "ipv4": check_ip("ipv4"),
+            "ipv6": check_ip("ipv6", log_errors=False),
+            "dns": check_dns(),
+        }
 
-    status = {
-        "secure": len(issues) == 0,
-        "issues": issues,
-        "ipv4_data": ipv4_data,
-        "ipv6_data": ipv6_data,
-        "dns_servers": dns_servers,
-        "timestamp": timestamp,
-    }
+    issues = diagnose_issues(
+        status.get("ipv4"),
+        status.get("ipv6"),
+        status.get("dns", []),
+        approved_ips,
+    )
 
-    cache = load_cache_file()
+    status["issues"] = issues
+    status["secure"] = len(issues) == 0
+
+    cache = read_cache()
     old_status = cache.get("status") if cache else None
     if not old_status or any(
         old_status.get(k) != status.get(k)
-        for k in ["secure", "issues", "ipv4_data", "ipv6_data", "dns_servers"]
+        for k in ["secure", "issues", "ipv4", "ipv6", "dns"]
     ):
-        save_cache_file(status=status)
+        write_cache(status=status)
 
     return status
 
 
-def recalculate_security(status: Dict, approved_ips: List[str]) -> Dict:
-    issues = calculate_security_issues(
-        status.get("ipv4_data"),
-        status.get("ipv6_data"),
-        status.get("dns_servers", []),
-        approved_ips,
-    )
-    return {**status, "secure": len(issues) == 0, "issues": issues}
-
-
 def categorize_dns_servers(
-    dns_servers: List[Dict], approved_ips: List[str]
-) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]], List[Tuple[str, str]]]:
+    dns_servers: list[dict],
+    approved_ips: list[str],
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
     mullvad_servers = []
     unknown_servers = []
     approved_servers = []
@@ -205,7 +201,7 @@ def categorize_dns_servers(
     return mullvad_servers, unknown_servers, approved_servers
 
 
-def format_ip_section(data: Optional[Dict], label: str) -> List[str]:
+def format_ip_section(data: dict | None, label: str) -> list[str]:
     if not data:
         return (
             [f"{label}: ✗ Check failed"]
@@ -237,28 +233,23 @@ def format_ip_section(data: Optional[Dict], label: str) -> List[str]:
     return lines
 
 
-def format_detailed_status(
-    status: Optional[Dict], current_time: float, approved_dns_ips: List[str]
-) -> str:
+def format_tooltip(status: dict | None, approved_dns_ips: list[str]) -> str:
     if not status:
         return "Mullvad VPN: No data available"
 
     lines = []
-    timestamp = status.get("timestamp", 0)
-    age = current_time - timestamp
-    stale_marker = " (STALE DATA)" if age > STALE_DATA_THRESHOLD else ""
     is_secure = status.get("secure", False)
     icon = ICON_SECURE if is_secure else ICON_LEAK
     status_text = "SECURE" if is_secure else "INSECURE"
-    lines.append(f"{icon} Mullvad VPN: {status_text}{stale_marker}")
+    lines.append(f"{icon} Mullvad VPN: {status_text}")
     lines.append("")
 
-    lines.extend(format_ip_section(status.get("ipv4_data"), "IPv4"))
+    lines.extend(format_ip_section(status.get("ipv4"), "IPv4"))
     lines.append("")
-    lines.extend(format_ip_section(status.get("ipv6_data"), "IPv6"))
+    lines.extend(format_ip_section(status.get("ipv6"), "IPv6"))
     lines.append("")
 
-    dns_servers = status.get("dns_servers", [])
+    dns_servers = status.get("dns", [])
     if dns_servers:
         mullvad, unknown, approved = categorize_dns_servers(
             dns_servers, approved_dns_ips
@@ -299,12 +290,11 @@ def get_loading_icon(base_icon: str, frame_index: int) -> str:
 
 
 def format_waybar_output(
-    status: Optional[Dict],
-    current_time: float,
+    status: dict | None,
     loading: bool = False,
     loading_frame_index: int = 0,
-    approved_dns_ips: Optional[List[str]] = None,
-) -> Dict:
+    approved_dns_ips: list[str] | None = None,
+) -> dict:
     approved_dns_ips = approved_dns_ips or []
 
     if not status:
@@ -323,18 +313,13 @@ def format_waybar_output(
         }
 
     is_secure = status.get("secure", False)
-    timestamp = status.get("timestamp", 0)
-    age = current_time - timestamp
-    is_stale = age > STALE_DATA_THRESHOLD
 
     classes = ["mullvad"]
     classes.append("state-secure" if is_secure else "state-leak")
-    if is_stale:
-        classes.append("stale")
     if loading:
         classes.append("loading")
 
-    tooltip = format_detailed_status(status, current_time, approved_dns_ips)
+    tooltip = format_tooltip(status, approved_dns_ips)
     if loading:
         tooltip = "Loading...\n\n" + tooltip
 
@@ -359,13 +344,13 @@ def show_rofi_error(message: str):
 
 
 def show_menu() -> None:
-    cache = load_cache_file()
+    cache = read_cache()
     if not cache or not cache.get("status"):
         show_rofi_error("No DNS data available. Run a check first.")
         sys.exit(1)
 
     status = cache.get("status", {})
-    dns_servers = status.get("dns_servers", [])
+    dns_servers = status.get("dns", [])
     if not dns_servers:
         show_rofi_error("No DNS servers found in cached status.")
         sys.exit(1)
@@ -453,11 +438,11 @@ def show_menu() -> None:
         else:
             updated_approved.append(ip)
 
-    save_cache_file(approved_dns_ips=updated_approved)
+    write_cache(approved_dns_ips=updated_approved)
     sys.exit(0)
 
 
-def continuous_monitor():
+def monitor():
     last_network_hash = ""
     last_check_time = 0
     last_output_json = None
@@ -470,7 +455,7 @@ def continuous_monitor():
     check_lock = threading.Lock()
     last_secure_state = None
 
-    cache = load_cache_file()
+    cache = read_cache()
     approved_dns_ips = cache.get("approved_dns_ips", []) if cache else []
     prev_approved_dns_ips = approved_dns_ips.copy()
 
@@ -481,7 +466,6 @@ def continuous_monitor():
 
     output = format_waybar_output(
         status,
-        current_time,
         loading=True,
         loading_frame_index=loading_frame_index,
         approved_dns_ips=approved_dns_ips,
@@ -493,7 +477,7 @@ def continuous_monitor():
 
     def run_check_async(result_container: list, lock: threading.Lock):
         try:
-            result = perform_mullvad_checks()
+            result = check_security()
             with lock:
                 result_container[0] = result
         except Exception as e:
@@ -507,14 +491,14 @@ def continuous_monitor():
             if CACHE_FILE.exists():
                 current_mtime = CACHE_FILE.stat().st_mtime
                 if current_mtime != last_cache_mtime:
-                    cache = load_cache_file()
+                    cache = read_cache()
                     if cache and cache.get("status"):
                         status = cache.get("status")
                     new_approved = cache.get("approved_dns_ips", []) if cache else []
                     if set(new_approved) != set(prev_approved_dns_ips):
                         if status:
-                            status = recalculate_security(status, new_approved)
-                            save_cache_file(status=status)
+                            status = check_security(status, new_approved)
+                            write_cache(status=status)
                         prev_approved_dns_ips = new_approved.copy()
                     approved_dns_ips = new_approved
                     last_cache_mtime = current_mtime
@@ -543,8 +527,11 @@ def continuous_monitor():
             if status:
                 current_secure_state = status.get("secure", False)
                 should_notify = (
-                    (last_secure_state is None and not current_secure_state)
-                    or (last_secure_state is not None and last_secure_state and not current_secure_state)
+                    last_secure_state is None and not current_secure_state
+                ) or (
+                    last_secure_state is not None
+                    and last_secure_state
+                    and not current_secure_state
                 )
                 if should_notify:
                     issues = status.get("issues", [])
@@ -568,7 +555,6 @@ def continuous_monitor():
 
             output = format_waybar_output(
                 status,
-                current_time,
                 loading=is_loading,
                 loading_frame_index=loading_frame_index,
                 approved_dns_ips=approved_dns_ips,
@@ -599,7 +585,7 @@ def main():
     if args.show_menu:
         show_menu()
     else:
-        continuous_monitor()
+        monitor()
 
 
 if __name__ == "__main__":
