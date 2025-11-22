@@ -22,6 +22,24 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
 
+
+def run_command(cmd: str, timeout: int = 5) -> Optional[str]:
+    """Run a shell command and return its output."""
+    try:
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+        pass
+    return None
+
+
 # Constants
 NETWORK_CHECK_INTERVAL = 1.0    # Check local network state every second
 MULLVAD_CHECK_INTERVAL = 30.0   # Full API check every 30 seconds
@@ -35,4 +53,16 @@ ICON_LEAK = "󱙱"       # Lock failed icon when leaking
 
 if __name__ == "__main__":
     print("Mullvad VPN Status Checker - Phase 1")
-    print("Script structure ready")
+    print("\nTesting run_command helper:")
+
+    # Test with a simple command
+    result = run_command("echo 'test'")
+    print(f"Echo test: {result}")
+    assert result == "test", "run_command failed basic test"
+
+    # Test with failing command
+    result = run_command("false")
+    print(f"Failing command: {result}")
+    assert result is None, "run_command should return None on failure"
+
+    print("\n✓ Command runner helper working")
