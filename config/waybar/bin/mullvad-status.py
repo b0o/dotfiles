@@ -175,17 +175,21 @@ def save_dns_approved(dns_servers: List[Dict]) -> None:
         json.dump(data, f, indent=2)
 
 
-def check_dns_leaks() -> List[Dict]:
+def check_dns_leaks(quiet: bool = False) -> List[Dict]:
     """Check for DNS leaks using UUID-based subdomains.
 
     Makes multiple requests to unique subdomains. Each DNS server
     that resolves the request will be reported by the API.
 
+    Args:
+        quiet: If True, suppress console output
+
     Returns list of unique DNS servers (deduplicated by IP).
     """
     dns_servers = []
 
-    print(f"Running {DNS_LEAK_REQUESTS} DNS leak checks...", end="", flush=True)
+    if not quiet:
+        print(f"Running {DNS_LEAK_REQUESTS} DNS leak checks...", end="", flush=True)
 
     for i in range(DNS_LEAK_REQUESTS):
         try:
@@ -200,12 +204,15 @@ def check_dns_leaks() -> List[Dict]:
                 servers = response.json()
                 if isinstance(servers, list):
                     dns_servers.extend(servers)
-            print(".", end="", flush=True)
+            if not quiet:
+                print(".", end="", flush=True)
         except Exception:
-            print("x", end="", flush=True)
+            if not quiet:
+                print("x", end="", flush=True)
             continue
 
-    print()  # New line after progress
+    if not quiet:
+        print()  # New line after progress
 
     # Remove duplicates based on IP
     unique_servers = {}
@@ -245,7 +252,7 @@ def get_network_state_hash() -> str:
         return ""
 
 
-def perform_mullvad_checks() -> Dict:
+def perform_mullvad_checks(quiet: bool = False) -> Dict:
     """Run all Mullvad API checks and return combined status.
 
     Returns dict with:
@@ -255,43 +262,55 @@ def perform_mullvad_checks() -> Dict:
     - ipv6: IPv6 address or None
     - dns_servers: List of DNS servers
     - timestamp: When check was performed
+
+    Args:
+        quiet: If True, suppress console output
     """
-    print("\n" + "=" * 50)
-    print("PERFORMING MULLVAD SECURITY CHECKS")
-    print("=" * 50)
+    if not quiet:
+        print("\n" + "=" * 50)
+        print("PERFORMING MULLVAD SECURITY CHECKS")
+        print("=" * 50)
 
     timestamp = time.time()
     issues = []
 
     # IPv4 check
-    print("\n[1/3] Checking IPv4...")
+    if not quiet:
+        print("\n[1/3] Checking IPv4...")
     ipv4_data = check_ipv4()
     if not ipv4_data:
         issues.append("IPv4 check failed")
     elif not ipv4_data.get("mullvad_exit_ip"):
         issues.append("IPv4 leak detected - not using Mullvad exit IP")
-        print(f"  ✗ IP: {ipv4_data.get('ip')} (NOT MULLVAD)")
+        if not quiet:
+            print(f"  ✗ IP: {ipv4_data.get('ip')} (NOT MULLVAD)")
     else:
-        print(
-            f"  ✓ IP: {ipv4_data.get('ip')} via {ipv4_data.get('mullvad_exit_ip_hostname')}"
-        )
+        if not quiet:
+            print(
+                f"  ✓ IP: {ipv4_data.get('ip')} via {ipv4_data.get('mullvad_exit_ip_hostname')}"
+            )
 
     # IPv6 check
-    print("\n[2/3] Checking IPv6...")
+    if not quiet:
+        print("\n[2/3] Checking IPv6...")
     ipv6 = check_ipv6()
     if ipv6:
         ipv6_verified = verify_ip(ipv6)
         if not ipv6_verified:
             issues.append("IPv6 leak detected - not using Mullvad exit IP")
-            print(f"  ✗ IPv6: {ipv6} (NOT MULLVAD)")
+            if not quiet:
+                print(f"  ✗ IPv6: {ipv6} (NOT MULLVAD)")
         else:
-            print(f"  ✓ IPv6: {ipv6}")
+            if not quiet:
+                print(f"  ✓ IPv6: {ipv6}")
     else:
-        print("  ○ IPv6 not available (OK)")
+        if not quiet:
+            print("  ○ IPv6 not available (OK)")
 
     # DNS leak check
-    print("\n[3/3] Checking DNS...")
-    dns_servers = check_dns_leaks()
+    if not quiet:
+        print("\n[3/3] Checking DNS...")
+    dns_servers = check_dns_leaks(quiet=quiet)
 
     # Load approved list and filter out approved servers
     approved_ips = load_dns_approved()
@@ -307,25 +326,28 @@ def perform_mullvad_checks() -> Dict:
         non_mullvad = [
             s for s in non_approved_servers if not s.get("mullvad_dns", False)
         ]
-        for server in non_mullvad:
-            print(f"  ✗ {server.get('ip')} ({server.get('organization', 'Unknown')})")
+        if not quiet:
+            for server in non_mullvad:
+                print(f"  ✗ {server.get('ip')} ({server.get('organization', 'Unknown')})")
     else:
-        print(f"  ✓ All {len(non_approved_servers)} DNS server(s) are Mullvad")
-        if len(dns_servers) > len(non_approved_servers):
-            approved_count = len(dns_servers) - len(non_approved_servers)
-            print(f"  ○ {approved_count} approved DNS server(s) ignored")
+        if not quiet:
+            print(f"  ✓ All {len(non_approved_servers)} DNS server(s) are Mullvad")
+            if len(dns_servers) > len(non_approved_servers):
+                approved_count = len(dns_servers) - len(non_approved_servers)
+                print(f"  ○ {approved_count} approved DNS server(s) ignored")
 
     # Overall status
     is_secure = len(issues) == 0
 
-    print("\n" + "=" * 50)
-    if is_secure:
-        print("✓ SECURE - All checks passed")
-    else:
-        print("✗ INSECURE - Issues detected:")
-        for issue in issues:
-            print(f"  • {issue}")
-    print("=" * 50)
+    if not quiet:
+        print("\n" + "=" * 50)
+        if is_secure:
+            print("✓ SECURE - All checks passed")
+        else:
+            print("✗ INSECURE - Issues detected:")
+            for issue in issues:
+                print(f"  • {issue}")
+        print("=" * 50)
 
     return {
         "secure": is_secure,
