@@ -183,30 +183,91 @@ def get_network_state_hash() -> str:
         return ""
 
 
+def perform_mullvad_checks() -> Dict:
+    """Run all Mullvad API checks and return combined status.
+
+    Returns dict with:
+    - secure: bool (overall security status)
+    - issues: list of problem descriptions
+    - ipv4_data: IPv4 connection data
+    - ipv6: IPv6 address or None
+    - dns_servers: List of DNS servers
+    - timestamp: When check was performed
+    """
+    print("\n" + "="*50)
+    print("PERFORMING MULLVAD SECURITY CHECKS")
+    print("="*50)
+
+    timestamp = time.time()
+    issues = []
+
+    # IPv4 check
+    print("\n[1/3] Checking IPv4...")
+    ipv4_data = check_ipv4()
+    if not ipv4_data:
+        issues.append("IPv4 check failed")
+    elif not ipv4_data.get("mullvad_exit_ip"):
+        issues.append("IPv4 leak detected - not using Mullvad exit IP")
+        print(f"  ✗ IP: {ipv4_data.get('ip')} (NOT MULLVAD)")
+    else:
+        print(f"  ✓ IP: {ipv4_data.get('ip')} via {ipv4_data.get('mullvad_exit_ip_hostname')}")
+
+    # IPv6 check
+    print("\n[2/3] Checking IPv6...")
+    ipv6 = check_ipv6()
+    if ipv6:
+        ipv6_verified = verify_ip(ipv6)
+        if not ipv6_verified:
+            issues.append("IPv6 leak detected - not using Mullvad exit IP")
+            print(f"  ✗ IPv6: {ipv6} (NOT MULLVAD)")
+        else:
+            print(f"  ✓ IPv6: {ipv6}")
+    else:
+        print("  ○ IPv6 not available (OK)")
+
+    # DNS leak check
+    print("\n[3/3] Checking DNS...")
+    dns_servers = check_dns_leaks()
+    has_non_mullvad_dns = any(
+        not server.get("mullvad_dns", False)
+        for server in dns_servers
+    )
+    if has_non_mullvad_dns:
+        issues.append("DNS leak detected - non-Mullvad DNS servers found")
+        non_mullvad = [s for s in dns_servers if not s.get("mullvad_dns", False)]
+        for server in non_mullvad:
+            print(f"  ✗ {server.get('ip')} ({server.get('organization', 'Unknown')})")
+    else:
+        print(f"  ✓ All {len(dns_servers)} DNS server(s) are Mullvad")
+
+    # Overall status
+    is_secure = len(issues) == 0
+
+    print("\n" + "="*50)
+    if is_secure:
+        print("✓ SECURE - All checks passed")
+    else:
+        print("✗ INSECURE - Issues detected:")
+        for issue in issues:
+            print(f"  • {issue}")
+    print("="*50)
+
+    return {
+        "secure": is_secure,
+        "issues": issues,
+        "ipv4_data": ipv4_data,
+        "ipv6": ipv6,
+        "dns_servers": dns_servers,
+        "timestamp": timestamp,
+    }
+
+
 if __name__ == "__main__":
     print("Mullvad VPN Status Checker - Phase 1")
 
-    print("\n--- DNS Leak Check ---")
-    dns_servers = check_dns_leaks()
+    status = perform_mullvad_checks()
 
-    if dns_servers:
-        print(f"\nFound {len(dns_servers)} unique DNS server(s):")
-        for server in dns_servers:
-            ip = server.get("ip", "Unknown")
-            is_mullvad = server.get("mullvad_dns", False)
-            hostname = server.get("mullvad_dns_hostname", "")
-            org = server.get("organization", "")
-            country = server.get("country", "")
-
-            status = "✓" if is_mullvad else "✗"
-            info = hostname if is_mullvad else org
-            print(f"  {status} {ip} - {info} ({country})")
-
-        # Check for leaks
-        has_leak = any(not s.get("mullvad_dns", False) for s in dns_servers)
-        if has_leak:
-            print("\n⚠ DNS LEAK DETECTED - Non-Mullvad DNS servers found")
-        else:
-            print("\n✓ No DNS leaks - All servers are Mullvad")
-    else:
-        print("✗ DNS leak check failed")
+    print("\n--- Status Summary ---")
+    print(f"Secure: {status['secure']}")
+    print(f"Issues: {len(status['issues'])}")
+    print(f"Timestamp: {status['timestamp']}")
