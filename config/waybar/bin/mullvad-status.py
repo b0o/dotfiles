@@ -26,6 +26,7 @@ Usage:
     ./mullvad-status.py                # Single check and exit
     ./mullvad-status.py --watch        # Continuous monitoring mode
     ./mullvad-status.py --approve-dns  # Save current DNS servers to approved list
+    ./mullvad-status.py --waybar       # Waybar JSON output mode
 
 The script will run a single check by default.
 Use --watch for continuous monitoring. Press Ctrl+C to stop.
@@ -678,6 +679,7 @@ Examples:
   %(prog)s                    # Run single check and exit
   %(prog)s --watch            # Continuous monitoring mode
   %(prog)s --approve-dns      # Save current DNS servers to approved list
+  %(prog)s --waybar           # Waybar JSON output mode
         """,
     )
 
@@ -694,6 +696,12 @@ Examples:
         help="Save current DNS servers to approved list file and exit",
     )
 
+    parser.add_argument(
+        '--waybar',
+        action='store_true',
+        help='Enable waybar JSON output mode (continuous monitoring)'
+    )
+
     return parser.parse_args()
 
 
@@ -701,11 +709,10 @@ if __name__ == "__main__":
     args = parse_args()
 
     if args.approve_dns:
-        # Approve DNS mode
         approve_dns_mode()
+    elif args.waybar:
+        waybar_mode()
     elif args.watch:
-        # Continuous monitoring mode
         main_test_loop()
     else:
-        # Single check mode (default)
         single_check_mode()
