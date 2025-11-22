@@ -7,31 +7,6 @@
 # ]
 # ///
 
-"""
-Mullvad VPN Status Checker - Phase 1
-
-Monitors Mullvad VPN connection via Tailscale exit nodes and detects leaks.
-
-Features:
-- IPv4/IPv6 connection verification
-- DNS leak detection (6 unique subdomain requests)
-- Network topology change detection
-- Automatic re-checking on network changes
-- 30-second periodic checks
-
-Phase 1: Console output for manual testing
-Phase 2: Waybar JSON integration (future)
-
-Usage:
-    ./mullvad-status.py                # Single check and exit
-    ./mullvad-status.py --watch        # Continuous monitoring mode
-    ./mullvad-status.py --approve-dns  # Save current DNS servers to approved list
-    ./mullvad-status.py --waybar       # Waybar JSON output mode
-
-The script will run a single check by default.
-Use --watch for continuous monitoring. Press Ctrl+C to stop.
-"""
-
 import argparse
 import hashlib
 import json
@@ -572,63 +547,34 @@ def approve_dns_mode() -> None:
     sys.exit(0)
 
 
-def main_test_loop():
-    """Test loop for Phase 1 - runs checks periodically.
+def waybar_single_check() -> None:
+    """Run single check and output waybar JSON once, then exit.
 
-    In Phase 2, this will be replaced with waybar JSON output.
+    This is the default behavior for --waybar without --watch.
+    Used for waybar modules that poll the script at intervals.
     """
-    print("Mullvad VPN Status Checker - Continuous Monitoring Mode")
-    print("Running continuous monitoring...")
-    print("Press Ctrl+C to stop\n")
-
-    last_network_hash = ""
-    last_check_time = 0
-    status = None
-
-    try:
-        while True:
-            current_time = time.time()
-            current_hash = get_network_state_hash()
-
-            # Trigger check if network changed or timer elapsed
-            should_check = (
-                current_hash != last_network_hash
-                or current_time - last_check_time >= MULLVAD_CHECK_INTERVAL
-                or status is None  # First run
-            )
-
-            if should_check:
-                if current_hash != last_network_hash and last_network_hash:
-                    print("\n⚡ Network state changed - triggering check")
-
-                status = perform_mullvad_checks()
-                last_check_time = current_time
-                last_network_hash = current_hash
-
-                print("\n" + "=" * 50)
-                print("CURRENT STATUS")
-                print("=" * 50)
-                detailed = format_detailed_status(status, current_time)
-                print(detailed)
-
-                # Show next check time
-                next_check = int(
-                    MULLVAD_CHECK_INTERVAL - (time.time() - last_check_time)
-                )
-                print(f"\nNext check in {next_check}s (or on network change)")
-
-            time.sleep(NETWORK_CHECK_INTERVAL)
-
-    except KeyboardInterrupt:
-        print("\n\nStopped by user")
+    verify_cache: Dict[str, bool] = {}
+    status = perform_mullvad_checks(quiet=True)
+    current_time = time.time()
+    output = format_waybar_output(status, current_time, verify_cache)
+    print(json.dumps(output), flush=True)
+    sys.exit(0)
 
 
-def waybar_mode():
-    """Waybar continuous monitoring mode - JSON output only.
+def continuous_monitor(waybar_output: bool = False):
+    """Unified continuous monitoring function.
 
-    Runs continuously, outputting JSON to stdout only when status changes.
-    Errors go to stderr. Network state is monitored for instant updates.
+    Args:
+        waybar_output: If True, output JSON format. If False, output console format.
+
+    This function handles both --watch (console) and --waybar --watch (JSON) modes.
+    Network state is monitored for instant updates.
     """
+    if not waybar_output:
+        print("Mullvad VPN Status Checker - Continuous Monitoring Mode")
+        print("Running continuous monitoring...")
+        print("Press Ctrl+C to stop\n")
+
     last_network_hash = ""
     last_check_time = 0
     last_output_json = None
@@ -648,28 +594,53 @@ def waybar_mode():
             )
 
             if should_check:
+                if (
+                    not waybar_output
+                    and current_hash != last_network_hash
+                    and last_network_hash
+                ):
+                    print("\n⚡ Network state changed - triggering check")
+
                 # Clear verify cache on new check
                 verify_cache.clear()
-                status = perform_mullvad_checks(quiet=True)
+                status = perform_mullvad_checks(quiet=waybar_output)
                 last_check_time = current_time
                 last_network_hash = current_hash
 
-            # Format and output if changed
-            output = format_waybar_output(status, current_time, verify_cache)
-            output_json = json.dumps(output)
+                if not waybar_output:
+                    # Console output mode
+                    print("\n" + "=" * 50)
+                    print("CURRENT STATUS")
+                    print("=" * 50)
+                    detailed = format_detailed_status(
+                        status, current_time, verify_cache
+                    )
+                    print(detailed)
 
-            if output_json != last_output_json:
-                print(output_json, flush=True)
-                last_output_json = output_json
+                    # Show next check time
+                    next_check = int(
+                        MULLVAD_CHECK_INTERVAL - (time.time() - last_check_time)
+                    )
+                    print(f"\nNext check in {next_check}s (or on network change)")
+
+            if waybar_output:
+                # JSON output mode - output only if changed
+                output = format_waybar_output(status, current_time, verify_cache)
+                output_json = json.dumps(output)
+
+                if output_json != last_output_json:
+                    print(output_json, flush=True)
+                    last_output_json = output_json
 
             time.sleep(NETWORK_CHECK_INTERVAL)
 
     except KeyboardInterrupt:
-        # Silent exit on Ctrl+C
+        if not waybar_output:
+            print("\n\nStopped by user")
         sys.exit(0)
     except Exception as e:
         # Log errors to stderr
-        print(f"Waybar mode error: {e}", file=sys.stderr)
+        print(f"Monitoring error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -680,10 +651,11 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                    # Run single check and exit
-  %(prog)s --watch            # Continuous monitoring mode
+  %(prog)s                    # Single check with console output
+  %(prog)s --watch            # Continuous console monitoring
+  %(prog)s --waybar           # Single waybar JSON output
+  %(prog)s --waybar --watch   # Continuous waybar JSON monitoring
   %(prog)s --approve-dns      # Save current DNS servers to approved list
-  %(prog)s --waybar           # Waybar JSON output mode
         """,
     )
 
@@ -691,7 +663,7 @@ Examples:
         "-w",
         "--watch",
         action="store_true",
-        help="Enable continuous monitoring mode (default: single check and exit)",
+        help="Enable continuous monitoring (combine with --waybar for continuous JSON output)",
     )
 
     parser.add_argument(
@@ -703,7 +675,7 @@ Examples:
     parser.add_argument(
         "--waybar",
         action="store_true",
-        help="Enable waybar JSON output mode (continuous monitoring)",
+        help="Output waybar JSON format (single check unless --watch is also specified)",
     )
 
     return parser.parse_args()
@@ -713,10 +685,17 @@ if __name__ == "__main__":
     args = parse_args()
 
     if args.approve_dns:
+        # DNS approval mode (overrides all other flags)
         approve_dns_mode()
+    elif args.waybar and args.watch:
+        # Continuous JSON monitoring (for waybar persistent modules)
+        continuous_monitor(waybar_output=True)
     elif args.waybar:
-        waybar_mode()
+        # Single JSON output (for waybar polling modules)
+        waybar_single_check()
     elif args.watch:
-        main_test_loop()
+        # Continuous console monitoring
+        continuous_monitor(waybar_output=False)
     else:
+        # Single console check
         single_check_mode()
