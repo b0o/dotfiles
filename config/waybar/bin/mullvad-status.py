@@ -75,6 +75,26 @@ def check_ipv4() -> Optional[Dict]:
     return None
 
 
+def check_ipv6() -> Optional[str]:
+    """Check IPv6 connection via Mullvad API.
+
+    Returns IPv6 address if available, None otherwise.
+    IPv6 may not be available on all networks.
+    """
+    try:
+        response = requests.get(
+            "https://ipv6.am.i.mullvad.net/json",
+            timeout=REQUEST_TIMEOUT
+        )
+        if response.ok:
+            data = response.json()
+            return data.get("ip")
+    except Exception as e:
+        # IPv6 not available is normal, don't print error
+        pass
+    return None
+
+
 def get_network_state_hash() -> str:
     """Get hash of current network configuration.
 
@@ -105,16 +125,17 @@ def get_network_state_hash() -> str:
 
 if __name__ == "__main__":
     print("Mullvad VPN Status Checker - Phase 1")
-    print("\nTesting IPv4 connection check:")
 
+    print("\n--- IPv4 Check ---")
     ipv4_data = check_ipv4()
     if ipv4_data:
         print(f"IP: {ipv4_data.get('ip')}")
-        print(f"Location: {ipv4_data.get('city')}, {ipv4_data.get('country')}")
-        print(f"Mullvad Exit IP: {ipv4_data.get('mullvad_exit_ip')}")
-        print(f"Server: {ipv4_data.get('mullvad_exit_ip_hostname')}")
-        print(f"Protocol: {ipv4_data.get('mullvad_server_type')}")
-        print(f"Provider: {ipv4_data.get('organization')}")
-        print("\n✓ IPv4 check working")
+        print(f"Mullvad: {ipv4_data.get('mullvad_exit_ip')}")
+
+    print("\n--- IPv6 Check ---")
+    ipv6 = check_ipv6()
+    if ipv6:
+        print(f"IPv6: {ipv6}")
+        print("✓ IPv6 available")
     else:
-        print("✗ IPv4 check failed (check network connection)")
+        print("IPv6: Not available (this is normal)")
