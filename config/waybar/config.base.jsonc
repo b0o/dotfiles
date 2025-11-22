@@ -122,8 +122,8 @@
     "on-click": "echo",
   },
   "custom/mullvad": {
-    "exec": "~/.config/waybar/bin/mullvad-status.py --waybar --watch",
-    "on-click": "~/.config/waybar/bin/mullvad-status.py --approve-dns-interactive",
+    "exec": "~/.config/waybar/bin/mullvad-status.py",
+    "on-click": "~/.config/waybar/bin/mullvad-status.py --show-menu",
     "return-type": "json",
     "format": "{}",
     "escape": true,
