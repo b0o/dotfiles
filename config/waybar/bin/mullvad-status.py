@@ -51,18 +51,46 @@ ICON_SECURE = ""     # Lock icon when secure
 ICON_LEAK = "󱙱"       # Lock failed icon when leaking
 
 
+def get_network_state_hash() -> str:
+    """Get hash of current network configuration.
+
+    Monitors: routing table, interface states, IP addresses, DNS config.
+    Returns SHA256 hash to detect any network topology changes.
+    """
+    try:
+        route_output = run_command("ip route show") or ""
+        link_output = run_command("ip link show") or ""
+        addr_output = run_command("ip addr show") or ""
+
+        # Read DNS config
+        resolv_conf = ""
+        try:
+            resolv_path = Path("/etc/resolv.conf")
+            if resolv_path.exists():
+                resolv_conf = resolv_path.read_text()
+        except Exception:
+            pass
+
+        # Combine and hash
+        combined = f"{route_output}\n{link_output}\n{addr_output}\n{resolv_conf}"
+        return hashlib.sha256(combined.encode()).hexdigest()
+    except Exception as e:
+        print(f"Error getting network state: {e}")
+        return ""
+
+
 if __name__ == "__main__":
     print("Mullvad VPN Status Checker - Phase 1")
-    print("\nTesting run_command helper:")
+    print("\nTesting network state hashing:")
 
-    # Test with a simple command
-    result = run_command("echo 'test'")
-    print(f"Echo test: {result}")
-    assert result == "test", "run_command failed basic test"
+    # Get initial hash
+    hash1 = get_network_state_hash()
+    print(f"Network state hash: {hash1[:16]}...")
+    assert len(hash1) == 64, "Hash should be 64 chars (SHA256)"
 
-    # Test with failing command
-    result = run_command("false")
-    print(f"Failing command: {result}")
-    assert result is None, "run_command should return None on failure"
+    # Get hash again (should be same)
+    hash2 = get_network_state_hash()
+    assert hash1 == hash2, "Hash should be consistent"
 
-    print("\n✓ Command runner helper working")
+    print(f"Hash is consistent: {hash1 == hash2}")
+    print("\n✓ Network state hashing working")
