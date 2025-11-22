@@ -95,6 +95,24 @@ def check_ipv6() -> Optional[str]:
     return None
 
 
+def verify_ip(ip: str) -> bool:
+    """Verify if an IP address is a Mullvad exit IP.
+
+    Uses the check-ip endpoint to double-check IP addresses.
+    """
+    try:
+        response = requests.get(
+            f"https://am.i.mullvad.net/check-ip/{ip}",
+            timeout=REQUEST_TIMEOUT
+        )
+        if response.ok:
+            data = response.json()
+            return data.get("mullvad_exit_ip", False)
+    except Exception as e:
+        print(f"IP verification error for {ip}: {e}")
+    return False
+
+
 def get_network_state_hash() -> str:
     """Get hash of current network configuration.
 
@@ -129,13 +147,19 @@ if __name__ == "__main__":
     print("\n--- IPv4 Check ---")
     ipv4_data = check_ipv4()
     if ipv4_data:
-        print(f"IP: {ipv4_data.get('ip')}")
-        print(f"Mullvad: {ipv4_data.get('mullvad_exit_ip')}")
+        ipv4 = ipv4_data.get('ip')
+        print(f"IP: {ipv4}")
+        print(f"Mullvad (from API): {ipv4_data.get('mullvad_exit_ip')}")
+
+        # Verify the IP
+        verified = verify_ip(ipv4)
+        print(f"Mullvad (verified): {verified}")
 
     print("\n--- IPv6 Check ---")
     ipv6 = check_ipv6()
     if ipv6:
         print(f"IPv6: {ipv6}")
-        print("✓ IPv6 available")
+        verified = verify_ip(ipv6)
+        print(f"Mullvad (verified): {verified}")
     else:
-        print("IPv6: Not available (this is normal)")
+        print("IPv6: Not available")
