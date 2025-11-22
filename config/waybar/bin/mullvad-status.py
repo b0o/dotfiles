@@ -8,10 +8,25 @@
 # ///
 
 """
-Mullvad VPN Status Checker
+Mullvad VPN Status Checker - Phase 1
 
-Monitors Mullvad VPN connection and detects IP/DNS leaks.
-Phase 1: Console output for testing.
+Monitors Mullvad VPN connection via Tailscale exit nodes and detects leaks.
+
+Features:
+- IPv4/IPv6 connection verification
+- DNS leak detection (6 unique subdomain requests)
+- Network topology change detection
+- Automatic re-checking on network changes
+- 30-second periodic checks
+
+Phase 1: Console output for manual testing
+Phase 2: Waybar JSON integration (future)
+
+Usage:
+    ./mullvad-status.py
+
+The script will run continuously and show VPN status.
+Press Ctrl+C to stop.
 """
 
 import hashlib
@@ -358,6 +373,20 @@ def format_detailed_status(status: Optional[Dict], current_time: float, verify_c
             lines.append(f"  • {issue}")
 
     return "\n".join(lines)
+
+
+# Usage Notes:
+# - Run script to start monitoring
+# - Initial check happens immediately
+# - Subsequent checks every 30 seconds
+# - Instant check if network topology changes
+# - Ctrl+C to stop
+#
+# Testing scenarios:
+# 1. Connected to Mullvad: Should show SECURE
+# 2. Disconnected from VPN: Should show INSECURE with IP leak
+# 3. Toggle VPN: Should detect network change and re-check
+# 4. Kill network: Should handle errors gracefully
 
 
 def main_test_loop():
