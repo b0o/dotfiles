@@ -262,12 +262,99 @@ def perform_mullvad_checks() -> Dict:
     }
 
 
+def format_detailed_status(status: Optional[Dict], current_time: float) -> str:
+    """Format detailed status information for display.
+
+    Similar to what will be shown in waybar tooltip.
+    """
+    if not status:
+        return "Mullvad VPN: No data available"
+
+    lines = []
+
+    # Header with staleness check
+    timestamp = status.get("timestamp", 0)
+    age = current_time - timestamp
+    stale_marker = " (STALE DATA)" if age > STALE_DATA_THRESHOLD else ""
+
+    is_secure = status.get("secure", False)
+    icon = ICON_SECURE if is_secure else ICON_LEAK
+    status_text = "SECURE" if is_secure else "INSECURE"
+
+    lines.append(f"{icon} Mullvad VPN: {status_text}{stale_marker}")
+    lines.append("")
+
+    # IPv4 info
+    ipv4_data = status.get("ipv4_data")
+    if ipv4_data:
+        ip = ipv4_data.get("ip", "Unknown")
+        server = ipv4_data.get("mullvad_exit_ip_hostname", "Unknown")
+        city = ipv4_data.get("city", "")
+        country = ipv4_data.get("country", "")
+        protocol = ipv4_data.get("mullvad_server_type", "")
+        provider = ipv4_data.get("organization", "")
+        is_mullvad = ipv4_data.get("mullvad_exit_ip", False)
+
+        check = "✓" if is_mullvad else "✗"
+        lines.append(f"IPv4: {check} {ip}")
+        if server != "Unknown":
+            lines.append(f"  Server: {server}")
+        if city and country:
+            lines.append(f"  Location: {city}, {country}")
+        if protocol:
+            lines.append(f"  Protocol: {protocol}")
+        if provider:
+            lines.append(f"  Provider: {provider}")
+    else:
+        lines.append("IPv4: ✗ Check failed")
+
+    lines.append("")
+
+    # IPv6 info
+    ipv6 = status.get("ipv6")
+    if ipv6:
+        is_verified = verify_ip(ipv6)
+        check = "✓" if is_verified else "✗"
+        lines.append(f"IPv6: {check} {ipv6}")
+    else:
+        lines.append("IPv6: Not available")
+
+    lines.append("")
+
+    # DNS servers
+    dns_servers = status.get("dns_servers", [])
+    if dns_servers:
+        lines.append(f"DNS Servers ({len(dns_servers)}):")
+        for server in dns_servers:
+            ip = server.get("ip", "Unknown")
+            is_mullvad = server.get("mullvad_dns", False)
+            hostname = server.get("mullvad_dns_hostname", "")
+            org = server.get("organization", "")
+
+            check = "✓" if is_mullvad else "✗"
+            info = hostname if is_mullvad else org
+            lines.append(f"  {check} {ip} ({info})")
+    else:
+        lines.append("DNS: No data")
+
+    # Issues
+    issues = status.get("issues", [])
+    if issues:
+        lines.append("")
+        lines.append("Issues:")
+        for issue in issues:
+            lines.append(f"  • {issue}")
+
+    return "\n".join(lines)
+
+
 if __name__ == "__main__":
     print("Mullvad VPN Status Checker - Phase 1")
 
     status = perform_mullvad_checks()
 
-    print("\n--- Status Summary ---")
-    print(f"Secure: {status['secure']}")
-    print(f"Issues: {len(status['issues'])}")
-    print(f"Timestamp: {status['timestamp']}")
+    print("\n" + "="*50)
+    print("FORMATTED OUTPUT (for waybar tooltip)")
+    print("="*50)
+    detailed = format_detailed_status(status, time.time())
+    print(detailed)
