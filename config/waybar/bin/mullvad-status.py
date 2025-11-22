@@ -49,9 +49,9 @@ STALE_DATA_THRESHOLD = 300  # 5 minutes before marking data as stale
 DNS_LEAK_REQUESTS = 6  # Number of DNS leak check requests
 REQUEST_TIMEOUT = 6  # HTTP request timeout in seconds
 
-ICON_SECURE = ""  # Lock icon when secure
-ICON_LEAK = "󱙱"  # Lock failed icon when leaking
-ICON_LOADING = "󰦖"  # Loading spinner icon
+ICON_SECURE = "󰌾 "  # Lock icon when secure
+ICON_LEAK = "󱙱 "  # Lock failed icon when leaking
+ICON_LOADING = "󰦖 "  # Loading spinner icon
 
 # Cache file location (stores status and approved DNS list)
 CACHE_DIR = Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
@@ -135,7 +135,9 @@ def load_cache_file() -> Optional[Dict]:
         return None
 
 
-def save_cache_file(status: Optional[Dict] = None, approved_dns_ips: Optional[List[str]] = None) -> None:
+def save_cache_file(
+    status: Optional[Dict] = None, approved_dns_ips: Optional[List[str]] = None
+) -> None:
     """Save status and/or approved DNS list to cache file.
 
     Args:
@@ -148,7 +150,9 @@ def save_cache_file(status: Optional[Dict] = None, approved_dns_ips: Optional[Li
     # Update with new data (preserve existing if not provided)
     data = {
         "status": status if status is not None else existing.get("status"),
-        "approved_dns_ips": approved_dns_ips if approved_dns_ips is not None else existing.get("approved_dns_ips", []),
+        "approved_dns_ips": approved_dns_ips
+        if approved_dns_ips is not None
+        else existing.get("approved_dns_ips", []),
         "updated_at": time.time(),
     }
 
@@ -453,7 +457,10 @@ def format_detailed_status(
 
 
 def format_waybar_output(
-    status: Optional[Dict], current_time: float, verify_cache: Optional[Dict] = None, loading: bool = False
+    status: Optional[Dict],
+    current_time: float,
+    verify_cache: Optional[Dict] = None,
+    loading: bool = False,
 ) -> Dict:
     """Format status for waybar JSON output.
 
@@ -560,18 +567,20 @@ def approve_dns_mode() -> None:
     # Load cached status
     cache = load_cache_file()
     if not cache or not cache.get("status"):
-        print("\n✗ No cached status found. Run a check first before approving DNS servers.")
+        print(
+            "\n✗ No cached status found. Run a check first before approving DNS servers."
+        )
         print("   Hint: Run without --approve-dns to perform a check.")
         sys.exit(1)
 
     status = cache.get("status")
-    dns_servers = status.get("dns_servers", [])
+    dns_servers = status.get("dns_servers", []) if status else []
 
     if not dns_servers:
         print("\n✗ No DNS servers found in cached status.")
         sys.exit(1)
 
-    print(f"\nDNS servers from last check:")
+    print("\nDNS servers from last check:")
     for server in dns_servers:
         ip = server.get("ip", "Unknown")
         org = server.get("organization", "Unknown")
@@ -646,7 +655,9 @@ def continuous_monitor(waybar_output: bool = False):
             status = cache.get("status")
             current_time = time.time()
             # Show loading spinner since this is cached data, fresh check pending
-            output = format_waybar_output(status, current_time, verify_cache, loading=True)
+            output = format_waybar_output(
+                status, current_time, verify_cache, loading=True
+            )
             output_json = json.dumps(output)
             print(output_json, flush=True)
             last_output_json = output_json
@@ -698,7 +709,9 @@ def continuous_monitor(waybar_output: bool = False):
                 # JSON output mode - output only if changed
                 # Show loading spinner only if first check hasn't completed yet
                 is_loading = not first_check_completed
-                output = format_waybar_output(status, current_time, verify_cache, loading=is_loading)
+                output = format_waybar_output(
+                    status, current_time, verify_cache, loading=is_loading
+                )
                 output_json = json.dumps(output)
 
                 if output_json != last_output_json:
