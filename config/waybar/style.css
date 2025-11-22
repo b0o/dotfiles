@@ -113,6 +113,7 @@ tooltip {
 #custom-linear,
 #custom-command-center,
 #custom-claude-time,
+#custom-mullvad,
 #idle_inhibitor,
 #systemd-failed-units,
 #mpris,
@@ -128,6 +129,7 @@ tooltip {
 #custom-linear,
 #custom-command-center,
 #custom-claude-time,
+#custom-mullvad,
 #idle_inhibitor,
 #systemd-failed-units,
 #mpris,
@@ -140,6 +142,7 @@ tooltip {
 #custom-linear:hover,
 #custom-command-center:hover,
 #custom-claude-time:hover,
+#custom-mullvad:hover,
 #idle_inhibitor:hover,
 #systemd-failed-units:hover,
 #mpris:hover,
@@ -260,4 +263,22 @@ label:focus {
   100% {
     opacity: 1;
   }
+}
+
+/* Mullvad VPN status module */
+#custom-mullvad.state-secure {
+  color: @violet;
+}
+
+#custom-mullvad.state-leak {
+  color: @red;
+}
+
+#custom-mullvad.stale {
+  opacity: 0.6;
+}
+
+#custom-mullvad.error {
+  color: @red;
+  opacity: 0.5;
 }
