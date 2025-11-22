@@ -121,4 +121,12 @@
     },
     "on-click": "echo",
   },
+  "custom/mullvad": {
+    "exec": "~/.config/waybar/bin/mullvad-status.py --waybar",
+    "return-type": "json",
+    "format": "{}",
+    "escape": true,
+    "tooltip": true,
+    "restart-interval": 1,
+  },
 }
