@@ -428,6 +428,56 @@ def format_detailed_status(
     return "\n".join(lines)
 
 
+def format_waybar_output(status: Optional[Dict], current_time: float, verify_cache: Optional[Dict] = None) -> Dict:
+    """Format status for waybar JSON output.
+
+    Returns dict with:
+    - text: Icon string
+    - tooltip: Detailed status
+    - class: List of CSS classes
+    - alt: Alternative text identifier
+    """
+    if verify_cache is None:
+        verify_cache = {}
+
+    if not status:
+        return {
+            "text": ICON_LEAK,
+            "tooltip": "Mullvad VPN: No data available",
+            "class": ["mullvad", "error"],
+            "alt": "mullvad-error",
+        }
+
+    is_secure = status.get("secure", False)
+    timestamp = status.get("timestamp", 0)
+    age = current_time - timestamp
+    is_stale = age > STALE_DATA_THRESHOLD
+
+    # Build CSS classes
+    classes = ["mullvad"]
+    if is_secure:
+        classes.append("state-secure")
+    else:
+        classes.append("state-leak")
+
+    if is_stale:
+        classes.append("stale")
+
+    # Generate tooltip using existing function
+    tooltip = format_detailed_status(status, current_time, verify_cache)
+
+    # Determine icon and alt
+    icon = ICON_SECURE if is_secure else ICON_LEAK
+    alt = "mullvad-secure" if is_secure else "mullvad-leak"
+
+    return {
+        "text": icon,
+        "tooltip": tooltip,
+        "class": classes,
+        "alt": alt,
+    }
+
+
 # Usage Notes:
 # - Run script to start monitoring
 # - Initial check happens immediately
