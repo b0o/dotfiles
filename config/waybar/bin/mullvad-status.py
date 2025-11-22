@@ -98,7 +98,7 @@ def check_ipv4() -> Optional[Dict]:
         if response.ok:
             return response.json()
     except Exception as e:
-        print(f"IPv4 check error: {e}")
+        print(f"IPv4 check error: {e}", file=sys.stderr)
     return None
 
 
@@ -134,7 +134,7 @@ def verify_ip(ip: str) -> bool:
             data = response.json()
             return data.get("mullvad_exit_ip", False)
     except Exception as e:
-        print(f"IP verification error for {ip}: {e}")
+        print(f"IP verification error for {ip}: {e}", file=sys.stderr)
     return False
 
 
@@ -151,7 +151,7 @@ def load_dns_approved() -> List[str]:
             data = json.load(f)
             return data.get("approved_ips", [])
     except Exception as e:
-        print(f"Error loading DNS approved list: {e}")
+        print(f"Error loading DNS approved list: {e}", file=sys.stderr)
         return []
 
 
@@ -249,7 +249,7 @@ def get_network_state_hash() -> str:
         combined = f"{route_output}\n{link_output}\n{addr_output}\n{resolv_conf}"
         return hashlib.sha256(combined.encode()).hexdigest()
     except Exception as e:
-        print(f"Error getting network state: {e}")
+        print(f"Error getting network state: {e}", file=sys.stderr)
         return ""
 
 
