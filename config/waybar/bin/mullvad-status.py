@@ -16,6 +16,7 @@ Phase 1: Console output for testing.
 
 import hashlib
 import json
+import requests
 import subprocess
 import time
 import uuid
@@ -51,6 +52,29 @@ ICON_SECURE = ""     # Lock icon when secure
 ICON_LEAK = "󱙱"       # Lock failed icon when leaking
 
 
+def check_ipv4() -> Optional[Dict]:
+    """Check IPv4 connection via Mullvad API.
+
+    Returns connection details including:
+    - ip, country, city, latitude, longitude
+    - mullvad_exit_ip (bool)
+    - mullvad_exit_ip_hostname
+    - mullvad_server_type (e.g., "WireGuard")
+    - organization (provider)
+    - blacklisted info
+    """
+    try:
+        response = requests.get(
+            "https://ipv4.am.i.mullvad.net/json",
+            timeout=REQUEST_TIMEOUT
+        )
+        if response.ok:
+            return response.json()
+    except Exception as e:
+        print(f"IPv4 check error: {e}")
+    return None
+
+
 def get_network_state_hash() -> str:
     """Get hash of current network configuration.
 
@@ -81,16 +105,16 @@ def get_network_state_hash() -> str:
 
 if __name__ == "__main__":
     print("Mullvad VPN Status Checker - Phase 1")
-    print("\nTesting network state hashing:")
+    print("\nTesting IPv4 connection check:")
 
-    # Get initial hash
-    hash1 = get_network_state_hash()
-    print(f"Network state hash: {hash1[:16]}...")
-    assert len(hash1) == 64, "Hash should be 64 chars (SHA256)"
-
-    # Get hash again (should be same)
-    hash2 = get_network_state_hash()
-    assert hash1 == hash2, "Hash should be consistent"
-
-    print(f"Hash is consistent: {hash1 == hash2}")
-    print("\n✓ Network state hashing working")
+    ipv4_data = check_ipv4()
+    if ipv4_data:
+        print(f"IP: {ipv4_data.get('ip')}")
+        print(f"Location: {ipv4_data.get('city')}, {ipv4_data.get('country')}")
+        print(f"Mullvad Exit IP: {ipv4_data.get('mullvad_exit_ip')}")
+        print(f"Server: {ipv4_data.get('mullvad_exit_ip_hostname')}")
+        print(f"Protocol: {ipv4_data.get('mullvad_server_type')}")
+        print(f"Provider: {ipv4_data.get('organization')}")
+        print("\n✓ IPv4 check working")
+    else:
+        print("✗ IPv4 check failed (check network connection)")
