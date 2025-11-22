@@ -20,6 +20,9 @@
     "on-click": "activate",
     "sort-by-number": true,
   },
+  "tray": {
+    "spacing": 10,
+  },
   "clock": {
     "tooltip-format": "<big>{:%Y %B}</big>\n<tt>{calendar}</tt>",
     "format": "{:%a %b %d %H:%M}",
@@ -77,7 +80,7 @@
     "tooltip": true,
     "status-icons": {
       "playing": "▶",
-      "paused": "⏸"
+      "paused": "⏸",
     },
     "title-len": 40,
     "artist-len": 20,

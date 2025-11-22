@@ -54,7 +54,9 @@ tooltip {
   padding-right: 0px;
 }
 
-#workspaces button:hover {
+#workspaces button:hover,
+#tray > .passive:hover,
+#tray > .active:hover {
   background: @bright_bg;
 }
 
@@ -116,10 +118,23 @@ tooltip {
 #mpris,
 #window,
 #clock,
-#pulseaudio {
-  padding: 0 10px;
+#pulseaudio,
+#tray > .passive,
+#tray > .active {
   transition-duration: 0.2s;
   transition-property: background-color;
+}
+
+#custom-linear,
+#custom-command-center,
+#custom-claude-time,
+#idle_inhibitor,
+#systemd-failed-units,
+#mpris,
+#window,
+#clock,
+#pulseaudio {
+  padding: 0 10px;
 }
 
 #custom-linear:hover,
@@ -141,6 +156,7 @@ tooltip {
 }
 
 #custom-linear {
+  font-weight: bold;
   color: @dark_fg_dim;
   margin-right: 20px;
 }
@@ -152,6 +168,19 @@ tooltip {
 
 #window {
   color: @dark_fg_dim;
+}
+
+#tray {
+  padding-right: 5px;
+  padding-left: 10px;
+}
+
+#tray menu {
+  background-color: @dark_bg;
+  color: @white;
+  border-radius: 8px;
+  border: 2px solid @indigo;
+  padding: 16px;
 }
 
 .modules-right {
@@ -203,9 +232,6 @@ label:focus {
 
 #custom-claude-time {
   margin-right: 20px;
-}
-
-#custom-claude-time {
   color: #fda587;
 }
 
