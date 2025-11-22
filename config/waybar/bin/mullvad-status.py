@@ -51,6 +51,7 @@ REQUEST_TIMEOUT = 6  # HTTP request timeout in seconds
 
 ICON_SECURE = ""  # Lock icon when secure
 ICON_LEAK = "󱙱"  # Lock failed icon when leaking
+ICON_LOADING = "󰦖"  # Loading spinner icon
 
 # Cache file location (stores status and approved DNS list)
 CACHE_DIR = Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
@@ -452,9 +453,15 @@ def format_detailed_status(
 
 
 def format_waybar_output(
-    status: Optional[Dict], current_time: float, verify_cache: Optional[Dict] = None
+    status: Optional[Dict], current_time: float, verify_cache: Optional[Dict] = None, loading: bool = False
 ) -> Dict:
     """Format status for waybar JSON output.
+
+    Args:
+        status: Status dict from perform_mullvad_checks
+        current_time: Current timestamp
+        verify_cache: IP verification cache
+        loading: If True, show loading spinner (for initial fetch only)
 
     Returns dict with:
     - text: Icon string
@@ -488,12 +495,19 @@ def format_waybar_output(
     if is_stale:
         classes.append("stale")
 
+    if loading:
+        classes.append("loading")
+
     # Generate tooltip using existing function
     tooltip = format_detailed_status(status, current_time, verify_cache)
 
     # Determine icon and alt
-    icon = ICON_SECURE if is_secure else ICON_LEAK
-    alt = "mullvad-secure" if is_secure else "mullvad-leak"
+    if loading:
+        icon = ICON_LOADING
+        alt = "mullvad-loading"
+    else:
+        icon = ICON_SECURE if is_secure else ICON_LEAK
+        alt = "mullvad-secure" if is_secure else "mullvad-leak"
 
     return {
         "text": icon,
@@ -623,14 +637,16 @@ def continuous_monitor(waybar_output: bool = False):
     last_output_json = None
     status = None
     verify_cache: Dict[str, bool] = {}
+    first_check_completed = False  # Track if first fresh check has completed
 
-    # Load cached status for instant waybar output
+    # Load cached status for instant waybar output (with loading spinner)
     if waybar_output:
         cache = load_cache_file()
         if cache and cache.get("status"):
             status = cache.get("status")
             current_time = time.time()
-            output = format_waybar_output(status, current_time, verify_cache)
+            # Show loading spinner since this is cached data, fresh check pending
+            output = format_waybar_output(status, current_time, verify_cache, loading=True)
             output_json = json.dumps(output)
             print(output_json, flush=True)
             last_output_json = output_json
@@ -660,6 +676,7 @@ def continuous_monitor(waybar_output: bool = False):
                 status = perform_mullvad_checks(quiet=waybar_output)
                 last_check_time = current_time
                 last_network_hash = current_hash
+                first_check_completed = True  # Mark first check as done
 
                 if not waybar_output:
                     # Console output mode
@@ -679,7 +696,9 @@ def continuous_monitor(waybar_output: bool = False):
 
             if waybar_output:
                 # JSON output mode - output only if changed
-                output = format_waybar_output(status, current_time, verify_cache)
+                # Show loading spinner only if first check hasn't completed yet
+                is_loading = not first_check_completed
+                output = format_waybar_output(status, current_time, verify_cache, loading=is_loading)
                 output_json = json.dumps(output)
 
                 if output_json != last_output_json:
