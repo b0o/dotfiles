@@ -205,10 +205,6 @@ label:focus {
   background-color: #000000;
 }
 
-/* #pulseaudio.muted { */
-/*   color: @text; */
-/* } */
-
 /* Linear module state-based icon colors */
 #custom-linear.state-started {
   color: @yellow;
@@ -248,19 +244,6 @@ label:focus {
   color: @red;
 }
 
-@keyframes pulse {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-/* Mullvad VPN status module */
 #custom-mullvad {
   color: @velvet;
 }
@@ -277,4 +260,16 @@ label:focus {
 #custom-mullvad.error {
   color: @red;
   opacity: 0.5;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
 }
