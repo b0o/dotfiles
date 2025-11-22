@@ -329,7 +329,9 @@ def perform_mullvad_checks(quiet: bool = False) -> Dict:
         ]
         if not quiet:
             for server in non_mullvad:
-                print(f"  ✗ {server.get('ip')} ({server.get('organization', 'Unknown')})")
+                print(
+                    f"  ✗ {server.get('ip')} ({server.get('organization', 'Unknown')})"
+                )
     else:
         if not quiet:
             print(f"  ✓ All {len(non_approved_servers)} DNS server(s) are Mullvad")
@@ -451,7 +453,9 @@ def format_detailed_status(
     return "\n".join(lines)
 
 
-def format_waybar_output(status: Optional[Dict], current_time: float, verify_cache: Optional[Dict] = None) -> Dict:
+def format_waybar_output(
+    status: Optional[Dict], current_time: float, verify_cache: Optional[Dict] = None
+) -> Dict:
     """Format status for waybar JSON output.
 
     Returns dict with:
@@ -638,9 +642,9 @@ def waybar_mode():
 
             # Trigger check if network changed or timer elapsed or first run
             should_check = (
-                current_hash != last_network_hash or
-                current_time - last_check_time >= MULLVAD_CHECK_INTERVAL or
-                status is None
+                current_hash != last_network_hash
+                or current_time - last_check_time >= MULLVAD_CHECK_INTERVAL
+                or status is None
             )
 
             if should_check:
@@ -697,9 +701,9 @@ Examples:
     )
 
     parser.add_argument(
-        '--waybar',
-        action='store_true',
-        help='Enable waybar JSON output mode (continuous monitoring)'
+        "--waybar",
+        action="store_true",
+        help="Enable waybar JSON output mode (continuous monitoring)",
     )
 
     return parser.parse_args()
