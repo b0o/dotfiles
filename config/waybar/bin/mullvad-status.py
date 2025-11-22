@@ -348,13 +348,54 @@ def format_detailed_status(status: Optional[Dict], current_time: float) -> str:
     return "\n".join(lines)
 
 
+def main_test_loop():
+    """Test loop for Phase 1 - runs checks periodically.
+
+    In Phase 2, this will be replaced with waybar JSON output.
+    """
+    print("Mullvad VPN Status Checker - Phase 1 Test Mode")
+    print("Running continuous monitoring...")
+    print("Press Ctrl+C to stop\n")
+
+    last_network_hash = ""
+    last_check_time = 0
+    status = None
+
+    try:
+        while True:
+            current_time = time.time()
+            current_hash = get_network_state_hash()
+
+            # Trigger check if network changed or timer elapsed
+            should_check = (
+                current_hash != last_network_hash or
+                current_time - last_check_time >= MULLVAD_CHECK_INTERVAL or
+                status is None  # First run
+            )
+
+            if should_check:
+                if current_hash != last_network_hash and last_network_hash:
+                    print("\n⚡ Network state changed - triggering check")
+
+                status = perform_mullvad_checks()
+                last_check_time = current_time
+                last_network_hash = current_hash
+
+                print("\n" + "="*50)
+                print("CURRENT STATUS")
+                print("="*50)
+                detailed = format_detailed_status(status, current_time)
+                print(detailed)
+
+                # Show next check time
+                next_check = int(MULLVAD_CHECK_INTERVAL - (time.time() - last_check_time))
+                print(f"\nNext check in {next_check}s (or on network change)")
+
+            time.sleep(NETWORK_CHECK_INTERVAL)
+
+    except KeyboardInterrupt:
+        print("\n\nStopped by user")
+
+
 if __name__ == "__main__":
-    print("Mullvad VPN Status Checker - Phase 1")
-
-    status = perform_mullvad_checks()
-
-    print("\n" + "="*50)
-    print("FORMATTED OUTPUT (for waybar tooltip)")
-    print("="*50)
-    detailed = format_detailed_status(status, time.time())
-    print(detailed)
+    main_test_loop()
