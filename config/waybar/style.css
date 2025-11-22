@@ -274,12 +274,12 @@ label:focus {
   color: @red;
 }
 
-#custom-mullvad.stale {
-  opacity: 0.6;
+#custom-mullvad.loading {
+  color: @dark_fg_dim;
 }
 
-#custom-mullvad.loading {
-  animation: pulse 1.5s ease-in-out infinite;
+#custom-mullvad.stale {
+  opacity: 0.6;
 }
 
 #custom-mullvad.error {

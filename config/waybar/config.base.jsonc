@@ -122,7 +122,7 @@
     "on-click": "echo",
   },
   "custom/mullvad": {
-    "exec": "~/.config/waybar/bin/mullvad-status.py --waybar",
+    "exec": "~/.config/waybar/bin/mullvad-status.py --waybar --watch",
     "return-type": "json",
     "format": "{}",
     "escape": true,

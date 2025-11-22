@@ -14,6 +14,7 @@ import os
 import requests
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -51,7 +52,14 @@ REQUEST_TIMEOUT = 6  # HTTP request timeout in seconds
 
 ICON_SECURE = "󰌾 "  # Lock icon when secure
 ICON_LEAK = "󱙱 "  # Lock failed icon when leaking
-ICON_LOADING = "󰦖 "  # Loading spinner icon
+ICON_LOADING_FRAMES = [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+]
 
 # Cache file location (stores status and approved DNS list)
 CACHE_DIR = Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
@@ -461,6 +469,7 @@ def format_waybar_output(
     current_time: float,
     verify_cache: Optional[Dict] = None,
     loading: bool = False,
+    loading_frame_index: int = 0,
 ) -> Dict:
     """Format status for waybar JSON output.
 
@@ -469,6 +478,7 @@ def format_waybar_output(
         current_time: Current timestamp
         verify_cache: IP verification cache
         loading: If True, show loading spinner (for initial fetch only)
+        loading_frame_index: Frame index for animated loading spinner
 
     Returns dict with:
     - text: Icon string
@@ -505,15 +515,21 @@ def format_waybar_output(
     if loading:
         classes.append("loading")
 
-    # Generate tooltip using existing function
+    # Generate tooltip
     tooltip = format_detailed_status(status, current_time, verify_cache)
+    if loading:
+        tooltip = "Loading...\n\n" + tooltip
 
     # Determine icon and alt
+    status_icon = ICON_SECURE if is_secure else ICON_LEAK
+
     if loading:
-        icon = ICON_LOADING
+        # Show status icon + loading spinner frame
+        frame = ICON_LOADING_FRAMES[loading_frame_index % len(ICON_LOADING_FRAMES)]
+        icon = f"{status_icon} {frame}"
         alt = "mullvad-loading"
     else:
-        icon = ICON_SECURE if is_secure else ICON_LEAK
+        icon = status_icon
         alt = "mullvad-secure" if is_secure else "mullvad-leak"
 
     return {
@@ -635,6 +651,7 @@ def continuous_monitor(waybar_output: bool = False):
     This function handles both --watch (console) and --waybar --watch (JSON) modes.
     Network state is monitored for instant updates.
     Loads cached status first for instant waybar output.
+    Uses threading for async API checks to allow spinner animation.
     """
     if not waybar_output:
         print("Mullvad VPN Status Checker - Continuous Monitoring Mode")
@@ -647,6 +664,12 @@ def continuous_monitor(waybar_output: bool = False):
     status = None
     verify_cache: Dict[str, bool] = {}
     first_check_completed = False  # Track if first fresh check has completed
+    loading_frame_index = 0  # Track current frame for loading animation
+
+    # Thread management for async checks
+    check_thread = None
+    check_result = [None]  # Mutable container for thread result
+    check_lock = threading.Lock()
 
     # Load cached status for instant waybar output (with loading spinner)
     if waybar_output:
@@ -656,23 +679,71 @@ def continuous_monitor(waybar_output: bool = False):
             current_time = time.time()
             # Show loading spinner since this is cached data, fresh check pending
             output = format_waybar_output(
-                status, current_time, verify_cache, loading=True
+                status,
+                current_time,
+                verify_cache,
+                loading=True,
+                loading_frame_index=loading_frame_index,
             )
             output_json = json.dumps(output)
             print(output_json, flush=True)
             last_output_json = output_json
+            loading_frame_index += 1
+
+    def run_check_async(quiet: bool, result_container: list, lock: threading.Lock):
+        """Run check in background thread and store result."""
+        try:
+            result = perform_mullvad_checks(quiet=quiet)
+            with lock:
+                result_container[0] = result
+        except Exception as e:
+            print(f"Error in background check: {e}", file=sys.stderr, flush=True)
+            import traceback
+
+            traceback.print_exc(file=sys.stderr)
 
     try:
         while True:
             current_time = time.time()
             current_hash = get_network_state_hash()
 
+            # Check if background thread completed
+            if check_thread is not None:
+                if not check_thread.is_alive():
+                    # Retrieve result from thread
+                    with check_lock:
+                        if check_result[0] is not None:
+                            status = check_result[0]
+                            first_check_completed = True
+                            check_result[0] = None  # Clear for next check
+
+                            if not waybar_output:
+                                # Console output mode
+                                print("\n" + "=" * 50)
+                                print("CURRENT STATUS")
+                                print("=" * 50)
+                                detailed = format_detailed_status(
+                                    status, current_time, verify_cache
+                                )
+                                print(detailed)
+
+                                # Show next check time
+                                next_check = int(
+                                    MULLVAD_CHECK_INTERVAL
+                                    - (time.time() - last_check_time)
+                                )
+                                print(
+                                    f"\nNext check in {next_check}s (or on network change)"
+                                )
+
+                    check_thread = None  # Clear thread reference
+
             # Trigger check if network changed or timer elapsed or first run
             should_check = (
                 current_hash != last_network_hash
                 or current_time - last_check_time >= MULLVAD_CHECK_INTERVAL
                 or status is None
-            )
+            ) and check_thread is None  # Don't start new check if one is running
 
             if should_check:
                 if (
@@ -684,33 +755,32 @@ def continuous_monitor(waybar_output: bool = False):
 
                 # Clear verify cache on new check
                 verify_cache.clear()
-                status = perform_mullvad_checks(quiet=waybar_output)
+
+                # Start check in background thread
+                check_thread = threading.Thread(
+                    target=run_check_async,
+                    args=(waybar_output, check_result, check_lock),
+                    daemon=True,
+                )
+                check_thread.start()
                 last_check_time = current_time
                 last_network_hash = current_hash
-                first_check_completed = True  # Mark first check as done
-
-                if not waybar_output:
-                    # Console output mode
-                    print("\n" + "=" * 50)
-                    print("CURRENT STATUS")
-                    print("=" * 50)
-                    detailed = format_detailed_status(
-                        status, current_time, verify_cache
-                    )
-                    print(detailed)
-
-                    # Show next check time
-                    next_check = int(
-                        MULLVAD_CHECK_INTERVAL - (time.time() - last_check_time)
-                    )
-                    print(f"\nNext check in {next_check}s (or on network change)")
 
             if waybar_output:
                 # JSON output mode - output only if changed
-                # Show loading spinner only if first check hasn't completed yet
-                is_loading = not first_check_completed
+                # Show loading spinner only during first check, not on periodic refreshes
+                is_loading = (
+                    check_thread is not None
+                    and check_thread.is_alive()
+                    and not first_check_completed
+                )
+
                 output = format_waybar_output(
-                    status, current_time, verify_cache, loading=is_loading
+                    status,
+                    current_time,
+                    verify_cache,
+                    loading=is_loading,
+                    loading_frame_index=loading_frame_index,
                 )
                 output_json = json.dumps(output)
 
@@ -718,7 +788,15 @@ def continuous_monitor(waybar_output: bool = False):
                     print(output_json, flush=True)
                     last_output_json = output_json
 
-            time.sleep(NETWORK_CHECK_INTERVAL)
+                # Increment frame index for animation (cycles through frames)
+                if is_loading:
+                    loading_frame_index += 1
+
+            # Use shorter sleep interval when loading spinner is active for faster animation
+            sleep_interval = (
+                0.10 if (waybar_output and is_loading) else NETWORK_CHECK_INTERVAL
+            )
+            time.sleep(sleep_interval)
 
     except KeyboardInterrupt:
         if not waybar_output:
