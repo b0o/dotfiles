@@ -32,11 +32,9 @@ tooltip {
 }
 #workspaces button {
   padding: 0 10px;
-  /* background: @med_bg; */
   background: transparent;
   color: @white;
   border: none;
-  /* margin-right: 6px; */
   border-radius: 0;
 }
 
@@ -161,7 +159,6 @@ tooltip {
 #custom-linear {
   font-weight: bold;
   color: @dark_fg_dim;
-  margin-right: 20px;
 }
 
 #mpris,
@@ -234,14 +231,12 @@ label:focus {
 }
 
 #custom-claude-time {
-  margin-right: 20px;
   color: #fda587;
 }
 
 /* Command Center module styling */
 #custom-command-center {
   color: #fda587;
-  margin-right: 0px;
 }
 
 #custom-command-center.state-waiting {
@@ -258,7 +253,7 @@ label:focus {
     opacity: 1;
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.7;
   }
   100% {
     opacity: 1;
@@ -266,20 +261,17 @@ label:focus {
 }
 
 /* Mullvad VPN status module */
-#custom-mullvad.state-secure {
-  color: @violet;
+#custom-mullvad {
+  color: @velvet;
 }
 
 #custom-mullvad.state-leak {
   color: @red;
 }
 
-#custom-mullvad.loading {
-  color: @dark_fg_dim;
-}
-
+#custom-mullvad.loading,
 #custom-mullvad.stale {
-  opacity: 0.6;
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 #custom-mullvad.error {

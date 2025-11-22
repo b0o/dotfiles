@@ -50,8 +50,8 @@ STALE_DATA_THRESHOLD = 300  # 5 minutes before marking data as stale
 DNS_LEAK_REQUESTS = 6  # Number of DNS leak check requests
 REQUEST_TIMEOUT = 6  # HTTP request timeout in seconds
 
-ICON_SECURE = "󰌾 "  # Lock icon when secure
-ICON_LEAK = "󱙱 "  # Lock failed icon when leaking
+ICON_SECURE = "󰌾"  # Lock icon when secure
+ICON_LEAK = "󱙱"  # Lock failed icon when leaking
 ICON_LOADING_FRAMES = [
     "",
     "",
@@ -88,19 +88,25 @@ def check_ipv4() -> Optional[Dict]:
     return None
 
 
-def check_ipv6() -> Optional[str]:
+def check_ipv6() -> Optional[Dict]:
     """Check IPv6 connection via Mullvad API.
 
-    Returns IPv6 address if available, None otherwise.
-    IPv6 may not be available on all networks.
+    Returns connection details including:
+    - ip, country, city, latitude, longitude
+    - mullvad_exit_ip (bool)
+    - mullvad_exit_ip_hostname
+    - mullvad_server_type (e.g., "WireGuard")
+    - organization (provider)
+    - blacklisted info
+
+    Returns None if IPv6 is not available on the network.
     """
     try:
         response = requests.get(
             "https://ipv6.am.i.mullvad.net/json", timeout=REQUEST_TIMEOUT
         )
         if response.ok:
-            data = response.json()
-            return data.get("ip")
+            return response.json()
     except Exception:
         # IPv6 not available is normal, don't print error
         pass
@@ -161,7 +167,6 @@ def save_cache_file(
         "approved_dns_ips": approved_dns_ips
         if approved_dns_ips is not None
         else existing.get("approved_dns_ips", []),
-        "updated_at": time.time(),
     }
 
     # Create parent directory if needed
@@ -300,16 +305,18 @@ def perform_mullvad_checks(quiet: bool = False) -> Dict:
     # IPv6 check
     if not quiet:
         print("\n[2/3] Checking IPv6...")
-    ipv6 = check_ipv6()
-    if ipv6:
-        ipv6_verified = verify_ip(ipv6)
-        if not ipv6_verified:
+    ipv6_data = check_ipv6()
+    if ipv6_data:
+        ipv6 = ipv6_data.get("ip", "Unknown")
+        is_mullvad = ipv6_data.get("mullvad_exit_ip", False)
+        if not is_mullvad:
             issues.append("IPv6 leak detected - not using Mullvad exit IP")
             if not quiet:
                 print(f"  ✗ IPv6: {ipv6} (NOT MULLVAD)")
         else:
             if not quiet:
-                print(f"  ✓ IPv6: {ipv6}")
+                server = ipv6_data.get("mullvad_exit_ip_hostname", "")
+                print(f"  ✓ IPv6: {ipv6} ({server})")
     else:
         if not quiet:
             print("  ○ IPv6 not available (OK)")
@@ -362,19 +369,39 @@ def perform_mullvad_checks(quiet: bool = False) -> Dict:
         "secure": is_secure,
         "issues": issues,
         "ipv4_data": ipv4_data,
-        "ipv6": ipv6,
+        "ipv6_data": ipv6_data,
         "dns_servers": dns_servers,
         "timestamp": timestamp,
     }
 
-    # Save status to cache
-    save_cache_file(status=status)
+    # Only save to cache if status actually changed (excluding timestamp)
+    cache = load_cache_file()
+    old_status = cache.get("status") if cache else None
+
+    # Compare status excluding timestamp
+    def status_changed(old: Optional[Dict], new: Dict) -> bool:
+        if not old:
+            return True
+        # Compare all fields except timestamp
+        return (
+            old.get("secure") != new.get("secure")
+            or old.get("issues") != new.get("issues")
+            or old.get("ipv4_data") != new.get("ipv4_data")
+            or old.get("ipv6_data") != new.get("ipv6_data")
+            or old.get("dns_servers") != new.get("dns_servers")
+        )
+
+    if status_changed(old_status, status):
+        save_cache_file(status=status)
 
     return status
 
 
 def format_detailed_status(
-    status: Optional[Dict], current_time: float, verify_cache: Optional[Dict] = None
+    status: Optional[Dict],
+    current_time: float,
+    verify_cache: Optional[Dict] = None,
+    approved_dns_ips: Optional[list] = None,
 ) -> str:
     """Format detailed status information for display.
 
@@ -382,6 +409,8 @@ def format_detailed_status(
     """
     if verify_cache is None:
         verify_cache = {}
+    if approved_dns_ips is None:
+        approved_dns_ips = []
 
     if not status:
         return "Mullvad VPN: No data available"
@@ -427,29 +456,81 @@ def format_detailed_status(
     lines.append("")
 
     # IPv6 info
-    ipv6 = status.get("ipv6")
-    if ipv6:
-        is_verified = safe_verify_ip(ipv6, verify_cache)
-        check = "✓" if is_verified else "✗"
-        lines.append(f"IPv6: {check} {ipv6}")
+    ipv6_data = status.get("ipv6_data")
+    if ipv6_data:
+        ip = ipv6_data.get("ip", "Unknown")
+        server = ipv6_data.get("mullvad_exit_ip_hostname", "Unknown")
+        city = ipv6_data.get("city", "")
+        country = ipv6_data.get("country", "")
+        protocol = ipv6_data.get("mullvad_server_type", "")
+        provider = ipv6_data.get("organization", "")
+        is_mullvad = ipv6_data.get("mullvad_exit_ip", False)
+
+        check = "✓" if is_mullvad else "✗"
+        lines.append(f"IPv6: {check} {ip}")
+        if server != "Unknown":
+            lines.append(f"  Server: {server}")
+        if city and country:
+            lines.append(f"  Location: {city}, {country}")
+        if protocol:
+            lines.append(f"  Protocol: {protocol}")
+        if provider:
+            lines.append(f"  Provider: {provider}")
     else:
         lines.append("IPv6: Not available")
 
     lines.append("")
 
-    # DNS servers
+    # DNS servers - organize into three sections
     dns_servers = status.get("dns_servers", [])
     if dns_servers:
-        lines.append(f"DNS Servers ({len(dns_servers)}):")
+        # Categorize servers
+        mullvad_servers = []
+        unknown_servers = []
+        approved_servers = []
+
         for server in dns_servers:
             ip = server.get("ip", "Unknown")
             is_mullvad = server.get("mullvad_dns", False)
             hostname = server.get("mullvad_dns_hostname", "")
             org = server.get("organization", "")
 
-            check = "✓" if is_mullvad else "✗"
-            info = hostname if is_mullvad else org
-            lines.append(f"  {check} {ip} ({info})")
+            if is_mullvad:
+                mullvad_servers.append((ip, hostname))
+            elif ip in approved_dns_ips:
+                approved_servers.append((ip, org))
+            else:
+                unknown_servers.append((ip, org))
+
+        # Show sections that have servers
+        sections_shown = 0
+
+        if mullvad_servers:
+            if sections_shown > 0:
+                lines.append("")
+            lines.append(f"Mullvad DNS ({len(mullvad_servers)}):")
+            for ip, hostname in mullvad_servers:
+                lines.append(f"  ✓ {ip} ({hostname})")
+            sections_shown += 1
+
+        if unknown_servers:
+            if sections_shown > 0:
+                lines.append("")
+            lines.append(f"Unknown DNS ({len(unknown_servers)}):")
+            for ip, org in unknown_servers:
+                lines.append(f"  ✗ {ip} ({org})")
+            sections_shown += 1
+
+        if approved_servers:
+            if sections_shown > 0:
+                lines.append("")
+            lines.append(f"Approved DNS ({len(approved_servers)}):")
+            for ip, org in approved_servers:
+                lines.append(f"  ✓ {ip} ({org})")
+            sections_shown += 1
+
+        if sections_shown == 0:
+            lines.append("DNS: No servers detected")
     else:
         lines.append("DNS: No data")
 
@@ -470,6 +551,7 @@ def format_waybar_output(
     verify_cache: Optional[Dict] = None,
     loading: bool = False,
     loading_frame_index: int = 0,
+    approved_dns_ips: Optional[list] = None,
 ) -> Dict:
     """Format status for waybar JSON output.
 
@@ -479,6 +561,7 @@ def format_waybar_output(
         verify_cache: IP verification cache
         loading: If True, show loading spinner (for initial fetch only)
         loading_frame_index: Frame index for animated loading spinner
+        approved_dns_ips: List of manually approved DNS server IPs
 
     Returns dict with:
     - text: Icon string
@@ -488,6 +571,8 @@ def format_waybar_output(
     """
     if verify_cache is None:
         verify_cache = {}
+    if approved_dns_ips is None:
+        approved_dns_ips = []
 
     if not status:
         return {
@@ -516,7 +601,9 @@ def format_waybar_output(
         classes.append("loading")
 
     # Generate tooltip
-    tooltip = format_detailed_status(status, current_time, verify_cache)
+    tooltip = format_detailed_status(
+        status, current_time, verify_cache, approved_dns_ips
+    )
     if loading:
         tooltip = "Loading...\n\n" + tooltip
 
@@ -563,10 +650,14 @@ def single_check_mode() -> None:
     """
     status = perform_mullvad_checks()
 
+    # Load approved DNS list from cache
+    cache = load_cache_file()
+    approved_dns_ips = cache.get("approved_dns_ips", []) if cache else []
+
     print("\n" + "=" * 50)
     print("FINAL STATUS")
     print("=" * 50)
-    detailed = format_detailed_status(status, time.time())
+    detailed = format_detailed_status(status, time.time(), approved_dns_ips=approved_dns_ips)
     print(detailed)
 
     # Exit with appropriate code
@@ -617,6 +708,112 @@ def approve_dns_mode() -> None:
     sys.exit(0)
 
 
+def approve_dns_interactive() -> None:
+    """Launch rofi for interactive DNS approval management."""
+    # Load cached status
+    cache = load_cache_file()
+    if not cache or not cache.get("status"):
+        # Show error in rofi
+        run_command('rofi -e "No DNS data available. Run a check first."')
+        sys.exit(1)
+
+    status = cache.get("status")
+    dns_servers = status.get("dns_servers", []) if status else []
+
+    if not dns_servers:
+        run_command('rofi -e "No DNS servers found in cached status."')
+        sys.exit(1)
+
+    # Get current approved list
+    approved_ips = cache.get("approved_dns_ips", [])
+
+    # Record initial mtime for conflict detection
+    if not CACHE_FILE.exists():
+        sys.exit(1)
+    initial_mtime = CACHE_FILE.stat().st_mtime
+
+    # Build rofi options and index mapping
+    rofi_lines = []
+    index_to_server = {}  # Map rofi index -> dns_server
+    mullvad_indices = []  # Track Mullvad DNS indices (non-selectable)
+
+    for idx, server in enumerate(dns_servers):
+        ip = server.get("ip", "Unknown")
+        org = server.get("organization", "Unknown")
+        is_mullvad = server.get("mullvad_dns", False)
+        hostname = server.get("mullvad_dns_hostname", "")
+
+        info = hostname if is_mullvad else org
+
+        if is_mullvad:
+            # Mullvad DNS: read-only, shown with --- prefix
+            rofi_lines.append(f"--- {ip} ({info})")
+            mullvad_indices.append(idx)
+        else:
+            # Non-Mullvad DNS: show checkbox based on approval status
+            is_approved = ip in approved_ips
+            checkbox = "[✓]" if is_approved else "[ ]"
+            rofi_lines.append(f"{checkbox} {ip} ({info})")
+            index_to_server[idx] = server
+
+    # Launch rofi with multi-select, using format 'i' to get indices
+    rofi_input = "\n".join(rofi_lines)
+    rofi_cmd = 'rofi -multi-select -dmenu -p "DNS Servers" -format i -markup-rows'
+    result = subprocess.run(
+        rofi_cmd,
+        shell=True,
+        input=rofi_input,
+        capture_output=True,
+        text=True,
+    )
+
+    # User cancelled or no selection
+    if result.returncode != 0 or not result.stdout.strip():
+        sys.exit(0)
+
+    # Parse selected indices
+    selected_indices = []
+    for line in result.stdout.strip().split("\n"):
+        try:
+            idx = int(line.strip())
+            # Skip Mullvad DNS indices (shouldn't be selectable, but filter anyway)
+            if idx not in mullvad_indices:
+                selected_indices.append(idx)
+        except ValueError:
+            continue
+
+    # Map indices to IPs
+    selected_ips = []
+    for idx in selected_indices:
+        if idx in index_to_server:
+            selected_ips.append(index_to_server[idx].get("ip"))
+
+    if not selected_ips:
+        sys.exit(0)
+
+    # Check for concurrent modification
+    current_mtime = CACHE_FILE.stat().st_mtime
+    if current_mtime != initial_mtime:
+        run_command(
+            'notify-send "DNS Approval Conflict" "Cache file was modified. Please try again."'
+        )
+        sys.exit(1)
+
+    # Toggle approval for selected IPs
+    updated_approved = approved_ips.copy()
+    for ip in selected_ips:
+        if ip in updated_approved:
+            # Unapprove
+            updated_approved.remove(ip)
+        else:
+            # Approve
+            updated_approved.append(ip)
+
+    # Save updated approved list
+    save_cache_file(approved_dns_ips=updated_approved)
+    sys.exit(0)
+
+
 def waybar_single_check() -> None:
     """Run single check and output waybar JSON once, then exit.
 
@@ -630,14 +827,22 @@ def waybar_single_check() -> None:
 
     # Try to load cached status for instant output
     cache = load_cache_file()
+    approved_dns_ips = cache.get("approved_dns_ips", []) if cache else []
     if cache and cache.get("status"):
         cached_status = cache.get("status")
-        output = format_waybar_output(cached_status, current_time, verify_cache)
+        output = format_waybar_output(
+            cached_status, current_time, verify_cache, approved_dns_ips=approved_dns_ips
+        )
         print(json.dumps(output), flush=True)
 
     # Perform fresh check (which saves to cache)
     status = perform_mullvad_checks(quiet=True)
-    output = format_waybar_output(status, current_time, verify_cache)
+    # Reload approved_dns_ips in case it changed
+    cache = load_cache_file()
+    approved_dns_ips = cache.get("approved_dns_ips", []) if cache else []
+    output = format_waybar_output(
+        status, current_time, verify_cache, approved_dns_ips=approved_dns_ips
+    )
     print(json.dumps(output), flush=True)
     sys.exit(0)
 
@@ -665,6 +870,7 @@ def continuous_monitor(waybar_output: bool = False):
     verify_cache: Dict[str, bool] = {}
     first_check_completed = False  # Track if first fresh check has completed
     loading_frame_index = 0  # Track current frame for loading animation
+    last_cache_mtime = 0  # Track cache file modification time
 
     # Thread management for async checks
     check_thread = None
@@ -672,8 +878,10 @@ def continuous_monitor(waybar_output: bool = False):
     check_lock = threading.Lock()
 
     # Load cached status for instant waybar output (with loading spinner)
+    approved_dns_ips = []
     if waybar_output:
         cache = load_cache_file()
+        approved_dns_ips = cache.get("approved_dns_ips", []) if cache else []
         if cache and cache.get("status"):
             status = cache.get("status")
             current_time = time.time()
@@ -684,6 +892,7 @@ def continuous_monitor(waybar_output: bool = False):
                 verify_cache,
                 loading=True,
                 loading_frame_index=loading_frame_index,
+                approved_dns_ips=approved_dns_ips,
             )
             output_json = json.dumps(output)
             print(output_json, flush=True)
@@ -707,6 +916,18 @@ def continuous_monitor(waybar_output: bool = False):
             current_time = time.time()
             current_hash = get_network_state_hash()
 
+            # Check if cache file was modified externally (e.g., by rofi approval)
+            if waybar_output and CACHE_FILE.exists():
+                current_mtime = CACHE_FILE.stat().st_mtime
+                if current_mtime != last_cache_mtime:
+                    # Re-read cache and update status immediately
+                    cache = load_cache_file()
+                    if cache and cache.get("status"):
+                        status = cache.get("status")
+                    # Update approved DNS list
+                    approved_dns_ips = cache.get("approved_dns_ips", []) if cache else []
+                    last_cache_mtime = current_mtime
+
             # Check if background thread completed
             if check_thread is not None:
                 if not check_thread.is_alive():
@@ -723,7 +944,7 @@ def continuous_monitor(waybar_output: bool = False):
                                 print("CURRENT STATUS")
                                 print("=" * 50)
                                 detailed = format_detailed_status(
-                                    status, current_time, verify_cache
+                                    status, current_time, verify_cache, approved_dns_ips
                                 )
                                 print(detailed)
 
@@ -781,6 +1002,7 @@ def continuous_monitor(waybar_output: bool = False):
                     verify_cache,
                     loading=is_loading,
                     loading_frame_index=loading_frame_index,
+                    approved_dns_ips=approved_dns_ips,
                 )
                 output_json = json.dumps(output)
 
@@ -837,6 +1059,12 @@ Examples:
     )
 
     parser.add_argument(
+        "--approve-dns-interactive",
+        action="store_true",
+        help="Launch rofi for interactive DNS approval management",
+    )
+
+    parser.add_argument(
         "--waybar",
         action="store_true",
         help="Output waybar JSON format (single check unless --watch is also specified)",
@@ -851,6 +1079,9 @@ if __name__ == "__main__":
     if args.approve_dns:
         # DNS approval mode (overrides all other flags)
         approve_dns_mode()
+    elif args.approve_dns_interactive:
+        # Interactive DNS approval via rofi
+        approve_dns_interactive()
     elif args.waybar and args.watch:
         # Continuous JSON monitoring (for waybar persistent modules)
         continuous_monitor(waybar_output=True)
