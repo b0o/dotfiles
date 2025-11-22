@@ -23,16 +23,20 @@ Phase 1: Console output for manual testing
 Phase 2: Waybar JSON integration (future)
 
 Usage:
-    ./mullvad-status.py
+    ./mullvad-status.py                # Single check and exit
+    ./mullvad-status.py --watch        # Continuous monitoring mode
+    ./mullvad-status.py --approve-dns  # Save current DNS servers to approved list
 
-The script will run continuously and show VPN status.
-Press Ctrl+C to stop.
+The script will run a single check by default.
+Use --watch for continuous monitoring. Press Ctrl+C to stop.
 """
 
+import argparse
 import hashlib
 import json
 import requests
 import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -74,6 +78,9 @@ REQUEST_TIMEOUT = 6             # HTTP request timeout in seconds
 
 ICON_SECURE = ""     # Lock icon when secure
 ICON_LEAK = "󱙱"       # Lock failed icon when leaking
+
+# Approved DNS file location
+APPROVED_FILE = Path.home() / ".config" / "mullvad-status-dns-approved.json"
 
 
 def check_ipv4() -> Optional[Dict]:
@@ -135,6 +142,44 @@ def verify_ip(ip: str) -> bool:
     except Exception as e:
         print(f"IP verification error for {ip}: {e}")
     return False
+
+
+def load_dns_approved() -> List[str]:
+    """Load DNS approved list from file.
+
+    Returns list of approved DNS server IPs.
+    """
+    if not APPROVED_FILE.exists():
+        return []
+
+    try:
+        with open(APPROVED_FILE, 'r') as f:
+            data = json.load(f)
+            return data.get("approved_ips", [])
+    except Exception as e:
+        print(f"Error loading DNS approved list: {e}")
+        return []
+
+
+def save_dns_approved(dns_servers: List[Dict]) -> None:
+    """Save DNS server IPs to approved list file.
+
+    Args:
+        dns_servers: List of DNS server dictionaries from Mullvad API
+    """
+    approved_ips = [server.get("ip") for server in dns_servers if server.get("ip")]
+
+    # Create parent directory if needed
+    APPROVED_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    data = {
+        "approved_ips": approved_ips,
+        "created_at": time.time(),
+        "servers": dns_servers  # Store full server info for reference
+    }
+
+    with open(APPROVED_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
 
 
 def check_dns_leaks() -> List[Dict]:
@@ -252,17 +297,30 @@ def perform_mullvad_checks() -> Dict:
     # DNS leak check
     print("\n[3/3] Checking DNS...")
     dns_servers = check_dns_leaks()
+
+    # Load approved list and filter out approved servers
+    approved_ips = load_dns_approved()
+    non_approved_servers = [
+        s for s in dns_servers
+        if s.get("ip") not in approved_ips
+    ]
+
+    # Check for non-Mullvad DNS among non-approved servers
     has_non_mullvad_dns = any(
         not server.get("mullvad_dns", False)
-        for server in dns_servers
+        for server in non_approved_servers
     )
+
     if has_non_mullvad_dns:
         issues.append("DNS leak detected - non-Mullvad DNS servers found")
-        non_mullvad = [s for s in dns_servers if not s.get("mullvad_dns", False)]
+        non_mullvad = [s for s in non_approved_servers if not s.get("mullvad_dns", False)]
         for server in non_mullvad:
             print(f"  ✗ {server.get('ip')} ({server.get('organization', 'Unknown')})")
     else:
-        print(f"  ✓ All {len(dns_servers)} DNS server(s) are Mullvad")
+        print(f"  ✓ All {len(non_approved_servers)} DNS server(s) are Mullvad")
+        if len(dns_servers) > len(non_approved_servers):
+            approved_count = len(dns_servers) - len(non_approved_servers)
+            print(f"  ○ {approved_count} approved DNS server(s) ignored")
 
     # Overall status
     is_secure = len(issues) == 0
@@ -389,12 +447,65 @@ def format_detailed_status(status: Optional[Dict], current_time: float, verify_c
 # 4. Kill network: Should handle errors gracefully
 
 
+def single_check_mode() -> None:
+    """Run a single check and exit with appropriate exit code.
+
+    Exit codes:
+    - 0: Secure (all checks passed)
+    - 1: Insecure (issues detected)
+    """
+    status = perform_mullvad_checks()
+
+    print("\n" + "="*50)
+    print("FINAL STATUS")
+    print("="*50)
+    detailed = format_detailed_status(status, time.time())
+    print(detailed)
+
+    # Exit with appropriate code
+    exit_code = 0 if status.get("secure", False) else 1
+    sys.exit(exit_code)
+
+
+def approve_dns_mode() -> None:
+    """Run DNS check, save servers to approved list, and exit."""
+    print("\n" + "="*50)
+    print("DNS APPROVAL MODE")
+    print("="*50)
+
+    print("\nRunning DNS checks to capture current servers...")
+    dns_servers = check_dns_leaks()
+
+    if not dns_servers:
+        print("\n✗ No DNS servers detected. Cannot create approved list.")
+        sys.exit(1)
+
+    print(f"\nDetected {len(dns_servers)} DNS server(s):")
+    for server in dns_servers:
+        ip = server.get("ip", "Unknown")
+        org = server.get("organization", "Unknown")
+        is_mullvad = server.get("mullvad_dns", False)
+        hostname = server.get("mullvad_dns_hostname", "")
+
+        check = "✓" if is_mullvad else "✗"
+        info = hostname if is_mullvad else org
+        print(f"  {check} {ip} ({info})")
+
+    # Save to approved list
+    save_dns_approved(dns_servers)
+
+    print(f"\n✓ Saved {len(dns_servers)} DNS server(s) to approved list")
+    print(f"  Location: {APPROVED_FILE}")
+    print("\nThese servers will be ignored in future checks.")
+    sys.exit(0)
+
+
 def main_test_loop():
     """Test loop for Phase 1 - runs checks periodically.
 
     In Phase 2, this will be replaced with waybar JSON output.
     """
-    print("Mullvad VPN Status Checker - Phase 1 Test Mode")
+    print("Mullvad VPN Status Checker - Continuous Monitoring Mode")
     print("Running continuous monitoring...")
     print("Press Ctrl+C to stop\n")
 
@@ -438,5 +549,43 @@ def main_test_loop():
         print("\n\nStopped by user")
 
 
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Mullvad VPN Status Checker - Monitor VPN connection security",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s                    # Run single check and exit
+  %(prog)s --watch            # Continuous monitoring mode
+  %(prog)s --approve-dns      # Save current DNS servers to approved list
+        """
+    )
+
+    parser.add_argument(
+        "-w", "--watch",
+        action="store_true",
+        help="Enable continuous monitoring mode (default: single check and exit)"
+    )
+
+    parser.add_argument(
+        "--approve-dns",
+        action="store_true",
+        help="Save current DNS servers to approved list file and exit"
+    )
+
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    main_test_loop()
+    args = parse_args()
+
+    if args.approve_dns:
+        # Approve DNS mode
+        approve_dns_mode()
+    elif args.watch:
+        # Continuous monitoring mode
+        main_test_loop()
+    else:
+        # Single check mode (default)
+        single_check_mode()
