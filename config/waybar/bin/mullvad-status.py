@@ -41,6 +41,15 @@ def run_command(cmd: str, timeout: int = 5) -> Optional[str]:
     return None
 
 
+def safe_verify_ip(ip: str, cache: Dict[str, bool]) -> bool:
+    """Verify IP with caching to avoid redundant checks in formatting."""
+    if ip in cache:
+        return cache[ip]
+    result = verify_ip(ip)
+    cache[ip] = result
+    return result
+
+
 # Constants
 NETWORK_CHECK_INTERVAL = 1.0    # Check local network state every second
 MULLVAD_CHECK_INTERVAL = 30.0   # Full API check every 30 seconds
@@ -262,11 +271,14 @@ def perform_mullvad_checks() -> Dict:
     }
 
 
-def format_detailed_status(status: Optional[Dict], current_time: float) -> str:
+def format_detailed_status(status: Optional[Dict], current_time: float, verify_cache: Optional[Dict] = None) -> str:
     """Format detailed status information for display.
 
     Similar to what will be shown in waybar tooltip.
     """
+    if verify_cache is None:
+        verify_cache = {}
+
     if not status:
         return "Mullvad VPN: No data available"
 
@@ -313,7 +325,7 @@ def format_detailed_status(status: Optional[Dict], current_time: float) -> str:
     # IPv6 info
     ipv6 = status.get("ipv6")
     if ipv6:
-        is_verified = verify_ip(ipv6)
+        is_verified = safe_verify_ip(ipv6, verify_cache)
         check = "✓" if is_verified else "✗"
         lines.append(f"IPv6: {check} {ipv6}")
     else:
