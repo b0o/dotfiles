@@ -618,6 +618,56 @@ def main_test_loop():
         print("\n\nStopped by user")
 
 
+def waybar_mode():
+    """Waybar continuous monitoring mode - JSON output only.
+
+    Runs continuously, outputting JSON to stdout only when status changes.
+    Errors go to stderr. Network state is monitored for instant updates.
+    """
+    last_network_hash = ""
+    last_check_time = 0
+    last_output_json = None
+    status = None
+    verify_cache: Dict[str, bool] = {}
+
+    try:
+        while True:
+            current_time = time.time()
+            current_hash = get_network_state_hash()
+
+            # Trigger check if network changed or timer elapsed or first run
+            should_check = (
+                current_hash != last_network_hash or
+                current_time - last_check_time >= MULLVAD_CHECK_INTERVAL or
+                status is None
+            )
+
+            if should_check:
+                # Clear verify cache on new check
+                verify_cache.clear()
+                status = perform_mullvad_checks(quiet=True)
+                last_check_time = current_time
+                last_network_hash = current_hash
+
+            # Format and output if changed
+            output = format_waybar_output(status, current_time, verify_cache)
+            output_json = json.dumps(output)
+
+            if output_json != last_output_json:
+                print(output_json, flush=True)
+                last_output_json = output_json
+
+            time.sleep(NETWORK_CHECK_INTERVAL)
+
+    except KeyboardInterrupt:
+        # Silent exit on Ctrl+C
+        sys.exit(0)
+    except Exception as e:
+        # Log errors to stderr
+        print(f"Waybar mode error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
