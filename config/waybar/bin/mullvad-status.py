@@ -10,6 +10,7 @@
 import argparse
 import hashlib
 import json
+import os
 import requests
 import subprocess
 import sys
@@ -51,8 +52,9 @@ REQUEST_TIMEOUT = 6  # HTTP request timeout in seconds
 ICON_SECURE = ""  # Lock icon when secure
 ICON_LEAK = "󱙱"  # Lock failed icon when leaking
 
-# Approved DNS file location
-APPROVED_FILE = Path.home() / ".config" / "mullvad-status-dns-approved.json"
+# Cache file location (stores status and approved DNS list)
+CACHE_DIR = Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
+CACHE_FILE = CACHE_DIR / "mullvad-waybar-status.json"
 
 
 def check_ipv4() -> Optional[Dict]:
@@ -113,42 +115,58 @@ def verify_ip(ip: str) -> bool:
     return False
 
 
+def load_cache_file() -> Optional[Dict]:
+    """Load cache file containing status and approved DNS list.
+
+    Returns dict with:
+    - status: Last known status (or None)
+    - approved_dns_ips: List of approved DNS server IPs
+    """
+    if not CACHE_FILE.exists():
+        return None
+
+    try:
+        with open(CACHE_FILE, "r") as f:
+            data = json.load(f)
+            return data
+    except Exception as e:
+        print(f"Error loading cache file: {e}", file=sys.stderr)
+        return None
+
+
+def save_cache_file(status: Optional[Dict] = None, approved_dns_ips: Optional[List[str]] = None) -> None:
+    """Save status and/or approved DNS list to cache file.
+
+    Args:
+        status: Current status dict (if None, preserves existing status)
+        approved_dns_ips: List of approved DNS IPs (if None, preserves existing list)
+    """
+    # Load existing data
+    existing = load_cache_file() or {}
+
+    # Update with new data (preserve existing if not provided)
+    data = {
+        "status": status if status is not None else existing.get("status"),
+        "approved_dns_ips": approved_dns_ips if approved_dns_ips is not None else existing.get("approved_dns_ips", []),
+        "updated_at": time.time(),
+    }
+
+    # Create parent directory if needed
+    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(CACHE_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+
 def load_dns_approved() -> List[str]:
-    """Load DNS approved list from file.
+    """Load DNS approved list from cache file.
 
     Returns list of approved DNS server IPs.
     """
-    if not APPROVED_FILE.exists():
-        return []
-
-    try:
-        with open(APPROVED_FILE, "r") as f:
-            data = json.load(f)
-            return data.get("approved_ips", [])
-    except Exception as e:
-        print(f"Error loading DNS approved list: {e}", file=sys.stderr)
-        return []
-
-
-def save_dns_approved(dns_servers: List[Dict]) -> None:
-    """Save DNS server IPs to approved list file.
-
-    Args:
-        dns_servers: List of DNS server dictionaries from Mullvad API
-    """
-    approved_ips = [server.get("ip") for server in dns_servers if server.get("ip")]
-
-    # Create parent directory if needed
-    APPROVED_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    data = {
-        "approved_ips": approved_ips,
-        "created_at": time.time(),
-        "servers": dns_servers,  # Store full server info for reference
-    }
-
-    with open(APPROVED_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+    cache = load_cache_file()
+    if cache:
+        return cache.get("approved_dns_ips", [])
+    return []
 
 
 def check_dns_leaks(quiet: bool = False) -> List[Dict]:
@@ -327,7 +345,7 @@ def perform_mullvad_checks(quiet: bool = False) -> Dict:
                 print(f"  • {issue}")
         print("=" * 50)
 
-    return {
+    status = {
         "secure": is_secure,
         "issues": issues,
         "ipv4_data": ipv4_data,
@@ -335,6 +353,11 @@ def perform_mullvad_checks(quiet: bool = False) -> Dict:
         "dns_servers": dns_servers,
         "timestamp": timestamp,
     }
+
+    # Save status to cache
+    save_cache_file(status=status)
+
+    return status
 
 
 def format_detailed_status(
@@ -515,19 +538,26 @@ def single_check_mode() -> None:
 
 
 def approve_dns_mode() -> None:
-    """Run DNS check, save servers to approved list, and exit."""
+    """Load DNS servers from cache and save to approved list."""
     print("\n" + "=" * 50)
     print("DNS APPROVAL MODE")
     print("=" * 50)
 
-    print("\nRunning DNS checks to capture current servers...")
-    dns_servers = check_dns_leaks()
-
-    if not dns_servers:
-        print("\n✗ No DNS servers detected. Cannot create approved list.")
+    # Load cached status
+    cache = load_cache_file()
+    if not cache or not cache.get("status"):
+        print("\n✗ No cached status found. Run a check first before approving DNS servers.")
+        print("   Hint: Run without --approve-dns to perform a check.")
         sys.exit(1)
 
-    print(f"\nDetected {len(dns_servers)} DNS server(s):")
+    status = cache.get("status")
+    dns_servers = status.get("dns_servers", [])
+
+    if not dns_servers:
+        print("\n✗ No DNS servers found in cached status.")
+        sys.exit(1)
+
+    print(f"\nDNS servers from last check:")
     for server in dns_servers:
         ip = server.get("ip", "Unknown")
         org = server.get("organization", "Unknown")
@@ -538,11 +568,12 @@ def approve_dns_mode() -> None:
         info = hostname if is_mullvad else org
         print(f"  {check} {ip} ({info})")
 
-    # Save to approved list
-    save_dns_approved(dns_servers)
+    # Extract IPs and save to approved list
+    approved_ips = [server.get("ip") for server in dns_servers if server.get("ip")]
+    save_cache_file(approved_dns_ips=approved_ips)
 
-    print(f"\n✓ Saved {len(dns_servers)} DNS server(s) to approved list")
-    print(f"  Location: {APPROVED_FILE}")
+    print(f"\n✓ Saved {len(approved_ips)} DNS server(s) to approved list")
+    print(f"  Location: {CACHE_FILE}")
     print("\nThese servers will be ignored in future checks.")
     sys.exit(0)
 
@@ -552,10 +583,21 @@ def waybar_single_check() -> None:
 
     This is the default behavior for --waybar without --watch.
     Used for waybar modules that poll the script at intervals.
+
+    Loads cached status first for instant output, then performs fresh check.
     """
     verify_cache: Dict[str, bool] = {}
-    status = perform_mullvad_checks(quiet=True)
     current_time = time.time()
+
+    # Try to load cached status for instant output
+    cache = load_cache_file()
+    if cache and cache.get("status"):
+        cached_status = cache.get("status")
+        output = format_waybar_output(cached_status, current_time, verify_cache)
+        print(json.dumps(output), flush=True)
+
+    # Perform fresh check (which saves to cache)
+    status = perform_mullvad_checks(quiet=True)
     output = format_waybar_output(status, current_time, verify_cache)
     print(json.dumps(output), flush=True)
     sys.exit(0)
@@ -569,6 +611,7 @@ def continuous_monitor(waybar_output: bool = False):
 
     This function handles both --watch (console) and --waybar --watch (JSON) modes.
     Network state is monitored for instant updates.
+    Loads cached status first for instant waybar output.
     """
     if not waybar_output:
         print("Mullvad VPN Status Checker - Continuous Monitoring Mode")
@@ -580,6 +623,17 @@ def continuous_monitor(waybar_output: bool = False):
     last_output_json = None
     status = None
     verify_cache: Dict[str, bool] = {}
+
+    # Load cached status for instant waybar output
+    if waybar_output:
+        cache = load_cache_file()
+        if cache and cache.get("status"):
+            status = cache.get("status")
+            current_time = time.time()
+            output = format_waybar_output(status, current_time, verify_cache)
+            output_json = json.dumps(output)
+            print(output_json, flush=True)
+            last_output_json = output_json
 
     try:
         while True:
