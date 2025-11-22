@@ -442,6 +442,52 @@ def show_menu() -> None:
     sys.exit(0)
 
 
+def approve_all() -> None:
+    cache = read_cache()
+    if not cache or not cache.get("status"):
+        show_rofi_error("No DNS data available. Run a check first.")
+        sys.exit(1)
+
+    status = cache.get("status", {})
+
+    dns_servers = status.get("dns", [])
+    if not dns_servers:
+        show_rofi_error("No DNS servers found in cached status.")
+        sys.exit(1)
+
+    approved_ips = get_approved_dns_ips()
+    for server in dns_servers:
+        ip = server.get("ip")
+        if ip and ip not in approved_ips:
+            approved_ips.append(ip)
+
+    write_cache(approved_dns_ips=approved_ips)
+    sys.exit(0)
+
+
+def unapprove_all() -> None:
+    cache = read_cache()
+    if not cache or not cache.get("status"):
+        show_rofi_error("No DNS data available. Run a check first.")
+        sys.exit(1)
+
+    status = cache.get("status", {})
+
+    dns_servers = status.get("dns", [])
+    if not dns_servers:
+        show_rofi_error("No DNS servers found in cached status.")
+        sys.exit(1)
+
+    approved_ips = get_approved_dns_ips()
+    for server in dns_servers:
+        ip = server.get("ip")
+        if ip and ip in approved_ips:
+            approved_ips.remove(ip)
+
+    write_cache(approved_dns_ips=approved_ips)
+    sys.exit(0)
+
+
 def monitor():
     last_network_hash = ""
     last_check_time = 0
@@ -580,10 +626,20 @@ def main():
     parser.add_argument(
         "--show-menu", action="store_true", help="Show DNS approval menu"
     )
+    parser.add_argument(
+        "--approve-all", action="store_true", help="Approve all DNS servers"
+    )
+    parser.add_argument(
+        "--unapprove-all", action="store_true", help="Unapprove all DNS servers"
+    )
     args = parser.parse_args()
 
     if args.show_menu:
         show_menu()
+    elif args.approve_all:
+        approve_all()
+    elif args.unapprove_all:
+        unapprove_all()
     else:
         monitor()
 

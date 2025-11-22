@@ -173,7 +173,7 @@ tooltip {
   padding-left: 10px;
 }
 
-#tray menu {
+menu {
   background-color: @dark_bg;
   color: @white;
   border-radius: 8px;

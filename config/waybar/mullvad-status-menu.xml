@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <object class="GtkMenu" id="menu">
+    <child>
+      <object class="GtkMenuItem" id="approve-all">
+        <property name="label">Approve All</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="unapprove-all">
+        <property name="label">Unapprove All</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkSeparatorMenuItem" id="delimiter1" />
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="check-web">
+        <property name="label">Check on Web</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="show-menu">
+        <property name="label">Show Menu</property>
+      </object>
+    </child>
+  </object>
+</interface>

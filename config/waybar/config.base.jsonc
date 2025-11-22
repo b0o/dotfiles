@@ -129,5 +129,13 @@
     "escape": true,
     "tooltip": true,
     "restart-interval": 1,
+    "menu": "on-click-right",
+    "menu-file": "~/.config/waybar/mullvad-status-menu.xml",
+    "menu-actions": {
+      "approve-all": "~/.config/waybar/bin/mullvad-status.py --approve-all",
+      "unapprove-all": "~/.config/waybar/bin/mullvad-status.py --unapprove-all",
+      "show-menu": "~/.config/waybar/bin/mullvad-status.py --show-menu",
+      "check-web": "xdg-open https://mullvad.net/check/",
+    },
   },
 }
