@@ -10,6 +10,9 @@ with pkgs; [
   zsh # z-shell
   nushell # modern shell
 
+  # Nushell plugins
+  nushellPlugins.skim
+
   # Terminal multiplexer
   zellij # terminal workspace manager
 
@@ -22,6 +25,7 @@ with pkgs; [
   # Environment management
   direnv # load/unload env vars depending on current directory
   nix-direnv # faster implementation of direnv's use_nix and use_flake
+  # bash-env-nushell # load bash environment variables in nushell
 
   # Shell enhancements
   starship # customizable shell prompt
@@ -33,6 +37,7 @@ with pkgs; [
   bat # cat clone with syntax highlighting and Git integration
   eza # modern replacement for 'ls'
   fzf # command-line fuzzy finder
+  skim # fuzzy finder written in Rust
   fd # simple, fast alternative to 'find'
   ripgrep # faster grep alternative
 

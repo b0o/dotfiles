@@ -17,6 +17,10 @@
       url = "github:JoaquinTrinanes/nushell-nightly-flake";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    bash-env-nushell = {
+      url = "github:tesujimath/bash-env-nushell";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # Niri
     niri = {

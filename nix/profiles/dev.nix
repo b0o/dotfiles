@@ -16,5 +16,6 @@ in
       packageGroups.base
       ++ packageGroups.shell
       ++ packageGroups.neovim
+      ++ packageGroups.javascript
       ++ packageGroups.niri;
   }
