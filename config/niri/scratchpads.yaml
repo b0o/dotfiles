@@ -1,0 +1,217 @@
+include:
+  - scratchpads.private.yaml
+
+scratchpads:
+  term:
+    app_id: com.mitchellh.ghostty
+    command: ghostty
+    size: 60%x60%
+    position:
+      DP-2: 34%,20%
+      DP-1: 6%,20%
+
+  term-n:
+    app_id: com.mitchellh.ghostty
+    command:
+      ["ghostty", "--theme=TokyoNight Storm", "-e", "zsh", "-ic", "obsidnvim"]
+    size: 50%x80%
+    position:
+      DP-2: 41%,10%
+      DP-1: 9%,10%
+
+  web-m:
+    app_id: /(?i)google-chrome
+    command:
+      [
+        "xdg-launch",
+        "-A",
+        "new-window",
+        "google-chrome",
+        "https://mail.google.com/mail/u/0/#inbox",
+        "https://mail.google.com/mail/u/1/#inbox",
+      ]
+    size: 60%x60%
+    position:
+      DP-2: 37%,20%
+      DP-1: 3%,20%
+
+  web-i:
+    app_id: chrome-bgdbmehlmdmddlgneophbcddadgknlpm-alt
+    command:
+      [
+        "xdg-launch",
+        "-A",
+        "app-window",
+        "google-chrome",
+        "bgdbmehlmdmddlgneophbcddadgknlpm",
+      ]
+    size: 40%x75%
+    position:
+      DP-2: 50%,13%
+      DP-1: 10%,13%
+
+  # TODO: Allow cycleable scratchpads
+  music:
+    app_id: chrome-eikjhbkpemdappjfcmdeeeamdpkgabmk-alt # soundcloud
+    # app_id: chrome-cinhimbnkkaeohfgghhklpknlkffjgod-alt # youtube
+    command:
+      [
+        "xdg-launch",
+        "-A",
+        "app-window",
+        "google-chrome",
+        "eikjhbkpemdappjfcmdeeeamdpkgabmk", # soundcloud
+        # "cinhimbnkkaeohfgghhklpknlkffjgod", # youtube
+      ]
+    size: 42%x55%
+    position:
+      DP-2: 50%,22%
+      DP-1: 10%,22%
+
+  volume:
+    app_id: org.pulseaudio.pavucontrol
+    command: ["pavucontrol"]
+    size: 40%x55%
+    position:
+      DP-2: 50%,22%
+      DP-1: 10%,22%
+
+  calendar:
+    app_id: org.gnome.Calendar
+    command: ["xdg-launch", "org.gnome.Calendar"]
+    size: 55%x65%
+    position:
+      DP-2: 36%,17%
+      DP-1: 10%,17%
+
+  web-b:
+    app_id: chrome-dcllmfmjlkpljanfegjgohmlnfipachj-alt
+    command:
+      [
+        "xdg-launch",
+        "-A",
+        "app-window",
+        "google-chrome",
+        "dcllmfmjlkpljanfegjgohmlnfipachj",
+      ]
+    size: 30%x65%
+    position:
+      DP-2: 50%,13%
+      DP-1: 10%,13%
+
+  web-d:
+    app_id: chrome-ahiigpfcghkbjfcibpojancebdfjmoop-alt
+    command:
+      [
+        "xdg-launch",
+        "-A",
+        "app-window",
+        "google-chrome",
+        "ahiigpfcghkbjfcibpojancebdfjmoop",
+      ]
+    size: 40%x65%
+    position:
+      DP-2: 50%,13%
+      DP-1: 10%,13%
+
+  web-k:
+    app_id: chrome-eaghjkinfdiclgpfbfdpbfkdpbjoceob-alt
+    command:
+      [
+        "xdg-launch",
+        "-A",
+        "app-window",
+        "google-chrome",
+        "eaghjkinfdiclgpfbfdpbfkdpbjoceob",
+      ]
+    size: 40%x65%
+    position:
+      DP-2: 50%,13%
+      DP-1: 10%,13%
+
+  web-claude:
+    app_id: chrome-fmpnliohjhemenmnlpbfagaolkdacoja-alt
+    command:
+      [
+        "xdg-launch",
+        "-A",
+        "app-window",
+        "google-chrome",
+        "fmpnliohjhemenmnlpbfagaolkdacoja",
+      ]
+    size: 40%x90%
+    position:
+      DP-2: 50%,5%
+      DP-1: 10%,5%
+
+  web-discord:
+    app_id: chrome-magkoliahgffibhgfkmoealggombgknl-alt
+    command:
+      [
+        "xdg-launch",
+        "-A",
+        "app-window",
+        "google-chrome",
+        "magkoliahgffibhgfkmoealggombgknl",
+      ]
+    size: 50%x90%
+    position:
+      DP-2: 42%,5%
+      DP-1: 8%,5%
+
+  term-cc:
+    app_id: com.mitchellh.ghostty
+    command:
+      ["ghostty", "--theme=Monokai Pro", "-e", "zsh", "-ic", "commander-claude"]
+    size: 40%x90%
+    position:
+      DP-2: 50%,5%
+      DP-1: 10%,5%
+
+  claude:
+    app_id: Claude
+    command: ["xdg-launch", "claude-desktop"]
+    size: 40%x90%
+    position:
+      DP-2: 50%,5%
+      DP-1: 10%,5%
+
+  discord:
+    title: "/^[a-zA-Z0-9]* - Discord$"
+    command: ["gtk-launch", "discord"]
+    size: 50%x90%
+    position:
+      DP-2: 42%,5%
+      DP-1: 8%,5%
+
+  figma:
+    app_id: figma-linux
+    command: ["gtk-launch", "figma-linux"]
+    size: 61%x90%
+    position:
+      DP-2: 36%,5%
+      DP-1: 2%,5%
+
+  element:
+    app_id: Element
+    command: ["gtk-launch", "io.element.Element"]
+    size: 50%x90%
+    position:
+      DP-2: 42%,5%
+      DP-1: 8%,5%
+
+  parsec:
+    app_id: parsecd
+    command: ["xdg-launch", "parsecd"]
+    size: 2560x1440
+    position:
+      DP-2: 32%,15%
+      DP-1: 1%,15%
+
+  books:
+    title: "/^calibre — "
+    command: ["xdg-launch", "calibre-gui"]
+    size: 50%x60%
+    position:
+      DP-2: 40%,20%
+      DP-1: 10%,20%

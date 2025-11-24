@@ -1,0 +1,395 @@
+// https://github.com/YaLTeR/niri/wiki/Configuration:-Input
+input {
+  keyboard {
+    numlock
+    repeat-delay 240
+    repeat-rate 40
+  }
+
+  mouse {
+    accel-speed 0.0
+    accel-profile "adaptive"
+  }
+
+  // warp-mouse-to-focus mode="center-xy"
+  workspace-auto-back-and-forth
+}
+
+cursor {
+  xcursor-theme "macOS"
+  xcursor-size 28
+  hide-when-typing
+}
+
+// Left monitor (BenQ EW3280U)
+output "DP-2" {
+  mode "3840x2160@59.997"
+  position x=0 y=0
+  scale 1
+  focus-at-startup
+  // Fix flickering in Chrome with GPU acceleration.
+  // XXX: currently causes nvidia driver to crash :(
+  // variable-refresh-rate
+}
+
+// Right monitor (Samsung U32E850)
+output "DP-1" {
+  mode "3840x2160@59.997"
+  position x=3840 y=0
+  scale 1
+  // Fix flickering in Chrome with GPU acceleration.
+  // XXX: currently causes nvidia driver to crash :(
+  // variable-refresh-rate
+}
+
+overview {
+  zoom 0.5
+  backdrop-color "#2b2645"
+  workspace-shadow {
+    softness 40
+    spread 10
+    offset x=0 y=10
+    color "#00000050"
+  }
+}
+
+// https://github.com/YaLTeR/niri/wiki/Configuration:-Layout
+layout {
+  gaps 48
+  center-focused-column "never"
+  // background-color "#41396b"
+  background-color "transparent"
+
+  preset-column-widths {
+    proportion 0.33333
+    proportion 0.5
+    proportion 0.66667
+  }
+
+  default-column-width { proportion 0.33333; }
+
+  focus-ring {
+    width 2
+    active-gradient from="#9074ff" to="#6627ff" angle=45 relative-to="window"
+    inactive-gradient from="#61598d" to="#4a3f88" angle=45 relative-to="window"
+  }
+
+  border {
+    width 1
+    urgent-color "#FF7D90"
+    active-gradient from="#9074ff" to="#6627ff" angle=45 relative-to="window"
+    inactive-gradient from="#61598d" to="#4a3f88" angle=45 relative-to="window"
+  }
+
+  shadow {
+    on
+    softness 20
+    spread 3
+    offset x=0 y=5
+    color "#130e3799"
+  }
+
+  struts {
+    left 32
+    right 32
+  }
+}
+layer-rule {
+  match namespace="^wallpaper$"
+  place-within-backdrop true
+}
+
+// Applies to overlay bg
+spawn-at-startup "zsh" "-c" "swaybg -i ~/Documents/pictures/wallpapers/purple-foliage_blur.jpg"
+// spawn-at-startup "zsh" "-c" "swaybg -i ~/Documents/pictures/wallpapers/purple-foliage.jpg"
+
+// Applies to workspace bg
+spawn-at-startup "zsh" "-c" "wpaperd"
+
+spawn-at-startup "zsh" "-c" "tailscale systray"
+
+prefer-no-csd
+gestures { hot-corners { off; }; }
+hotkey-overlay { skip-at-startup; }
+
+screenshot-path "~/Documents/screenshots/%Y-%m-%d_%H-%M-%S.png"
+
+spawn-at-startup "xwayland-satellite"
+spawn-at-startup "zsh" "-c" "brightness -d"
+spawn-at-startup "zsh" "-c" "niri-tools monitor"
+spawn-at-startup "waybar"
+spawn-at-startup "librepods"
+
+environment {
+  DISPLAY ":0"
+}
+
+workspace "󰪷" {
+  open-on-output "DP-1"
+}
+
+// https://github.com/YaLTeR/niri/wiki/Configuration:-Window-Rules
+window-rule {
+  match app-id=r#"firefox$"# title="^Picture-in-Picture$"
+  match app-id="org.gnome.Nautilus"
+  match app-id="feh"
+  match app-id="eog" // Eye of GNOME image viewer
+  match title="Task Manager - Google Chrome"
+  open-floating true
+}
+
+window-rule {
+  match app-id="OrcaSlicer"
+  default-column-width { proportion 0.66667; }
+}
+
+window-rule {
+  match app-id="figma-linux"
+  default-window-height { proportion 0.90; }
+  default-column-width { proportion 0.61; }
+}
+
+window-rule {
+  match app-id="explorer.exe"
+  default-window-height { fixed 2560; }
+  default-column-width { fixed 1600; }
+}
+
+// window-rule {
+//     match app-id="com.mitchellh.ghostty"
+// }
+
+window-rule {
+  match app-id="me.kavishdevar.librepods"
+  open-floating true
+  default-column-width { fixed 477; }
+  default-window-height { fixed 514; }
+}
+
+// Enable rounded corners for all windows.
+window-rule {
+  geometry-corner-radius 6
+  clip-to-geometry true
+}
+
+binds {
+  Mod+Up repeat=false { toggle-overview; }
+  Mod+Shift+O repeat=false { toggle-overview; }
+
+  Mod+Shift+Backspace { close-window; }
+
+  Mod+H     { focus-column-left; }
+  Mod+J     { focus-window-down; }
+  Mod+K     { focus-window-up; }
+  Mod+L     { focus-column-right; }
+
+  // Mod+Left  { align-window-left; }
+  // Mod+Right { align-window-right; }
+  // Mod+Down  { align-window-center; }
+
+  Mod+Alt+H     { move-column-left; }
+  Mod+Alt+J     { move-window-down; }
+  Mod+Alt+K     { move-window-up; }
+  Mod+Alt+L     { move-column-right; }
+
+  Mod+Home { focus-column-first; }
+  Mod+End  { focus-column-last; }
+  Mod+Ctrl+Home { move-column-to-first; }
+  Mod+Ctrl+End  { move-column-to-last; }
+
+  Mod+Shift+H     { focus-monitor-left; }
+  Mod+Shift+L     { focus-monitor-right; }
+
+  Mod+Shift+Ctrl+H     { move-window-to-monitor-left; }
+  Mod+Shift+Ctrl+J     { move-window-to-workspace-down; }
+  Mod+Shift+Ctrl+K     { move-window-to-workspace-up; }
+  Mod+Shift+Ctrl+L     { move-window-to-monitor-right; }
+
+  Mod+Alt+Ctrl+H  { move-workspace-to-monitor-left; }
+  Mod+Alt+Ctrl+J  { move-workspace-down; }
+  Mod+Alt+Ctrl+K  { move-workspace-up; }
+  Mod+Alt+Ctrl+L  { move-workspace-to-monitor-right; }
+
+  Mod+Page_Down      { focus-workspace-down; }
+  Mod+Page_Up        { focus-workspace-up; }
+  Mod+Shift+J        { focus-workspace-down; }
+  Mod+Shift+K        { focus-workspace-up; }
+  Mod+Ctrl+Page_Down { move-column-to-workspace-down; }
+  Mod+Ctrl+Page_Up   { move-column-to-workspace-up; }
+  Mod+Ctrl+U         { move-column-to-workspace-down; }
+  Mod+Ctrl+I         { move-column-to-workspace-up; }
+
+  Mod+WheelScrollDown      cooldown-ms=150 { focus-workspace-down; }
+  Mod+WheelScrollUp        cooldown-ms=150 { focus-workspace-up; }
+  Mod+Ctrl+WheelScrollDown cooldown-ms=150 { move-column-to-workspace-down; }
+  Mod+Ctrl+WheelScrollUp   cooldown-ms=150 { move-column-to-workspace-up; }
+
+  Mod+WheelScrollRight      { focus-column-right; }
+  Mod+WheelScrollLeft       { focus-column-left; }
+  Mod+Ctrl+WheelScrollRight { move-column-right; }
+  Mod+Ctrl+WheelScrollLeft  { move-column-left; }
+
+  Mod+Shift+WheelScrollDown      { focus-column-right; }
+  Mod+Shift+WheelScrollUp        { focus-column-left; }
+  Mod+Ctrl+Shift+WheelScrollDown { move-column-right; }
+  Mod+Ctrl+Shift+WheelScrollUp   { move-column-left; }
+
+  // You can refer to workspaces by index. However, keep in mind that
+  // niri is a dynamic workspace system, so these commands are kind of
+  // "best effort". Trying to refer to a workspace index bigger than
+  // the current workspace count will instead refer to the bottommost
+  // (empty) workspace.
+  //
+  // For example, with 2 workspaces + 1 empty, indices 3, 4, 5 and so on
+  // will all refer to the 3rd workspace.
+  Mod+1 { focus-workspace 1; }
+  Mod+2 { focus-workspace 2; }
+  Mod+3 { focus-workspace 3; }
+  Mod+4 { focus-workspace 4; }
+  Mod+5 { focus-workspace 5; }
+  Mod+6 { focus-workspace 6; }
+  Mod+7 { focus-workspace 7; }
+  Mod+8 { focus-workspace 8; }
+  Mod+9 { focus-workspace 9; }
+  Mod+0 { focus-workspace 10; }
+  Mod+Shift+1 { move-window-to-workspace 1; }
+  Mod+Shift+2 { move-window-to-workspace 2; }
+  Mod+Shift+3 { move-window-to-workspace 3; }
+  Mod+Shift+4 { move-window-to-workspace 4; }
+  Mod+Shift+5 { move-window-to-workspace 5; }
+  Mod+Shift+6 { move-window-to-workspace 6; }
+  Mod+Shift+7 { move-window-to-workspace 7; }
+  Mod+Shift+8 { move-window-to-workspace 8; }
+  Mod+Shift+9 { move-window-to-workspace 9; }
+  Mod+Shift+0 { move-window-to-workspace 10; }
+
+  // Switches focus between the current and the previous workspace.
+  Mod+Shift+A { focus-monitor-previous; }
+  Mod+Ctrl+A { focus-workspace-previous; }
+  Mod+A { focus-window-previous; }
+
+  // The following binds move the focused window in and out of a column.
+  // If the window is alone, they will consume it into the nearby column to the side.
+  // If the window is already in a column, they will expel it out.
+  Mod+BracketLeft  { consume-or-expel-window-left; }
+  Mod+BracketRight { consume-or-expel-window-right; }
+
+  // Consume one window from the right to the bottom of the focused column.
+  // Mod+Comma  { consume-window-into-column; }
+  // Expel the bottom window from the focused column to the right.
+  // Mod+Period { expel-window-from-column; }
+
+  // Mod+R { switch-preset-column-width; }
+  // Mod+Shift+R { switch-preset-window-height; }
+  // Mod+Ctrl+R { reset-window-height; }
+  Mod+F { maximize-column; }
+  Mod+Shift+F { fullscreen-window; }
+  Mod+Ctrl+F { toggle-windowed-fullscreen; }
+
+  // Expand the focused column to space not taken up by other fully visible columns.
+  // Makes the column "fill the rest of the space".
+  // Mod+Ctrl+F { expand-column-to-available-width; }
+
+  Mod+Apostrophe { center-column; }
+
+  // Center all fully visible columns on screen.
+  Mod+Shift+Apostrophe { center-visible-columns; }
+
+  // Finer width adjustments.
+  // This command can also:
+  // * set width in pixels: "1000"
+  // * adjust width in pixels: "-5" or "+5"
+  // * set width as a percentage of screen width: "25%"
+  // * adjust width as a percentage of screen width: "-10%" or "+10%"
+  // Pixel sizes use logical, or scaled, pixels. I.e. on an output with scale 2.0,
+  // set-column-width "100" will make the column occupy 200 physical screen pixels.
+  Mod+Minus { set-column-width "-10%"; }
+  Mod+Equal { set-column-width "+10%"; }
+
+  // Finer height adjustments when in column with other windows.
+  Mod+Shift+Minus { set-window-height "-10%"; }
+  Mod+Shift+Equal { set-window-height "+10%"; }
+
+  Mod+Shift+Y { switch-focus-between-floating-and-tiling; }
+  Mod+Y { toggle-window-floating; }
+
+  // Toggle tabbed column display mode.
+  // Windows in this column will appear as vertical tabs,
+  // rather than stacked on top of each other.
+  Mod+F3 { toggle-column-tabbed-display; }
+
+  // TODO:
+  // Print { spawn "zsh" "-c" "snag --dir $HOME/Documents/screenshots -xNR"; }
+  // Ctrl+Print { screenshot-screen; }
+  // Print      { screenshot-window; }
+
+  // Awtrix
+  Mod+Shift+BracketLeft { spawn "nu" "-l" "-c" "use awtrix; awtrix next-app"; }
+  Mod+Shift+BracketRight { spawn "nu" "-l" "-c" "use awtrix; awtrix previous-app"; }
+
+  // Applications such as remote-desktop clients and software KVM switches may
+  // request that niri stops processing the keyboard shortcuts defined here
+  // so they may, for example, forward the key presses as-is to a remote machine.
+  // It's a good idea to bind an escape hatch to toggle the inhibitor,
+  // so a buggy application can't hold your session hostage.
+  //
+  // The allow-inhibiting=false property can be applied to other binds as well,
+  // which ensures niri always processes them, even when an inhibitor is active.
+  Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
+
+  Mod+Return                  hotkey-overlay-title="Terminal"                   { spawn "zsh" "-c" "ghostty"; }
+  Mod+Backslash               hotkey-overlay-title="Browser"                    { spawn "zsh" "-c" "browser"; }
+  Mod+Space                   hotkey-overlay-title="Menu"                       { spawn "zsh" "-c" "wlr-which-key"; }
+
+  XF86Sleep                   hotkey-overlay-title="Lock"                       { spawn "zsh" "-c" "niri msg action power-off-monitors && system lock"; }
+
+  XF86AudioLowerVolume        hotkey-overlay-title="Volume: Down"               { spawn "zsh" "-c" "audioctl -n vol down"; }
+  XF86AudioRaiseVolume        hotkey-overlay-title="Volume: Up"                 { spawn "zsh" "-c" "audioctl -n vol up"; }
+  XF86AudioMute               hotkey-overlay-title="Volume: Mute"               { spawn "zsh" "-c" "audioctl -n vol mute"; }
+
+  XF86AudioPlay               hotkey-overlay-title="Play: Toggle"               { spawn "zsh" "-c" "audioctl -n play toggle"; }
+  XF86AudioPrev               hotkey-overlay-title="Play: Prev"                 { spawn "zsh" "-c" "audioctl -n play prev"; }
+  XF86AudioNext               hotkey-overlay-title="Play: Next"                 { spawn "zsh" "-c" "audioctl -n play next"; }
+
+
+  Super+XF86AudioNext         hotkey-overlay-title="Audio: Next Sink"           { spawn "zsh" "-c" "audioctl -n sink next"; }
+  Super+XF86AudioPrev         hotkey-overlay-title="Audio: Prev Sink"           { spawn "zsh" "-c" "audioctl -n sink prev"; }
+  Super+Shift+XF86AudioMute   hotkey-overlay-title="Audio: Unify Sinks"         { spawn "zsh" "-c" "audioctl -n sink unify"; }
+  Super+Shift+XF86AudioNext   hotkey-overlay-title="Audio: Next Sink (Unify)"   { spawn "zsh" "-c" "audioctl -n sink -u next"; }
+  Super+Shift+XF86AudioPrev   hotkey-overlay-title="Audio: Prev Sink (Unify)"   { spawn "zsh" "-c" "audioctl -n sink -u prev"; }
+
+  Mod+Grave                   hotkey-overlay-title="KVM: Switch USB"            { spawn "zsh" "-c" "kvm usb 4"; }
+  Mod+Shift+Grave             hotkey-overlay-title="KVM: Switch USB + Montior"  { spawn "zsh" "-c" "kvm monitor input,ok usb 4"; }
+
+  Mod+B                       hotkey-overlay-title="Mode: Brightness"           { spawn "zsh" "-c" "wlr-which-key -k b"; }
+  Mod+Shift+N                 hotkey-overlay-title="Mode: Notifications"        { spawn "zsh" "-c" "wlr-which-key -k n"; }
+  Mod+O                       hotkey-overlay-title="Mode: Open"                 { spawn "zsh" "-c" "wlr-which-key -k o"; }
+  Mod+S                       hotkey-overlay-title="Mode: System"               { spawn "zsh" "-c" "wlr-which-key -k s"; }
+  Mod+Shift+S                 hotkey-overlay-title="Mode: Scratchpads"          { spawn "zsh" "-c" "wlr-which-key -k 'z s'"; }
+  Mod+T                       hotkey-overlay-title="Mode: Transcribe"           { spawn "zsh" "-c" "wlr-which-key -k t"; }
+  Mod+W                       hotkey-overlay-title="Mode: Windows"              { spawn "zsh" "-c" "wlr-which-key -k 'z w'"; }
+  Mod+R                       hotkey-overlay-title="Mode: Resize"               { spawn "zsh" "-c" "wlr-which-key -k 'z w r'"; }
+  Mod+X                       hotkey-overlay-title="Mode: Command Center"       { spawn "zsh" "-c" "wlr-which-key -k x"; }
+  Mod+Z                       hotkey-overlay-title="Mode: WM"                   { spawn "zsh" "-c" "wlr-which-key -k z"; }
+  Mod+Shift+W                 hotkey-overlay-title="Mode: Workspaces"           { spawn "zsh" "-c" "wlr-which-key -k 'z W'"; }
+  Mod+Period                  hotkey-overlay-title="Mode: KB Ptr"               { spawn "zsh" "-c" "wl-kbptr"; }
+  Print                       hotkey-overlay-title="Mode: Screenshot"           { spawn "zsh" "-c" "wlr-which-key -k 'Print Print'"; }
+  Mod+Print                   hotkey-overlay-title="Mode: Screenshot"           { spawn "zsh" "-c" "wlr-which-key -k Print"; }
+
+  Mod+Slash                   hotkey-overlay-title="Scratchpad: Term"           { spawn "zsh" "-c" "niri-tools scratchpad toggle term"; }
+  Mod+M                       hotkey-overlay-title="Scratchpad: Music"          { spawn "zsh" "-c" "niri-tools scratchpad toggle music"; }
+  Mod+N                       hotkey-overlay-title="Scratchpad: Notes"          { spawn "zsh" "-c" "niri-tools scratchpad toggle term-n"; }
+  Mod+I                       hotkey-overlay-title="Scratchpad: Issues"         { spawn "zsh" "-c" "niri-tools scratchpad toggle web-i"; }
+  Mod+Shift+b                 hotkey-overlay-title="Scratchpad: Brain.fm"       { spawn "zsh" "-c" "niri-tools scratchpad toggle web-b"; }
+  Mod+D                       hotkey-overlay-title="Scratchpad: Docs"           { spawn "zsh" "-c" "niri-tools scratchpad toggle web-d"; }
+  Mod+Alt+N                   hotkey-overlay-title="Scratchpad: Kite"           { spawn "zsh" "-c" "niri-tools scratchpad toggle web-k"; }
+  Mod+C                       hotkey-overlay-title="Scratchpad: Command Center" { spawn "zsh" "-c" "niri-tools scratchpad toggle term-cc"; }
+  Mod+Shift+C                 hotkey-overlay-title="Scratchpad: Claude"         { spawn "zsh" "-c" "niri-tools scratchpad toggle web-claude"; }
+  Mod+Alt+F                   hotkey-overlay-title="Scratchpad: Figma"          { spawn "zsh" "-c" "niri-tools scratchpad toggle figma"; }
+  Mod+Shift+E                 hotkey-overlay-title="Scratchpad: Element"        { spawn "zsh" "-c" "niri-tools scratchpad toggle element"; }
+  Mod+Alt+Grave               hotkey-overlay-title="Scratchpad: Parsec"         { spawn "zsh" "-c" "niri-tools scratchpad toggle parsec"; }
+
+  Mod+Alt+Slash               hotkey-overlay-title="Scratchpad: Toggle"         { spawn "zsh" "-c" "niri-tools scratchpad toggle"; }
+}
+
+include "private.kdl"
