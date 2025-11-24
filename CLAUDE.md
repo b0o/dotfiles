@@ -26,7 +26,6 @@ This is a NixOS dotfiles repository with configurations for Nushell, Neovim, Git
   - `comark.nu` - Bookmark management system with symlink-based storage
   - `nix.nu` - Flakey-profile wrapper commands (`fp`)
   - `git.nu`, `git/` - Git utilities and worktree management
-  - `interactive.nu` - FZF integrations
   - `platform/` - OS-specific utilities
   - `xtras/` - Additional utilities which can be executed using `xtras <command>`
 

@@ -754,6 +754,7 @@ keybind = alt+shift+plus=text:\u{00dd}
 keybind = alt+shift+-=text:\u{00de}
 keybind = ctrl+alt+shift+plus=text:\u{00df}
 keybind = ctrl+alt+shift+-=text:\u{00e0}
+keybind = ctrl+tab=text:\u{00e1}
 
 keybind = ctrl+enter=csi:24~
 keybind = alt+enter=csi:25~
