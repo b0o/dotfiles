@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 NETWORK_CHECK_INTERVAL = 1.0
@@ -33,17 +34,27 @@ CACHE_DIR = Path(os.getenv("XDG_CACHE_HOME", Path.home() / ".cache"))
 CACHE_FILE = CACHE_DIR / "mullvad-waybar-status.json"
 
 
-def check_ip(endpoint: str, log_errors: bool = True) -> dict | None:
+def check_ip(endpoint: str, log_errors: bool = True) -> tuple[dict | None, str | None]:
+    """Returns (data, error_type) where error_type is 'timeout', 'connection', or None"""
     try:
         response = requests.get(
             f"https://{endpoint}.am.i.mullvad.net/json", timeout=REQUEST_TIMEOUT
         )
         if response.ok:
-            return response.json()
+            return response.json(), None
+    except requests.Timeout as e:
+        if log_errors:
+            print(f"{endpoint.upper()} check timeout: {e}", file=sys.stderr)
+        return None, "timeout"
+    except requests.ConnectionError as e:
+        if log_errors:
+            print(f"{endpoint.upper()} connection error: {e}", file=sys.stderr)
+        return None, "connection"
     except Exception as e:
         if log_errors:
             print(f"{endpoint.upper()} check error: {e}", file=sys.stderr)
-    return None
+        return None, "unknown"
+    return None, None
 
 
 def check_dns() -> list[dict]:
@@ -121,25 +132,35 @@ def get_approved_dns_ips() -> list[str]:
 
 def diagnose_issues(
     ipv4_status: dict | None,
+    ipv4_error: str | None,
     ipv6_status: dict | None,
     dns_servers: list[dict],
     approved_ips: list[str],
-) -> list[str]:
+) -> tuple[list[str], bool]:
+    """Returns (issues, has_privacy_leak) where has_privacy_leak is True for actual privacy leaks"""
     issues = []
+    has_privacy_leak = False
+
     if ipv4_status:
         if not ipv4_status.get("mullvad_exit_ip", False):
             issues.append("IPv4 leak detected - not using Mullvad exit IP")
+            has_privacy_leak = True
     else:
-        issues.append("IPv4 check failed")
+        if ipv4_error in ("timeout", "connection"):
+            issues.append("IPv4 check failed - connection error")
+        else:
+            issues.append("IPv4 check failed")
 
     if ipv6_status and not ipv6_status.get("mullvad_exit_ip", False):
         issues.append("IPv6 leak detected - not using Mullvad exit IP")
+        has_privacy_leak = True
 
     non_approved_servers = [s for s in dns_servers if s.get("ip") not in approved_ips]
     if any(not s.get("mullvad_dns", False) for s in non_approved_servers):
         issues.append("DNS leak detected - non-Mullvad DNS servers found")
+        has_privacy_leak = True
 
-    return issues
+    return issues, has_privacy_leak
 
 
 def check_security(
@@ -150,14 +171,19 @@ def check_security(
         approved_ips = get_approved_dns_ips()
 
     if status is None:
+        ipv4_data, ipv4_error = check_ip("ipv4")
+        ipv6_data, ipv6_error = check_ip("ipv6", log_errors=False)
         status = {
-            "ipv4": check_ip("ipv4"),
-            "ipv6": check_ip("ipv6", log_errors=False),
+            "ipv4": ipv4_data,
+            "ipv4_error": ipv4_error,
+            "ipv6": ipv6_data,
+            "ipv6_error": ipv6_error,
             "dns": check_dns(),
         }
 
-    issues = diagnose_issues(
+    issues, has_privacy_leak = diagnose_issues(
         status.get("ipv4"),
+        status.get("ipv4_error"),
         status.get("ipv6"),
         status.get("dns", []),
         approved_ips,
@@ -165,12 +191,13 @@ def check_security(
 
     status["issues"] = issues
     status["secure"] = len(issues) == 0
+    status["has_privacy_leak"] = has_privacy_leak
 
     cache = read_cache()
     old_status = cache.get("status") if cache else None
     if not old_status or any(
         old_status.get(k) != status.get(k)
-        for k in ["secure", "issues", "ipv4", "ipv6", "dns"]
+        for k in ["secure", "issues", "ipv4", "ipv6", "dns", "has_privacy_leak"]
     ):
         write_cache(status=status)
 
@@ -201,13 +228,14 @@ def categorize_dns_servers(
     return mullvad_servers, unknown_servers, approved_servers
 
 
-def format_ip_section(data: dict | None, label: str) -> list[str]:
+def format_ip_section(data: dict | None, label: str, error: str | None = None) -> list[str]:
     if not data:
-        return (
-            [f"{label}: ✗ Check failed"]
-            if label == "IPv4"
-            else [f"{label}: Not available"]
-        )
+        if error in ("timeout", "connection"):
+            return [f"{label}: ✗ Connection error"]
+        elif label == "IPv4":
+            return [f"{label}: ✗ Check failed"]
+        else:
+            return [f"{label}: Not available"]
 
     lines = []
     ip = data.get("ip", "Unknown")
@@ -233,7 +261,11 @@ def format_ip_section(data: dict | None, label: str) -> list[str]:
     return lines
 
 
-def format_tooltip(status: dict | None, approved_dns_ips: list[str]) -> str:
+def format_tooltip(
+    status: dict | None,
+    approved_dns_ips: list[str],
+    last_check_time: datetime | None = None,
+) -> str:
     if not status:
         return "Mullvad VPN: No data available"
 
@@ -242,11 +274,15 @@ def format_tooltip(status: dict | None, approved_dns_ips: list[str]) -> str:
     icon = ICON_SECURE if is_secure else ICON_LEAK
     status_text = "SECURE" if is_secure else "INSECURE"
     lines.append(f"{icon} Mullvad VPN: {status_text}")
+
+    if last_check_time:
+        lines.append(f"Last check: {format_relative_time(last_check_time)}")
+
     lines.append("")
 
-    lines.extend(format_ip_section(status.get("ipv4"), "IPv4"))
+    lines.extend(format_ip_section(status.get("ipv4"), "IPv4", status.get("ipv4_error")))
     lines.append("")
-    lines.extend(format_ip_section(status.get("ipv6"), "IPv6"))
+    lines.extend(format_ip_section(status.get("ipv6"), "IPv6", status.get("ipv6_error")))
     lines.append("")
 
     dns_servers = status.get("dns", [])
@@ -289,11 +325,31 @@ def get_loading_icon(base_icon: str, frame_index: int) -> str:
     return f"{base_icon}  {frame}"
 
 
+def format_relative_time(dt: datetime) -> str:
+    """Format a datetime as a human-readable relative time."""
+    delta = datetime.now() - dt
+    seconds = int(delta.total_seconds())
+
+    if seconds < 5:
+        return "just now"
+    elif seconds < 60:
+        return f"{seconds} seconds ago"
+    elif seconds < 120:
+        return "1 minute ago"
+    elif seconds < 3600:
+        return f"{seconds // 60} minutes ago"
+    elif seconds < 7200:
+        return "1 hour ago"
+    else:
+        return f"{seconds // 3600} hours ago"
+
+
 def format_waybar_output(
     status: dict | None,
     loading: bool = False,
     loading_frame_index: int = 0,
     approved_dns_ips: list[str] | None = None,
+    last_check_time: datetime | None = None,
 ) -> dict:
     approved_dns_ips = approved_dns_ips or []
 
@@ -319,7 +375,7 @@ def format_waybar_output(
     if loading:
         classes.append("loading")
 
-    tooltip = format_tooltip(status, approved_dns_ips)
+    tooltip = format_tooltip(status, approved_dns_ips, last_check_time)
     if loading:
         tooltip = "Loading...\n\n" + tooltip
 
@@ -491,6 +547,7 @@ def unapprove_all() -> None:
 def monitor():
     last_network_hash = ""
     last_check_time = 0
+    last_check_datetime = None
     last_output_json = None
     status = None
     first_check_completed = False
@@ -515,6 +572,7 @@ def monitor():
         loading=True,
         loading_frame_index=loading_frame_index,
         approved_dns_ips=approved_dns_ips,
+        last_check_time=last_check_datetime,
     )
     output_json = json.dumps(output)
     print(output_json, flush=True)
@@ -554,6 +612,7 @@ def monitor():
                     if check_result[0] is not None:
                         status = check_result[0]
                         first_check_completed = True
+                        last_check_datetime = datetime.now()
                         check_result[0] = None
                 check_thread = None
 
@@ -572,6 +631,7 @@ def monitor():
 
             if status:
                 current_secure_state = status.get("secure", False)
+                has_privacy_leak = status.get("has_privacy_leak", False)
                 should_notify = (
                     last_secure_state is None and not current_secure_state
                 ) or (
@@ -579,7 +639,7 @@ def monitor():
                     and last_secure_state
                     and not current_secure_state
                 )
-                if should_notify:
+                if should_notify and has_privacy_leak:
                     issues = status.get("issues", [])
                     issue_text = "\n".join(f"• {issue}" for issue in issues)
                     subprocess.run(
@@ -604,6 +664,7 @@ def monitor():
                 loading=is_loading,
                 loading_frame_index=loading_frame_index,
                 approved_dns_ips=approved_dns_ips,
+                last_check_time=last_check_datetime,
             )
             output_json = json.dumps(output)
 
