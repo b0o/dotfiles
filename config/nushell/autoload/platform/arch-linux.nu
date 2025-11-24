@@ -1,5 +1,7 @@
 source ./systemd.nu
 
+use ./arch-linux.mod.nu *
+
 alias pss = pacman -Ss
 alias psi = pacman -Si
 alias pq = pacman -Q

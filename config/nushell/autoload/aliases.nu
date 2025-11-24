@@ -26,4 +26,5 @@ alias m = man
 
 # utilities
 alias md = gh markdown-preview -p 6419 --disable-auto-open
+alias serve = python -m http.server
 alias icat = kitty +kitten icat

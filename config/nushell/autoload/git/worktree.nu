@@ -1,5 +1,5 @@
 # Print git repo and worktree information
-def gw-parse [path?: string] {
+export def gw-parse [path?: string] {
   let dir = $path | default $env.PWD
 
   let result = (do {
@@ -17,7 +17,7 @@ def gw-parse [path?: string] {
   mut root = ""
   mut worktrees = {}
   mut bare = false
-  mut current_worktree = null
+  mut current_worktree: string = ""
 
   for line in $lines {
     if ($line | str starts-with "bare") {
@@ -33,7 +33,7 @@ def gw-parse [path?: string] {
           | str trim --left --char '/')
       }
     } else if ($line | str starts-with "branch ") {
-      if $current_worktree != null {
+      if $current_worktree != "" {
         let branch_ref = ($line | str substring 7..)
         # Get abbreviated branch name
         let branch_result = (git rev-parse --abbrev-ref $branch_ref | complete)
@@ -44,7 +44,7 @@ def gw-parse [path?: string] {
         }
 
         $worktrees = ($worktrees | insert $current_worktree $branch)
-        $current_worktree = null
+        $current_worktree = ""
       }
     }
   }
@@ -57,15 +57,15 @@ def gw-parse [path?: string] {
 }
 
 # Select a git worktree (for scripting)
-def gw-select [
+export def gw-select [
   target?: string              # Target worktree or branch name
-  --ignore-cwd (-c)            # Don't ignore current worktree in candidates
+  --ignore-cwd (-c)            # Ignore current worktree in candidates
   --prefill-cwd (-C)           # Prefill fzf with current worktree
   --header (-H): string        # Custom fzf header
+  --no-auto-select (-n)        # Don't automatically select if only one match
+  --ignore-root (-R)               # Don't include root worktree in candidates
 ] {
-  let ignore_cwd = not $ignore_cwd
-
-  let git_info = (gw-parse)
+  let git_info = gw-parse
 
   if ($git_info.git_worktrees | is-empty) {
     error make -u {msg: "no worktrees"}
@@ -75,7 +75,11 @@ def gw-select [
   let git_worktrees = $git_info.git_worktrees
   let git_bare = $git_info.git_bare
 
-  let candidates = ([""] | append ($git_worktrees | columns))
+  let candidates = if $ignore_root {
+    ($git_worktrees | columns)
+  } else {
+    ([""] | append ($git_worktrees | columns))
+  }
 
   # Find current worktree by checking which worktree path contains PWD
   mut current_worktree = ""
@@ -116,7 +120,7 @@ def gw-select [
     if not $ignore_cwd {
       $other_worktrees = ($other_worktrees | append $current_worktree)
     }
-    if $current_worktree != "" {
+    if $current_worktree != "" and not $ignore_root {
       $other_worktrees = ($other_worktrees | append "")
     }
   }
@@ -165,7 +169,7 @@ def gw-select [
     ]
 
     # Add -1 flag if we have multiple options and not prefilling cwd
-    if ($other_worktrees | length) >= 2 and not $prefill_cwd {
+    if ($other_worktrees | length) >= 2 and not $prefill_cwd and not $no_auto_select {
       $fzf_args = ($fzf_args | append "-1")
     }
 
@@ -255,7 +259,7 @@ export def gwx [
   let w = if $current {
     # Note: This requires gwc (get worktree current) to be implemented
     # gwc -p should return the path of the current worktree
-    let result = (gwc -p | complete)
+    let result = (gw-current | complete)
     if $result.exit_code != 0 {
       error make {msg: "failed to get current worktree"}
     }
@@ -283,14 +287,29 @@ export def gwx [
   git -C $w ...$git_args
 }
 
+# Completer for Git branches
+def complete-git-branch [context: string] {
+  let git_info = gw-parse
+  let git_root = $git_info.git_root
+
+  # Get all branches
+  let branches = (do {
+    git -C $git_root branch --format "%(refname:short)"
+  } | complete)
+
+  {
+    completions: ($branches.stdout | str trim | lines)
+  }
+}
+
 # Add a new worktree
 export def --env gwa [
-  branch: string                  # Branch name
-  worktree_name?: string          # Worktree name (defaults to branch name)
+  branch: string@complete-git-branch # Branch name
+  worktree_name?: string             # Worktree name (defaults to branch name)
 ] {
   let wt_name = ($worktree_name | default $branch)
 
-  let git_info = (gw-parse)
+  let git_info = gw-parse
   let git_root = $git_info.git_root
   let prev = $env.PWD
 
@@ -397,35 +416,26 @@ export def --env gwa [
   }
 }
 
-# Print or cd to the worktree set as "current"
-export def --env gwc [
-  --print (-p)  # Print the path instead of changing directory
-] {
-  let git_info = (gw-parse)
+# Get the git worktree marked as "current"
+export def gw-current [] {
+  let git_info = gw-parse
   let git_root = $git_info.git_root
   let current_path = [$git_root "worktree" "current"] | path join
-
   if not ($current_path | path exists) {
     error make -u {msg: "no current worktree"}
   }
-
   let path_type = ($current_path | path type)
   if $path_type != "symlink" {
     error make -u {msg: "no current worktree"}
   }
-
-  if $print {
-    print $current_path
-  } else {
-    cd -P $current_path
-  }
+  return $current_path
 }
 
 # Change "current" worktree symlink
 export def --env gwcc [
   target?: string  # Target worktree or branch name
 ] {
-  let git_info = (gw-parse)
+  let git_info = gw-parse
   let git_root = $git_info.git_root
   let current_link = [$git_root "worktree" "current"] | path join
 
@@ -437,7 +447,7 @@ export def --env gwcc [
   # Build header if current link exists
   let header = if $has_current {
     # Get symlink target
-    let link_target = (ls -l $current_link | get target.0)
+    let link_target = ($current_link | path expand | path dirname)
     # Expand relative to symlink directory
     let worktree_dir = [$git_root "worktree"] | path join
     let target_full = ([$worktree_dir $link_target] | path join | path expand)
@@ -453,9 +463,9 @@ export def --env gwcc [
 
   # Select worktree
   let selection = if $target != null {
-    gw-select $target --ignore-cwd --header=$header
+    gw-select $target --header=$header
   } else {
-    gw-select --ignore-cwd --prefill-cwd --header=$header
+    gw-select --prefill-cwd --header=$header
   }
 
   if $selection == null {
@@ -575,7 +585,7 @@ def complete-gh-pr [spans: list<string>] {
 export def --env gwpr [
   pr?: string  # PR number or search term
 ] {
-  let git_info = (gw-parse)
+  let git_info = gw-parse
   let git_root = $git_info.git_root
 
   # Get PR number from argument or fzf selection
@@ -668,4 +678,62 @@ export def gppr [
   }
 
   git pull origin $"refs/pull/($pr_num)/head:pull/($pr_num)"
+}
+
+# Remove a git worktree
+export def gwrm [
+  target?: string  # Target worktree or branch name
+] {
+  let git_info = gw-parse
+  let git_root = $git_info.git_root
+
+  # Get the target worktree
+  let selection = if $target != null {
+    gw-select --ignore-root --ignore-cwd --no-auto-select $target
+  } else {
+    gw-select --ignore-root --ignore-cwd --no-auto-select
+  }
+
+  if $selection == null {
+    return
+  }
+
+  # Don't allow removing the main worktree (root)
+  if $selection.worktree == "" {
+    error make -u {msg: "cannot remove main worktree (repo root)"}
+  }
+
+  let worktree_path = $selection.path
+  let display_name = $selection.worktree
+
+  # Try to remove the worktree
+  let remove_result = (git worktree remove $worktree_path | complete)
+
+  if $remove_result.exit_code == 0 {
+    print $"Removed worktree: ($display_name)"
+    return
+  }
+
+  # Check if it failed due to modifications (exit code 128 + specific error message)
+  let has_modifications = (
+    $remove_result.exit_code == 128 and
+    ($remove_result.stderr | str contains "contains modified or untracked files")
+  )
+
+  if $has_modifications {
+    print $"Worktree has modifications or untracked files:"
+    let should_force = (input "Force deletion? [y/N] " | str downcase | str starts-with "y")
+    if $should_force {
+      let force_result = (git worktree remove --force $worktree_path | complete)
+      if $force_result.exit_code == 0 {
+        print $"Forcefully removed worktree: ($display_name)"
+      } else {
+        error make -u {msg: $"failed to force remove worktree: ($force_result.stderr)"}
+      }
+    } else {
+      print "Removal cancelled"
+    }
+  } else {
+    error make -u {msg: $"failed to remove worktree: ($remove_result.stderr)"}
+  }
 }

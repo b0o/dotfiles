@@ -1,11 +1,11 @@
 # Git clone with smart defaults
-export def gcl [...args] {
+export def --wrapped  gcl [...args] {
   mut opts = ["--recurse-submodules"]
   mut positional = []
 
   # Separate options from positional arguments
   for item in $args {
-    if ($item | str starts-with "-") {
+    if ($item | to text | str starts-with "-") {
       $opts = ($opts | append $item)
     } else {
       $positional = ($positional | append $item)
@@ -25,7 +25,12 @@ export def gcl [...args] {
     $dest = ($repo | path basename)
     $positional = [$repo $dest]
   } else if ($positional | length) >= 2 {
-    $dest = ($positional | get 1)
+    $dest = ($positional | get 1 | path expand)
+    if ($dest | path exists) and ($dest | path type) == "dir" and (ls -a $dest | is-not-empty) {
+      let repo = ($positional | get 0)
+      $dest = ([$dest ($repo | path basename)] | path join)
+    }
+    $positional = ($positional | update 1 $dest)
   }
 
   # Check if we should clone
@@ -52,7 +57,7 @@ export def gcl [...args] {
 }
 
 # Git clone and cd
-export def --env gccl [...args] {
+export def --env --wrapped gccl [...args] {
   let dest = (gcl ...$args)
   cd $dest
 }

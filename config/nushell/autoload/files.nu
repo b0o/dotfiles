@@ -1,36 +1,109 @@
 # Smart & pretty file and directory lister using eza and bat
 export def l [
   --levels (-L): int = 1  # Levels of depth to display (for directories)
-  ...args: path           # Target files or directories to list
+  target: path = "."     # Target file or directory to list
 ] {
-  # Collect all targets from args and pipeline
-  let targets = (
-    if $in == null {
-      # No pipeline input
-      if ($args | is-empty) { ["."] } else { $args }
-    } else {
-      # Has pipeline input - combine with args
-      let from_pipeline = ($in | lines)
-      if ($args | is-empty) {
-        $from_pipeline
-      } else {
-        [...$args, ...$from_pipeline]
-      }
-    }
-  )
+  if not ($target | path exists) {
+    error make -u {msg: $"Target does not exist: ($target)"}
+  }
+  let expanded = ($target | path expand)
 
-  # Process each target
-  for $target in $targets {
-    if not ($target | path exists) {
-      error make -u {msg: $"Target does not exist: ($target)"}
-    }
-    let expanded = ($target | path expand)
-    match ($expanded | path type) {
-      "dir" => {
-        ^eza -algF --git --group-directories-first -TL $levels -- $expanded
+  def default-viewer [
+    --text (-t)  # Use text viewer
+    file: string
+  ] {
+    let text = $text or (
+      if (
+        (which isutf8 | is-not-empty) and
+        (isutf8 $file | complete).exit_code == 0) {
+        true
+      } else {
+        false
       }
-      "file" => {
-        ^bat -- $expanded
+    )
+    if ($text) {
+      if (which bat | is-not-empty) {
+        ^bat -- $file
+      } else {
+        ^cat -- $file
+      }
+    } else {
+      if (which file | is-not-empty) {
+        ^file -- $file
+      }
+      if (which identify | is-not-empty) {
+        ^identify -- $file
+      }
+    }
+  }
+
+  def exif-viewer [
+    file: path
+  ] {
+    if (which exiftool | is-not-empty) {
+      ^exiftool $file
+    }
+  }
+
+  match ($expanded | path type) {
+    "dir" => {
+      ^eza -algF --git --group-directories-first -TL $levels -- $expanded
+    }
+    "file" => {
+      let mime_type = if (which xdg-mime | is-not-empty) {
+        ^xdg-mime query filetype $expanded | str trim
+      } else {
+        "text/plain"
+      } | split row '/'
+
+      let type = ($mime_type | get 0)
+      let subtype = ($mime_type | get 1)
+
+      ^exa -algF --git -T -- $expanded
+      match $type {
+        "text" => {
+          default-viewer --text $expanded
+        }
+        "image" => {
+          exif-viewer $expanded
+          if (which sips | is-not-empty) {
+            ^sips -g pixelWidth -g pixelHeight -- $expanded
+          } else {
+            default-viewer $expanded
+          }
+        }
+        "video" => {
+          exif-viewer $expanded
+          if (which ffprobe | is-not-empty) {
+            ^ffprobe -hide_banner -loglevel error -- $expanded
+          } else {
+            default-viewer $expanded
+          }
+        }
+        "application" => {
+          if (
+            ($expanded | path parse | get stem | str ends-with ".tar") or
+            (($expanded | path parse | get extension) == "tar")
+            and (which tar | is-not-empty)
+          ) {
+            print "Archive Listing:"
+            ^tar -tvf $expanded
+          } else if ($subtype == "zip" and (which unzip | is-not-empty)) {
+            print "Archive Listing:"
+            ^unzip -l $expanded
+          } else if ($subtype == "x-7z-compressed" and (which 7z | is-not-empty)) {
+            print "Archive Listing:"
+            ^7z l $expanded
+          } else if ($subtype == "pdf") {
+            exif-viewer $expanded
+            if (which pdfinfo | is-not-empty) {
+              ^pdfinfo $expanded
+            }
+            default-viewer $expanded
+          } else {
+            default-viewer $expanded
+          }
+        }
       }
     }
   }
