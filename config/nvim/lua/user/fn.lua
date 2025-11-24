@@ -1,35 +1,7 @@
 ---- user.fn: General utility functions
 local apiutil = require 'user.util.api'
 
-local M = {
-  quiet = false,
-  captured = {},
-}
-
-M.notify = function(...)
-  if M.quiet then
-    for _, l in ipairs { ... } do
-      table.insert(M.captured, l)
-    end
-    return
-  end
-  vim.notify(...)
-end
-local notify = M.notify
-
-M.silent = function(f, ...)
-  local q = M.quiet
-  M.quiet = true
-  local res = { f(...) }
-  M.quiet = q
-  return unpack(res)
-end
-
-M.capture = function(f, ...)
-  M.captured = {}
-  local res = { M.silent(f, ...) }
-  return M.captured, unpack(res)
-end
+local M = {}
 
 -- print + vim.inspect
 M.inspect = function(...)
@@ -209,10 +181,12 @@ end
 -- Jump to prev/next buffer in jumplist
 M.jumplist_jump_buf = function(dir)
   local jumplist, jumppos = unpack(vim.fn.getjumplist())
-  local initial = math.min(jumppos + 1, #jumplist)
+  local initial = dir > 0 and (jumppos + 1) or jumppos
+  initial = math.max(1, math.min(initial, #jumplist))
   local bufnr = vim.api.nvim_get_current_buf()
   local target = { bufnr = bufnr }
   local i = initial
+  -- search for the first jumplist entry that is not the current buffer
   while i > 0 and i <= #jumplist do
     local j = jumplist[i]
     if j.bufnr ~= target.bufnr then
@@ -228,35 +202,9 @@ M.jumplist_jump_buf = function(dir)
   if jumppos == #jumplist then
     dist = dist - 1
   end
-  local keys =
-      vim.api.nvim_replace_termcodes(('%d<C-%s>'):format(math.abs(dist), dir > 0 and 'i' or 'o'), true, false, true)
+  local keys = vim.api.nvim_replace_termcodes(('%d<C-%s>')
+    :format(math.abs(dist), dir > 0 and 'i' or 'o'), true, false, true)
   vim.api.nvim_feedkeys(keys, 'n', false)
-end
-
-M.set_winfix = function(set, ...)
-  local dirs = { ... }
-  local msg = {}
-  for _, dir in ipairs(dirs) do
-    local fix = 'winfix' .. dir
-    if set == 'toggle' then
-      set = not vim.o[fix]
-    end
-    if vim.o[fix] ~= set then
-      vim.o[fix] = set
-      table.insert(msg, fix .. ' ' .. (vim.o[fix] and 'enable' or 'disable'))
-    end
-  end
-  if #msg > 0 then
-    notify(table.concat(msg, ', '))
-  end
-end
-
-M.toggle_winfix = function(...) M.set_winfix('toggle', ...) end
-
-M.resize_win = function(dir, dist)
-  dist = dist or ''
-  vim.cmd(dist .. 'wincmd ' .. dir)
-  M.set_winfix(true, (dir == '<' or dir == '>') and 'width' or 'height')
 end
 
 -- Replace occurrences of ${k} with v in tmpl for each { k = v } in data
@@ -585,7 +533,7 @@ end
 
 ---@param reg string
 ---@param lines (string|string[])[]
----@param force boolean  @if true, always send osc52 sequence even if a clipboard tool is available
+---@param force? boolean  @if true, always send osc52 sequence even if a clipboard tool is available
 M.osc52_smart_copy = function(reg, lines, force)
   lines = vim.iter({ lines, '' }):flatten(math.huge):totable()
   if reg and reg ~= '' then

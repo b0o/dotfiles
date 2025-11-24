@@ -1,71 +1,80 @@
+---@alias user.util.lsp_status.client_id integer
+
+---@class user.util.lsp_status.ClientExitResult
+---@field status 'exited'
+---@field name string
+---@field code integer
+---@field signal integer
+---@field attached_buffers integer[]
+
 local M = {
-  clients = { running = {}, exited = {} },
+  clients = {
+    ---@type table<user.util.lsp_status.client_id, vim.lsp.Client>
+    attached = {},
+    ---@type table<user.util.lsp_status.client_id, user.util.lsp_status.ClientExitResult>
+    exited = {},
+  },
 }
 
-local function getClientData(client)
-  return {
-    client = client,
-    buffers = vim.lsp.get_buffers_by_client_id(client.id),
-  }
-end
-
 function M.on_attach(client, _)
-  local clientData = getClientData(client)
-  M.clients.running[client.id] = clientData
+  M.clients.attached[client.id] = client
   M.clients.exited[client.id] = nil
-  for id, exitedClientData in pairs(M.clients.exited) do
-    if client.name == exitedClientData.client.name then
+  for id, exitedClient in pairs(M.clients.exited) do
+    if client.name == exitedClient.name then
       M.clients.exited[id] = nil
     end
   end
 end
 
 function M.on_exit(code, signal, id)
-  local data = M.clients.running[id]
-  data.code = code
-  data.signal = signal
-  M.clients.exited[id] = data
-  M.clients.running[id] = nil
+  local client = M.clients.attached[id]
+  M.clients.exited[id] = {
+    status = 'exited',
+    name = client.name,
+    code = code,
+    signal = signal,
+    attached_buffers = vim.deepcopy(client.attached_buffers),
+  }
+  M.clients.attached[id] = nil
   vim.notify(
-    'LSP client ' .. data.client.name .. ' (' .. id .. ') exited with code ' .. code .. ' and signal ' .. signal
+    'LSP client ' .. client.name .. ' (' .. id .. ') exited with code ' .. code .. ' and signal ' .. signal
   )
 end
 
-local function getBufClients(bufnr, clients)
-  local attached = {}
-  for _, client in pairs(vim.lsp.get_clients { bufnr = bufnr }) do
-    if clients[client.id] then
-      table.insert(attached, clients[client.id])
-    end
-  end
-  return attached
+---@param bufnr integer
+---@param clients? table<integer, vim.lsp.Client|user.util.lsp_status.ClientExitResult>
+---@return (vim.lsp.Client|user.util.lsp_status.ClientExitResult)[]
+local function buf_clients(bufnr, clients)
+  return vim.iter(clients and { clients } or { M.clients.exited, M.clients.attached })
+      :flatten()
+      :filter(
+        function(client) ---@param client vim.lsp.Client|user.util.lsp_status.ClientExitResult
+          return client.attached_buffers[bufnr] == true
+        end)
+      :totable()
 end
-
-function M.getBufClients(bufnr)
-  return getBufClients(bufnr, vim.list_extend(vim.list_extend({}, M.clients.running), M.clients.exited))
-end
-
-function M.getRunningBufClients(bufnr) return getBufClients(bufnr, M.clients.running) end
-
-function M.getExitedBufClients(bufnr) return getBufClients(bufnr, M.clients.exited) end
 
 function M.status_clients_count(status, bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
   local clients = {}
   if status == 'exited' or status == 'exited_ok' or status == 'exited_err' then
-    clients = M.getExitedBufClients(bufnr)
-  elseif status == 'running' then
-    clients = M.getRunningBufClients(bufnr)
+    clients = buf_clients(bufnr, M.clients.exited)
+  elseif status == 'running' or status == 'starting' then
+    clients = buf_clients(bufnr, M.clients.attached)
   else
-    clients = M.getBufClients(bufnr)
+    error('Invalid status: ' .. status)
   end
   local count = 0
   for _, c in pairs(clients) do
     local skip = false
-    skip = skip or status == 'exited_ok' and c.signal ~= 0
-    skip = skip or status == 'exited_err' and c.signal == 0
-    skip = skip or status == 'starting' and c.client.initialized
-    skip = skip or status == 'running' and not c.client.initialized
+    if c.status == 'exited' then
+      skip = skip or status == 'exited_ok' and c.signal ~= 0
+      skip = skip or status == 'exited_err' and c.signal == 0
+    else
+      local initialized = c.initialized == true
+      skip = skip or status == 'starting' and initialized
+      skip = skip or status == 'running' and not initialized
+    end
     count = skip and count or count + 1
   end
   return count

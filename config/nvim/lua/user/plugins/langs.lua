@@ -336,21 +336,31 @@ return {
         render_modes = { 'n', 'i', 'v', 'V', 'c', 't' },
         file_types = { 'markdown', 'mdx' },
         code = { language_name = false },
-        anti_conceal = { enabled = false },
+        anti_conceal = {
+          enabled = true,
+          disabled_modes = { 'n' },
+        },
         win_options = {
-          concealcursor = { rendered = 'n' },
+          concealcursor = { rendered = '' },
         },
         heading = {
-          icons = {
-            '  󰼏  ',
-            '  󰼐  ',
-            '  󰼑  ',
-            '󰼒  ',
-            '󰼓  ',
-            '󰼔  ',
-          },
           position = 'overlay',
-          border = true,
+          icons = {
+            '  󰬺  ',
+            '  󰬻  ',
+            '  󰬼  ',
+            '  󰬽  ',
+            '  󰬾  ',
+            '  󰬿  ',
+          },
+          border = {
+            true,  -- h1
+            true,  -- h2
+            false, -- h3
+            false, -- h4
+            false, -- h5
+            false, -- h6
+          },
         },
         checkbox = {
           unchecked = { icon = ' 󰄱 ' },
@@ -364,23 +374,17 @@ return {
       local ft = maputil.ft
 
       ft({ 'markdown', 'mdx' }, function(bufmap)
-        vim.o.wrap = false
+        vim.opt_local.wrap = true
 
-        bufmap('n', '<localleader>C', function()
+        bufmap('n', { '<localleader>C', '<localleader><localleader>cc' }, function()
           ---@diagnostic disable-next-line: invisible
           local config = require('render-markdown.state').config
           pcall(
             require('render-markdown').setup,
-            vim.tbl_deep_extend('force', config, config.anti_conceal.enabled and {
-              anti_conceal = { enabled = false },
-              win_options = {
-                concealcursor = { rendered = 'n' },
-              },
+            vim.tbl_deep_extend('force', config, config.win_options.concealcursor.rendered ~= 'n' and {
+              win_options = { concealcursor = { rendered = 'n' } },
             } or {
-              anti_conceal = { enabled = true },
-              win_options = {
-                concealcursor = { rendered = '' },
-              },
+              win_options = { concealcursor = { rendered = '' } },
             })
           )
         end, 'Markdown: Toggle concealcursor')

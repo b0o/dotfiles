@@ -18,9 +18,14 @@ map('n', 'q:', '<Nop>')
 map('n', 'q/', '<Nop>')
 map('n', 'q?', '<Nop>')
 
-map('n', 'j', function() return vim.v.count > 1 and 'j' or 'gj' end, { expr = true, desc = 'Line down' })
-
-map('n', 'k', function() return vim.v.count > 0 and 'k' or 'gk' end, { expr = true, desc = 'Line up' })
+for _, key in ipairs { 'j', 'k' } do
+  -- Jumping more than 2 lines at a time sets the ' mark so you can jump back to the previous position
+  map('n', key, function()
+    local mark = vim.v.count > 2 and ("m'" .. tostring(vim.v.count)) or ''
+    local prefix = vim.v.count == 0 and 'g' or ''
+    return mark .. prefix .. key
+  end, { expr = true, desc = 'Line ' .. (key == 'j' and 'down' or 'up') })
+end
 
 map('nx', 'J', '5j', 'Jump down')
 map('nx', 'K', '5k', 'Jump up')
@@ -139,8 +144,6 @@ map('n', '<localleader>X', cutbuf.swap, 'cutbuf: swap')
 local smart_size = require 'user.util.smart-size'
 map('n', '<leader>sa', smart_size.enable_autoresize, 'Smart size: Enable auto-resize')
 map('n', '<leader>sA', smart_size.disable_autoresize, 'Smart size: Disable auto-resize')
-map('n', '<leader>sc', smart_size.toggle_collapse, 'Smart size: Toggle collapse')
-map('n', '<leader>sC', smart_size.clear_all_collapse, 'Smart size: Clear collapse')
 
 ---- Editing
 map('n', 'gi', [[:exec "normal i".nr2char(getchar())."\e"<Cr>]], 'Insert a single character')
@@ -617,12 +620,6 @@ map('t', '<M-h>', '<C-\\><C-n><C-w>h', 'Goto window left')
 map('t', '<M-j>', '<C-\\><C-n><C-w>j', 'Goto window down')
 map('t', '<M-k>', '<C-\\><C-n><C-w>k', 'Goto window up')
 map('t', '<M-l>', '<C-\\><C-n><C-w>l', 'Goto window right')
-
-map('n', '<leader>sf', wrap(fn.toggle_winfix, 'height'), 'Toggle fixed window height')
-map('n', '<leader>sF', wrap(fn.toggle_winfix, 'width'), 'Toggle fixed window width')
-
-map('n', '<leader>s<M-f>', wrap(fn.set_winfix, true, 'height', 'width'), 'Enable fixed window height/width')
-map('n', '<leader>s<C-f>', wrap(fn.set_winfix, false, 'height', 'width'), 'Disable fixed window height/width')
 
 -- see also the VSplit plugin mappings below
 map('n', '<leader>S', '<Cmd>new<Cr>', 'Split (horiz, new)')

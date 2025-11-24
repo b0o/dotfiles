@@ -28,18 +28,12 @@ return {
       end
 
       require('obsidian').setup {
-        ui = {
-          enable = false,
-        },
+        ui = { enable = false }, -- use render-markdown.nvim instead
         workspaces = { vault },
-        ---@diagnostic disable-next-line: missing-fields
         completion = {
-          -- Enables completion using nvim_cmp
           nvim_cmp = false,
-          -- Enables completion using blink.cmp
           blink = true,
-          -- Trigger completion at 2 chars.
-          min_chars = 2,
+          min_chars = 0,
         },
 
         note_id_func = function(title)

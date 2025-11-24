@@ -43,14 +43,13 @@ return {
     dependencies = {
       { 'saghen/blink.compat', opts = {} },
     },
-    lazy = false, -- lazy loading handled internally
-    -- dev = true,
+    lazy = false, -- blink handles lazy loading internally
     -- run with `zsh -i` so Mise loads proper Rust toolchain:
     build = 'zsh -ic "cargo build --release"',
-    opts = {
+    opts = { ---@type blink.cmp.Config
       keymap = {
         preset = 'default',
-        [ xk [[<C-S-a>]] ] = { 'show', 'hide' },
+        [xk '<C-S-a>'] = { 'show', 'hide' },
         ['<CR>'] = { 'accept', 'fallback' },
         ['<Tab>'] = { 'snippet_forward', 'fallback' },
         ['<S-Tab>'] = { 'snippet_backward', 'fallback' },
@@ -71,7 +70,7 @@ return {
               return true
             end,
           },
-          [ xk [[<C-Cr>]] ] = {
+          [xk '<C-Cr>'] = {
             function(cmp)
               return cmp.select_and_accept {
                 callback = function()
@@ -81,7 +80,7 @@ return {
             end,
             'fallback',
           },
-          [ xk [[<C-S-a>]] ] = { 'show', 'hide' },
+          [xk '<C-S-a>'] = { 'show', 'hide' },
           ['<Tab>'] = {
             'show',
             function()
@@ -123,7 +122,10 @@ return {
       },
       completion = {
         list = {
-          selection = { preselect = false, auto_insert = true },
+          selection = {
+            -- preselect = false,
+            auto_insert = true,
+          },
         },
         menu = {
           border = 'rounded',

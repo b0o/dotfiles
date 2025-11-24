@@ -2,6 +2,7 @@
 local spec = {
   {
     'nvim-tree/nvim-tree.lua',
+    enabled = false,
     cmd = { 'NvimTreeOpen', 'NvimTreeFocus' },
     dependencies = {
       {
@@ -283,6 +284,9 @@ local spec = {
 }
 
 very_lazy(function()
+  if true then
+    return false
+  end
   local fn = require 'user.fn'
   local maputil = require 'user.util.map'
   local recent_wins = lazy_require 'user.util.recent-wins'

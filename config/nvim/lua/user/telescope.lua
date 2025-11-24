@@ -136,7 +136,25 @@ t.setup {
     layout_config = {
       scroll_speed = 2,
       preview_cutoff = 50,
-      -- preview_width = 0.6, -- TODO: breaks floatwins
+    },
+    file_ignore_patterns = {
+      'lazy%-lock%.json$',
+      'package%-lock%.json$',
+      'pnpm%-lock%.yaml$',
+
+      '%.git/',
+      'node_modules/',
+      '%.lock$',
+      '%.jpg$',
+      '%.png$',
+      '%.gif$',
+      '%.mp4$',
+      '%.exe$',
+      '%.gz$',
+      '%.zip$',
+      '%.webm$',
+      '%.avi$',
+      '%.mov$',
     },
     mappings = {
       i = {
@@ -156,6 +174,7 @@ t.setup {
         ['<C-k>'] = ta.preview_scrolling_up,
         ['<C-q>'] = ta.smart_send_to_qflist,
         [xk['<C-S-q>']] = ta.smart_add_to_qflist,
+        ['<C-A>'] = function() vim.api.nvim_win_set_cursor(0, { 1, 2 }) end,
       },
       n = {
         ['<C-x>'] = multiopen 'horizontal',
@@ -212,20 +231,6 @@ _cmds.smart_files = function()
   tb.find_files {
     prompt_title = 'Find Files (Smart)',
     hidden = true,
-    file_ignore_patterns = {
-      '%.git/',
-      'node_modules/',
-      '%.jpg$',
-      '%.png$',
-      '%.gif$',
-      '%.mp4$',
-      '%.exe$',
-      '%.gz$',
-      '%.zip$',
-      '%.webm$',
-      '%.avi$',
-      '%.mov$',
-    },
   }
 end
 
@@ -233,6 +238,7 @@ _cmds.any_files = function()
   tb.find_files {
     prompt_title = 'Find Files (Any)',
     hidden = true,
+    file_ignore_patterns = {},
   }
 end
 

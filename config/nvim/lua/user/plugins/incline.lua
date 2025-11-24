@@ -287,6 +287,11 @@ return {
               guifg = buf_focused and icon.fg or colors.deep_velvet,
               guibg = props.focused and icon.bg or bg,
             },
+            {
+              '',
+              guifg = props.focused and icon.bg or bg,
+              guibg = bg,
+            },
             status,
             {
               '',
@@ -418,9 +423,9 @@ return {
           return ''
         end
         return {
-          { lsp_clients_running(props.buf), guifg = colors.green },
-          { lsp_clients_starting(props.buf), guifg = colors.skyblue },
-          { lsp_clients_exited_ok(props.buf), guifg = colors.grey6 },
+          { lsp_clients_running(props.buf),    guifg = colors.green },
+          { lsp_clients_starting(props.buf),   guifg = colors.skyblue },
+          { lsp_clients_exited_ok(props.buf),  guifg = colors.grey6 },
           { lsp_clients_exited_err(props.buf), guifg = colors.red },
         }
       end
@@ -431,7 +436,7 @@ return {
             file_info.pnpm_workspace.name,
             ' ',
             guifg = file_info.pnpm_workspace.name == state.focused_workspace and extra_colors.fg_dim
-              or extra_colors.fg_nc,
+                or extra_colors.fg_nc,
           } or '',
         }
       end
@@ -540,7 +545,7 @@ return {
           local diag_disabled = not vim.diagnostic.is_enabled { bufnr = props.buf }
 
           local has_error = not diag_disabled
-            and #vim.diagnostic.get(props.buf, {
+              and #vim.diagnostic.get(props.buf, {
                 severity = vim.diagnostic.severity.ERROR,
               })
               > 0
@@ -586,9 +591,6 @@ return {
             active = { Normal = 'Normal' },
             inactive = { Normal = 'Normal' },
           },
-        },
-        hide = {
-          cursorline = 'focused_win',
         },
         ignore = {
           unlisted_buffers = false,

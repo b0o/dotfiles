@@ -198,7 +198,7 @@ local servers = function()
         tailwindCSS = {
           experimental = {
             classRegex = {
-              [[[\S]*ClassName="([^"]*)]], -- <MyComponent containerClassName="..." />
+              [[[\S]*ClassName="([^"]*)]],   -- <MyComponent containerClassName="..." />
               [[[\S]*ClassName={"([^"}]*)]], -- <MyComponent containerClassName={"..."} />
               [[[\S]*ClassName={"([^'}]*)]], -- <MyComponent containerClassName={'...'} />
             },
@@ -216,9 +216,8 @@ local servers = function()
       'tsgo',
       on_attach = function(client, bufnr) require('twoslash-queries').attach(client, bufnr) end,
     },
-    {
+    { --NOTE: ts_ls is typescript-language-server, which is a wrapper around tsserver
       'ts_ls',
-      enabled = true,
       on_attach = function(client, bufnr) require('twoslash-queries').attach(client, bufnr) end,
     },
     'vimls',

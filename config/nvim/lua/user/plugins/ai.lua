@@ -13,6 +13,7 @@ return {
           dapui_stacks = true,
           dapui_watches = true,
           dapui_hover = true,
+          Fyler = true,
         },
       }
 

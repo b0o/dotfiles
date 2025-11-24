@@ -12,7 +12,7 @@ autocmd({ 'WinNew', 'WinLeave' }, {
       return
     end
     local ft = vim.bo[event.buf].filetype
-    if ft == 'NvimTree' then
+    if ft == 'NvimTree' or ft == 'fyler' then
       return
     end
     vim.cmd [[setlocal winhl=CursorLine:CursorLineNC,CursorLineNr:CursorLineNrNC]]
@@ -51,7 +51,7 @@ autocmd('WinEnter', {
       return
     end
     local ft = vim.bo[event.buf].filetype
-    if ft == 'NvimTree' then
+    if ft == 'NvimTree' or ft == 'fyler' then
       return
     end
     vim.cmd [[setlocal winhighlight=]]

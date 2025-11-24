@@ -153,10 +153,14 @@ map('ox', 'ib', textobj_select '@block.inner', 'Select block (inner)')
 map('ox', 'ab', textobj_select '@block.outer', 'Select block (outer)')
 map('ox', 'im', textobj_select '@class.inner', 'Select class (inner)') -- m as in "(m)odule"
 map('ox', 'am', textobj_select '@class.outer', 'Select class (outer)')
-map('ox', 'aa', textobj_select '@call.outer', 'Select call (outer)') -- a as in "function (a)pplication" or "c(a)ll"
+map('ox', 'aa', textobj_select '@call.outer', 'Select call (outer)')   -- a as in "function (a)pplication" or "c(a)ll"
 map('ox', 'ia', textobj_select '@call.inner', 'Select call (inner)')
 map('ox', 'a/', textobj_select '@comment.outer', 'Select comment (outer)')
 map('ox', 'i/', textobj_select '@comment.outer', 'Select comment (outer)')
+
+-- restore paragraph textobjects
+map('ox', 'aP', 'ap', 'Select paragraph (outer)')
+map('ox', 'iP', 'ip', 'Select paragraph (inner)')
 
 -- Additional Filetypes
 
@@ -228,6 +232,8 @@ treesj.setup {
         },
       },
     },
+    -- TODO: Remove once https://github.com/Wansmer/treesj/pull/187 is merged
+    nu = require('treesj.langs.nu'),
   },
 
   -- Use `dot` for repeat action

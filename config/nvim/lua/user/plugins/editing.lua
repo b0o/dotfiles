@@ -32,13 +32,14 @@ local spec = {
       'MultipleCursorsJumpNextMatch',
     },
     keys = {
-      { '<C-Down>', '<Cmd>MultipleCursorsAddDown<CR>', mode = { 'n', 'i' } },
-      { '<C-Up>', '<Cmd>MultipleCursorsAddUp<CR>', mode = { 'n', 'i' } },
-      { '<C-LeftMouse>', '<Cmd>MultipleCursorsMouseAddDelete<CR>', mode = { 'n', 'i' } },
-      { '<C-n>', '<Cmd>MultipleCursorsAddJumpNextMatch<CR>', mode = { 'n', 'x' } },
-      { [[\\A]], '<Cmd>MultipleCursorsAddMatches<CR>', mode = { 'n', 'x' } },
-      { '<C-q>', '<Cmd>MultipleCursorsJumpNextMatch<CR>' },
-      { '<C-n>', '<Cmd>MultipleCursorsAddVisualArea<CR>', mode = { 'x' } },
+      { '<C-Down>',      '<Cmd>MultipleCursorsAddDown<CR>',                  mode = { 'n', 'i' } },
+      { '<C-Up>',        '<Cmd>MultipleCursorsAddUp<CR>',                    mode = { 'n', 'i' } },
+      { '<C-LeftMouse>', '<Cmd>MultipleCursorsMouseAddDelete<CR>',           mode = { 'n', 'i' } },
+      { '<C-n>',         '<Cmd>MultipleCursorsAddJumpNextMatch<CR>',         mode = { 'n', 'x' } },
+      { [[\\A]],         '<Cmd>MultipleCursorsAddMatches<CR>',               mode = { 'n', 'x' } },
+      { [[\\|]],         function() require('multiple-cursors').align() end, mode = { 'n', 'x' } },
+      { '<C-n>',         '<Cmd>MultipleCursorsAddVisualArea<CR>',            mode = { 'x' } },
+      { '<C-q>',         '<Cmd>MultipleCursorsJumpNextMatch<CR>' },
     },
   },
   {
@@ -47,7 +48,7 @@ local spec = {
       local state = {}
 
       local ts_context_commentstring_pre_hook =
-        require('ts_context_commentstring.integrations.comment_nvim').create_pre_hook()
+          require('ts_context_commentstring.integrations.comment_nvim').create_pre_hook()
 
       ---@diagnostic disable-next-line: missing-fields
       require('Comment').setup {
@@ -161,15 +162,15 @@ local spec = {
     'WilliamHsieh/overlook.nvim',
     opts = {},
     keys = {
-      { '<leader>pp', function() require('overlook.api').peek_definition() end, desc = 'Overlook: Peek definition' },
-      { '<leader>pc', function() require('overlook.api').peek_cursor() end, desc = 'Overlook: Peek cursor' },
-      { '<leader>pu', function() require('overlook.api').restore_popup() end, desc = 'Overlook: Restore' },
-      { '<leader>pU', function() require('overlook.api').restore_all_popups() end, desc = 'Overlook: Restore all' },
-      { '<leader>pq', function() require('overlook.api').close_all() end, desc = 'Overlook: Close all' },
-      { '<leader>pf', function() require('overlook.api').switch_focus() end, desc = 'Overlook: Switch focus' },
-      { '<leader>ps', function() require('overlook.api').open_in_split() end, desc = 'Overlook: Open in split' },
-      { '<leader>pv', function() require('overlook.api').open_in_vsplit() end, desc = 'Overlook: Open in vsplit' },
-      { '<leader>pt', function() require('overlook.api').open_in_tab() end, desc = 'Overlook: Open popup in tab' },
+      { '<leader>pp', function() require('overlook.api').peek_definition() end,         desc = 'Overlook: Peek definition' },
+      { '<leader>pc', function() require('overlook.api').peek_cursor() end,             desc = 'Overlook: Peek cursor' },
+      { '<leader>pu', function() require('overlook.api').restore_popup() end,           desc = 'Overlook: Restore' },
+      { '<leader>pU', function() require('overlook.api').restore_all_popups() end,      desc = 'Overlook: Restore all' },
+      { '<leader>pq', function() require('overlook.api').close_all() end,               desc = 'Overlook: Close all' },
+      { '<leader>pf', function() require('overlook.api').switch_focus() end,            desc = 'Overlook: Switch focus' },
+      { '<leader>ps', function() require('overlook.api').open_in_split() end,           desc = 'Overlook: Open in split' },
+      { '<leader>pv', function() require('overlook.api').open_in_vsplit() end,          desc = 'Overlook: Open in vsplit' },
+      { '<leader>pt', function() require('overlook.api').open_in_tab() end,             desc = 'Overlook: Open popup in tab' },
       { '<leader>po', function() require('overlook.api').open_in_original_window() end, desc = 'Overlook: Orig win' },
     },
   },
