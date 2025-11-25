@@ -85,7 +85,7 @@ luac.out
 .LSOverride
 
 # Icon must end with two 
-Icon
+Icon
 
 # Thumbnails
 ._*
@@ -192,6 +192,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!nix/lib/
 lib64/
 parts/
 sdist/

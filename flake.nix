@@ -28,6 +28,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # NixOS
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # wlr-which-key
     wlr-which-key-b0o = {
       # on branch b0o
@@ -82,10 +88,12 @@
     });
 
     nixosConfigurations = {
-      nixos-desktop = nixpkgs.lib.nixosSystem {
+      boonix = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = {inherit inputs;};
-        modules = [./nix/hosts/boonix];
+        modules = [
+          ./nix/hosts/boonix
+        ];
       };
     };
   };
