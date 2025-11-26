@@ -239,6 +239,8 @@ class UnifiedScratchpadState:
         state = self._load_state()
         if scratchpad_name in state["visible"]:
             state["visible"].remove(scratchpad_name)
+        # Update last_used so the most recently hidden scratchpad is restored next
+        state["last_used"][scratchpad_name] = time.time()
         self._save_state(state)
 
     def get_scratchpad_for_window(self, window_id: int) -> str | None:
