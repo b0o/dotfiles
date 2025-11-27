@@ -374,7 +374,7 @@ binds {
   Mod+Shift+W                 hotkey-overlay-title="Mode: Workspaces"           { spawn "zsh" "-c" "wlr-which-key -k 'z W'"; }
   Mod+Period                  hotkey-overlay-title="Mode: KB Ptr"               { spawn "zsh" "-c" "wl-kbptr"; }
   Print                       hotkey-overlay-title="Mode: Screenshot"           { spawn "zsh" "-c" "wlr-which-key -k 'Print Print'"; }
-  Mod+Print                   hotkey-overlay-title="Mode: Screenshot"           { spawn "zsh" "-c" "wlr-which-key -k Print"; }
+  Mod+Print                   hotkey-overlay-title="Mode: Screenshot Select"    { spawn "zsh" "-c" "wlr-which-key -k 'Print S'"; }
 
   Mod+Slash                   hotkey-overlay-title="Scratchpad: Term"           { spawn "zsh" "-c" "niri-tools scratchpad toggle term"; }
   Mod+M                       hotkey-overlay-title="Scratchpad: Music"          { spawn "zsh" "-c" "niri-tools scratchpad toggle music"; }

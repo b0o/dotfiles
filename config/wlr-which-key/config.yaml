@@ -3,7 +3,7 @@ font: Pragmasevka Nerd Font 16
 background: "#25213B"
 color: "#DFD9FB"
 border: "#8466E4"
-separator: " ➜ "
+separator: "  "
 border_width: 3
 corner_r: 6
 padding: 15
@@ -14,9 +14,10 @@ inhibit_compositor_keyboard_shortcuts: true
 
 menu:
   - key: "`"
-    desc: Lock System
+    desc: Lock
     cmd: system lock
-  - key: "Mod4+space"
+  - key: "space"
+    alias: "Mod4+space"
     desc: Launcher
     cmd: rofi -show drun -modi drun
   - key: "o"
@@ -491,26 +492,16 @@ menu:
       - key: "a"
         desc: Action
         cmd: "makoctl menu -- rofi -dmenu -p 'Choose Action: '"
-  - key: "Print"
+  - key: "S"
+    alias: "Print"
     desc: Screenshot
     submenu:
       # TODO: Screen Recording
-      # TODO: Window Selection
       - key: "Print"
-        desc: Screenshot Region
+        desc: Screenshot Window or Region
         alias: "r"
-        cmd: |
-          zsh -c '
-            region=$(slurp)
-            if [[ -z "$region" ]]; then
-              exit
-            fi
-            out="$HOME/Documents/screenshots/$(date +%Y-%m-%d_%H-%M-%S).png"
-            grim -g "$region" "$out" || {
-              notify-send -a screenshot -u critical "Screenshot Failed" "Failed to save screenshot"
-              exit
-            }
-            notify-send -a screenshot -i "$out" "Screenshot Saved" "Saved to $out"
-            wl-copy -t image/png < "$out"
-            wl-copy -p -t text/plain "$out"
-          '
+        cmd: $XDG_CONFIG_HOME/niri/bin/screenshot.nu capture
+      - key: "S"
+        alias: "s"
+        desc: Pick Screenshot
+        cmd: $XDG_CONFIG_HOME/niri/bin/screenshot.nu pick

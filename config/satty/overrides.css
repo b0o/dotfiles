@@ -1,0 +1,15 @@
+/* Make toolbars fully opaque instead of semi-transparent */
+.toolbar {
+    background: #000000;
+}
+
+/* Add borders to make swatches more visible */
+.toolbar-bottom button {
+    border: 1px solid #666666;
+    border-radius: 4px;
+    margin: 2px;
+}
+
+.toolbar-bottom button:checked {
+    border: 2px solid #ffffff;
+}
