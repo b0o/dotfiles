@@ -52,7 +52,8 @@ scratchpads:
 
   # TODO: Allow cycleable scratchpads
   music:
-    app_id: chrome-eikjhbkpemdappjfcmdeeeamdpkgabmk-alt # soundcloud
+    app_id: chrome-jkeipnhncidnkjhpeoiehafoaabagaha-alt # apple music
+    # app_id: chrome-eikjhbkpemdappjfcmdeeeamdpkgabmk-alt # soundcloud
     # app_id: chrome-cinhimbnkkaeohfgghhklpknlkffjgod-alt # youtube
     command:
       [
@@ -60,7 +61,8 @@ scratchpads:
         "-A",
         "app-window",
         "google-chrome",
-        "eikjhbkpemdappjfcmdeeeamdpkgabmk", # soundcloud
+        "jkeipnhncidnkjhpeoiehafoaabagaha", # apple music
+        # "eikjhbkpemdappjfcmdeeeamdpkgabmk", # soundcloud
         # "cinhimbnkkaeohfgghhklpknlkffjgod", # youtube
       ]
     size: 42%x55%
