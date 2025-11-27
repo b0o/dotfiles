@@ -32,6 +32,7 @@ in {
           monthly = 6;
         };
         owner = uid;
+        group = 100;
         mode = "700";
       };
 
@@ -45,6 +46,7 @@ in {
           monthly = 0;
         };
         owner = uid;
+        group = 100;
         mode = "700";
       };
 
@@ -58,6 +60,7 @@ in {
           monthly = 0;
         };
         owner = uid;
+        group = 100;
         mode = "700";
       };
 
@@ -71,6 +74,7 @@ in {
           monthly = 0;
         };
         owner = uid;
+        group = 100;
         mode = "700";
       };
 
@@ -84,6 +88,7 @@ in {
           monthly = 3;
         };
         owner = uid;
+        group = 100;
         mode = "700";
       };
 
@@ -97,6 +102,7 @@ in {
           monthly = 12;
         };
         owner = uid;
+        group = 100;
         mode = "700";
       };
 
@@ -110,6 +116,7 @@ in {
           monthly = 24;
         };
         owner = uid;
+        group = 100;
         mode = "700";
       };
     };

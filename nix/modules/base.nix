@@ -168,6 +168,7 @@ in {
 
             tailscale = mkDataset {
               mountpoint = "/var/lib/tailscale";
+              mode = "700";
               options = snapshotDataset {
                 frequent = 4;
                 hourly = 24;
@@ -213,6 +214,7 @@ in {
 
             secrets = mkDataset {
               mountpoint = cfg.secrets.directory;
+              mode = "700";
               options = snapshotDataset {
                 frequent = 4;
                 hourly = 24;
