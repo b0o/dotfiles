@@ -122,9 +122,12 @@ export def "flags external" [command: string, --short, --long]: nothing -> table
   if ($carapace_data | is-empty) {
     return null
   }
+  let flag_data = $carapace_data | get -o LocalFlags
+  if ($flag_data | is-empty) {
+    return null
+  }
 
-  let flags = $carapace_data
-    | get LocalFlags
+  let flags = $flag_data
     | rename --block {str downcase}
     | select -o shorthand longhand type usage
     | rename --column {shorthand: short_name, longhand: long_name, usage: description}
@@ -181,12 +184,10 @@ export def "flags internal" [command: string, --short, --long]: nothing -> table
 export def paths [prefix: path] {
   let prefix = ($prefix | str replace "~" $nu.home-path)
   let args = (
-    if ($prefix | is-empty) or ($prefix == ".") {
-      { dir: ".", pattern: "." }
-    } else if ($prefix | str ends-with "/") {
+    if ($prefix | str ends-with "/") {
       { dir: $prefix, pattern: "." }
     } else {
-      { dir: ($prefix | path dirname), pattern: ($prefix | path basename) }
+      { dir: ($prefix | path dirname | default --empty "."), pattern: ($prefix | path basename | default --empty ".") }
     }
   )
   (
