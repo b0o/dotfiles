@@ -1,0 +1,269 @@
+"""Socket server and niri event stream handling."""
+
+import asyncio
+import json
+import os
+import sys
+from typing import Any
+
+from ..common import CONFIG_FILE, SOCKET_PATH
+from .config import load_scratchpad_configs, notify_config_error
+from .scratchpad import ScratchpadManager
+from .state import DaemonState, OutputInfo, WindowInfo, WorkspaceInfo
+from .urgency import UrgencyHandler
+
+
+class DaemonServer:
+    """Main daemon server - handles socket, events, and config watching."""
+
+    def __init__(self) -> None:
+        self.state = DaemonState()
+        self.scratchpad_manager = ScratchpadManager(self.state)
+        self.urgency_handler = UrgencyHandler(self.state)
+        self.server: asyncio.Server | None = None
+        self.running = False
+
+    async def start(self) -> None:
+        """Start the daemon."""
+        print("Starting niri-tools daemon...")
+
+        # Load initial state
+        self.state.load_initial_state()
+
+        # Load config
+        self._reload_config()
+
+        # Remove stale socket
+        if SOCKET_PATH.exists():
+            SOCKET_PATH.unlink()
+
+        # Start socket server
+        self.server = await asyncio.start_unix_server(
+            self._handle_client, path=str(SOCKET_PATH)
+        )
+        os.chmod(SOCKET_PATH, 0o600)
+
+        self.running = True
+        print(f"Listening on {SOCKET_PATH}")
+
+        # Run main loops
+        await asyncio.gather(
+            self._event_stream_loop(),
+            self._config_watch_loop(),
+            self._serve_forever(),
+        )
+
+    async def stop(self) -> None:
+        """Stop the daemon."""
+        self.running = False
+        if self.server:
+            self.server.close()
+            await self.server.wait_closed()
+        await self.urgency_handler.cleanup_all()
+        if SOCKET_PATH.exists():
+            SOCKET_PATH.unlink()
+        print("Daemon stopped")
+
+    async def _serve_forever(self) -> None:
+        """Keep the server running."""
+        if self.server:
+            async with self.server:
+                await self.server.serve_forever()
+
+    async def _handle_client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        """Handle a client connection."""
+        try:
+            data = await reader.readline()
+            if not data:
+                return
+
+            try:
+                command = json.loads(data.decode())
+            except json.JSONDecodeError:
+                return
+
+            await self._dispatch_command(command)
+
+        except Exception as e:
+            print(f"Error handling client: {e}", file=sys.stderr)
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+    async def _dispatch_command(self, command: dict[str, Any]) -> None:
+        """Dispatch a command to the appropriate handler."""
+        cmd = command.get("cmd")
+
+        if cmd == "toggle":
+            name = command.get("name")
+            if name:
+                await self.scratchpad_manager.toggle(name)
+            else:
+                await self.scratchpad_manager.smart_toggle()
+
+        elif cmd == "hide":
+            await self.scratchpad_manager.hide()
+
+        else:
+            print(f"Unknown command: {cmd}", file=sys.stderr)
+
+    async def _event_stream_loop(self) -> None:
+        """Listen to niri event stream and update state."""
+        while self.running:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "niri", "msg", "-j", "event-stream",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+
+                if proc.stdout:
+                    async for line in proc.stdout:
+                        if not self.running:
+                            break
+
+                        line_str = line.decode().strip()
+                        if not line_str:
+                            continue
+
+                        try:
+                            event = json.loads(line_str)
+                            await self._handle_event(event)
+                        except json.JSONDecodeError:
+                            continue
+
+                if proc.returncode is None:
+                    proc.terminate()
+                    await proc.wait()
+
+            except Exception as e:
+                print(f"Event stream error: {e}", file=sys.stderr)
+                if self.running:
+                    await asyncio.sleep(1)  # Retry after delay
+
+    async def _handle_event(self, event: dict[str, Any]) -> None:
+        """Handle a single niri event."""
+        if "WindowOpenedOrChanged" in event:
+            window_data = event["WindowOpenedOrChanged"]["window"]
+            window = WindowInfo.from_niri(window_data)
+            is_new = window.id not in self.state.windows
+            self.state.windows[window.id] = window
+
+            if is_new:
+                await self.scratchpad_manager.handle_window_opened(window)
+
+        elif "WindowClosed" in event:
+            window_id = event["WindowClosed"]["id"]
+            self.state.windows.pop(window_id, None)
+            self.state.unregister_scratchpad_window(window_id)
+
+        elif "WindowFocusChanged" in event:
+            focus_data = event["WindowFocusChanged"]
+            # Clear old focus
+            for w in self.state.windows.values():
+                w.is_focused = False
+            # Set new focus
+            if "id" in focus_data:
+                self.state.focused_window_id = focus_data["id"]
+                if window := self.state.windows.get(focus_data["id"]):
+                    window.is_focused = True
+            else:
+                self.state.focused_window_id = None
+
+        elif "WorkspaceActivated" in event:
+            ws_data = event["WorkspaceActivated"]
+            ws_id = ws_data["id"]
+            is_focused = ws_data.get("focused", False)
+
+            # Update workspace active state - clear active on same output, set for activated
+            activated_ws = self.state.workspaces.get(ws_id)
+            if activated_ws:
+                for ws in self.state.workspaces.values():
+                    if ws.output == activated_ws.output:
+                        ws.is_active = ws.id == ws_id
+
+                if is_focused:
+                    self.state.focused_output = activated_ws.output
+
+        elif "WorkspacesChanged" in event:
+            # Reload workspace list
+            await self._reload_workspaces()
+
+        elif "OutputFocusChanged" in event:
+            output_data = event["OutputFocusChanged"]["output"]
+            self.state.focused_output = output_data.get("name")
+
+        elif "OutputsChanged" in event:
+            outputs_data = event["OutputsChanged"]["outputs"]
+            self.state.outputs.clear()
+            for name, data in outputs_data.items():
+                self.state.outputs[name] = OutputInfo.from_niri(name, data)
+
+        elif "WindowUrgencyChanged" in event:
+            urgency_data = event["WindowUrgencyChanged"]
+            await self.urgency_handler.handle_urgency_changed(
+                urgency_data["id"], urgency_data["urgent"]
+            )
+
+    async def _reload_workspaces(self) -> None:
+        """Reload workspace list from niri."""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "niri", "msg", "-j", "workspaces",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await proc.communicate()
+            workspaces = json.loads(stdout.decode())
+
+            self.state.workspaces.clear()
+            for ws_data in workspaces:
+                ws = WorkspaceInfo.from_niri(ws_data)
+                self.state.workspaces[ws.id] = ws
+
+        except Exception as e:
+            print(f"Failed to reload workspaces: {e}", file=sys.stderr)
+
+    async def _config_watch_loop(self) -> None:
+        """Watch for config file changes."""
+        while self.running:
+            await asyncio.sleep(1.0)
+
+            try:
+                if CONFIG_FILE.exists():
+                    mtime = CONFIG_FILE.stat().st_mtime
+                    if mtime > self.state.config_mtime:
+                        self._reload_config()
+            except OSError:
+                pass
+
+    def _reload_config(self) -> None:
+        """Reload configuration from file."""
+        try:
+            if CONFIG_FILE.exists():
+                self.state.config_mtime = CONFIG_FILE.stat().st_mtime
+
+            configs = load_scratchpad_configs()
+            self.state.scratchpad_configs = configs
+            print(f"Loaded {len(configs)} scratchpad configs")
+
+        except Exception as e:
+            error_msg = f"Failed to load config: {e}"
+            print(error_msg, file=sys.stderr)
+            notify_config_error(error_msg)
+
+
+async def run_daemon() -> int:
+    """Run the daemon until interrupted."""
+    server = DaemonServer()
+
+    try:
+        await server.start()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        await server.stop()
+
+    return 0
