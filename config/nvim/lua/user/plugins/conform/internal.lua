@@ -34,9 +34,7 @@ M.formatters_by_ft = {
   markdown = {
     'dprint' --[[ , 'injected' ]],
   },
-  -- TODO: Use dprint when MDX is supported: https://github.com/dprint/dprint-plugin-markdown/issues/93
-  mdx = { 'prettierd' },
-  -- rust = { 'dprint' },
+  mdx = { 'prettierd' }, -- TODO: Use dprint when MDX is supported: https://github.com/dprint/dprint-plugin-markdown/issues/93
   toml = { 'dprint' },
 
   css = { 'prettierd', 'stylelint' },

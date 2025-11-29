@@ -198,7 +198,7 @@ local servers = function()
         tailwindCSS = {
           experimental = {
             classRegex = {
-              [[[\S]*ClassName="([^"]*)]],   -- <MyComponent containerClassName="..." />
+              [[[\S]*ClassName="([^"]*)]], -- <MyComponent containerClassName="..." />
               [[[\S]*ClassName={"([^"}]*)]], -- <MyComponent containerClassName={"..."} />
               [[[\S]*ClassName={"([^'}]*)]], -- <MyComponent containerClassName={'...'} />
             },
@@ -211,7 +211,8 @@ local servers = function()
         },
       },
     },
-    'taplo',
+    -- 'taplo',
+    'tombi',
     {
       'tsgo',
       on_attach = function(client, bufnr) require('twoslash-queries').attach(client, bufnr) end,

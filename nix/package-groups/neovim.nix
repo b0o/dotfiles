@@ -21,4 +21,5 @@ with pkgs; [
 
   # Misc
   just-lsp # lsp server for just files
+  tombi # TOML Formatter / Linter / Language Server
 ]
