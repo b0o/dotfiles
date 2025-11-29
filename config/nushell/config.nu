@@ -1,7 +1,7 @@
 use hooks
-use completion [commandline-fuzzy-complete-dwim]
+# use completion [commandline-fuzzy-complete-dwim]
 use comark *
-use awtrix
+# use awtrix
 
 $env.config.completions = {
   algorithm: fuzzy
@@ -10,18 +10,18 @@ $env.config.completions = {
 }
 
 $env.config.keybindings ++= [
-  {
-    name: fuzzy_complete_dwim
-    modifier: none
-    keycode: char_á # mapped to ctrl+tab in ghostty
-    mode: [emacs vi_insert]
-    event: [
-      {
-        send: executehostcommand
-        cmd: commandline-fuzzy-complete-dwim
-      }
-    ]
-  }
+  # {
+  #   name: fuzzy_complete_dwim
+  #   modifier: none
+  #   keycode: char_á # mapped to ctrl+tab in ghostty
+  #   mode: [emacs vi_insert]
+  #   event: [
+  #     {
+  #       send: executehostcommand
+  #       cmd: commandline-fuzzy-complete-dwim
+  #     }
+  #   ]
+  # }
   {
     name: completion_menu
     modifier: alt
@@ -51,16 +51,6 @@ $env.config.keybindings ++= [
   }
 ]
 
-$env.config.hooks.pre_prompt ++= [
-  # Direnv
-  {
-    if (which direnv | is-empty) {
-      return
-    }
-    direnv export json | from json | default {} | load-env
-  }
-]
-
 $env.config.use_kitty_protocol = true
 
 hooks use {
@@ -72,16 +62,14 @@ hooks use {
       ATUIN_NOBIND: true
     }
     cmd: [atuin init nu]
-    on_load: {||
-      $env.config.keybindings ++= [
-        {
-          name: atuin
-          modifier: control
-          keycode: char_r
-          mode: [emacs, vi_normal, vi_insert]
-          event: { send: executehostcommand cmd: (_atuin_search_cmd) }
-        }
-      ]
+    on_load: {
+      $env.config.keybindings ++= [{
+        name: atuin
+        modifier: control
+        keycode: char_r
+        mode: [emacs vi_normal vi_insert]
+        event: { send: executehostcommand cmd: (_atuin_search_cmd) }
+      }]
     }
   }
   carapace: {
@@ -90,6 +78,9 @@ hooks use {
     cmd: [carapace _carapace nushell]
     env: {
       CARAPACE_BRIDGES: 'zsh,fish,bash'
+      CARAPACE_ENV: 0
+      CARAPACE_UNFILTERED: 1
+      CARAPACE_MERGEFLAGS: 0
     }
   }
   starship: {
@@ -107,6 +98,13 @@ hooks use {
   ls_colors: {
     enabled: true
     depends: vivid
-    cmd: { || $"$env.LS_COLORS = '(vivid generate lavi)'" }
+    cmd: { $"$env.LS_COLORS = '(vivid generate lavi)'" }
+  }
+  direnv: {
+    enabled: true
+    depends: direnv
+    on_load: {
+      $env.config.hooks.pre_prompt ++= [{ direnv export json | from json | default {} | load-env }]
+    }
   }
 }

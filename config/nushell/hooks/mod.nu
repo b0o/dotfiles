@@ -21,6 +21,7 @@ def hook-init [name: string, hook: record] {
     }
   }
 
+  let cmd = $hook | get -o cmd | default null
   let module = $hook | get -o module | default false
   let overlay = $hook | get -o overlay | default false
   let lazy = $hook | get -o lazy | default false
@@ -42,13 +43,11 @@ def hook-init [name: string, hook: record] {
     }
   }
 
-  let generated = (try {
-    # Check if cmd is a closure or a command
-    let is_closure = ($hook.cmd | describe) =~ '^closure'
-
-    let res = if $is_closure {
+  let generated = try {
+    let type = $cmd | describe
+    let res = if ($type =~ '^closure') {
       # Invoke the closure and capture output
-      let output = do $hook.cmd
+      let output = do $cmd
       {
         stdout: (if ($output | describe) =~ '^list' {
           $output | str join "\n"
@@ -58,9 +57,20 @@ def hook-init [name: string, hook: record] {
         stderr: ""
         exit_code: 0
       }
-    } else {
+    } else if ($type == 'string') or ($type == 'list<string>') {
       # Execute as external command
-      ^$hook.cmd | complete
+      ^$cmd | complete
+    } else if ($cmd | is-empty) {
+      # Empty
+      {
+        stdout: ""
+        stderr: ""
+        exit_code: 0
+      }
+    } else {
+      error make -u {
+        msg: $"hooks: ($name): cmd must be a string, list of strings, or closure, got: ($type)"
+      }
     }
 
     if ($res | get -o exit_code) != 0 {
@@ -77,7 +87,7 @@ def hook-init [name: string, hook: record] {
     let out = [
       $res.stdout
       $on_load
-    ] | where { is-not-empty } | str join "\n"
+    ] | where { is-not-empty } | str join "\n" | default ""
 
     if $module {
       # Save command output to module file
@@ -103,7 +113,7 @@ def hook-init [name: string, hook: record] {
     }
   } catch { |e|
     $"error make -u {\n  msg: \"hooks: ($name): failed to initialize: ($e.msg)\\nFix the issue and then run 'hooks clean ($name)' and restart Nushell, or disable the hook.\"\n}"
-  })
+  }
   if ($generated | is-not-empty) {
     $generated | save -f (hook-path $name)
   }
@@ -129,17 +139,18 @@ def hook-enabled [name: string, hook: record] {
 
   # Check if dependency command exists
   let depends = $hook | get -o depends
-  if ($depends != null) and (which $depends | is-empty) {
-    return false
-  }
-
-  # Check if main command exists (only for external commands, not closures)
-  let is_closure = ($hook.cmd | describe) =~ '^closure'
-  if not $is_closure {
-    let cmd = $hook.cmd | first
-    if (which $cmd | is-empty) {
-      print -e $"Warning: Hook '($name)': command '($cmd)' not found. Disabling hook."
-      return false
+  if ($depends | is-not-empty) {
+    let type = $depends | describe
+    if ($type == 'string') {
+      return (which $depends | is-not-empty)
+    } else if ($type == 'list<string>') {
+      return $depends | all { (which $in) | is-not-empty }
+    } else if ($type | str starts-with 'closure') {
+      return (do $depends)
+    } else {
+      error make -u {
+        msg: $"hooks: ($name): depends must be a string, list of strings, or closure, got: ($type)"
+      }
     }
   }
 
@@ -150,20 +161,20 @@ def hook-enabled [name: string, hook: record] {
 # hooks should be a record of the form:
 # {
 #   hook_name: {
-#     enabled?: bool = true           # Whether to enable the hook
-#     cmd: list<string> | closure     # Command to run to initialize the hook, or a closure that returns a string/list of lines
-#     depends?: string                # Command that must be installed; if not found, hook is quietly disabled
-#     env?: record                    # Environment variables to set before running the command
-#     module?: bool = false           # If true, save as a module
-#     lazy?: bool = false             # If true, don't load the module immediately, use `hooks load <name>` to load the module
-#                                     # Mutually exclusive with `overlay`
-#     overlay?: bool = false          # If true (requires module), don't load the module immediately,
-#                                     # create aliases `hooks load/unload <name>` to load/unload the module as an overlay
-#                                     # Mutually exclusive with `lazy`
-#     on_load?: closure               # Closure to run after the hook is loaded (for overlays, runs after `hooks load <name>`)
-#                                     # Note: the closure is run in the context of the hook module, variables captured at the
-#                                     # lambda definition will not be available, but variables/functions from the generated
-#                                     # hook module will be available.
+#     enabled?: bool = true                  # Whether to enable the hook
+#     cmd?: string|list<string>|closure      # Command to run to initialize the hook, or a closure that returns a string/list of lines
+#     depends?: string|list<string>|closure  # Command that must be installed; if not found, hook is quietly disabled
+#     env?: record                           # Environment variables to set before running the command
+#     module?: bool = false                  # If true, save as a module
+#     lazy?: bool = false                    # If true, don't load the module immediately, use `hooks load <name>` to load the module
+#                                            # Mutually exclusive with `overlay`
+#     overlay?: bool = false                 # If true (requires module), don't load the module immediately,
+#                                            # create aliases `hooks load/unload <name>` to load/unload the module as an overlay
+#                                            # Mutually exclusive with `lazy`
+#     on_load?: closure                      # Closure to run after the hook is loaded (for overlays, runs after `hooks load <name>`)
+#                                            # Note: the closure is run in the context of the hook module, variables captured at the
+#                                            # lambda definition will not be available, but variables/functions from the generated
+#                                            # hook module will be available.
 #   }
 # }
 # All hooks are automatically regenerated daily
