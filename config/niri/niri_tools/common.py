@@ -12,6 +12,10 @@ from typing import Any
 
 runtime_dir = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
 NIRI_STATE_FILE = Path(runtime_dir) / "niri-state.json"
+SOCKET_PATH = Path(runtime_dir) / "niri-tools.sock"
+SCRATCHPAD_WORKSPACE = "󰪷"
+CONFIG_DIR = Path.home() / ".config" / "niri"
+CONFIG_FILE = CONFIG_DIR / "scratchpads.yaml"
 
 
 class EventHandler(ABC):
