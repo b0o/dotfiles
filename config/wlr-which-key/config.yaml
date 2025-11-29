@@ -482,14 +482,16 @@ menu:
         cmd: makoctl dismiss
         keep_open: true
       - key: "D"
-        alias: "Mod4+N"
+        alias: "Mod4+D"
         desc: Dismiss All
         cmd: makoctl dismiss --all
-      - key: "r"
-        desc: Restore
+      - key: "p"
+        alias: "Mod4+P"
+        desc: Previous Notification
         cmd: makoctl restore
         keep_open: true
       - key: "a"
+        alias: "Mod4+N"
         desc: Action
         cmd: "makoctl menu -- rofi -dmenu -p 'Choose Action: '"
   - key: "S"
