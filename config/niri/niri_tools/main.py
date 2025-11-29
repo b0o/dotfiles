@@ -21,7 +21,6 @@ def create_parser() -> argparse.ArgumentParser:
         required=True,
     )
 
-    # Scratchpad subcommand
     scratchpad_parser = subparsers.add_parser(
         "scratchpad",
         help="Manage scratchpad windows",
@@ -29,7 +28,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     scratchpad.add_arguments(scratchpad_parser)
 
-    # Stream monitor subcommand
     monitor_parser = subparsers.add_parser(
         "monitor",
         help="Monitor niri event stream",

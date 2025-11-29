@@ -10,7 +10,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-# Runtime directory for state files
 runtime_dir = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
 NIRI_STATE_FILE = Path(runtime_dir) / "niri-state.json"
 

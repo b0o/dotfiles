@@ -56,11 +56,9 @@ class WindowUrgencyHandler(EventHandler):
         """Handle when window urgency is cleared"""
         if window_id in self.active_notifications:
             notification_id = self.active_notifications[window_id]
-            # Only dismiss if the notification process still exists
             if notification_id in self.notification_processes:
                 self._dismiss_notification(notification_id)
             else:
-                # Notification was already cleaned up by action, just clean up mappings
                 del self.active_notifications[window_id]
                 if notification_id in self.notification_window_map:
                     del self.notification_window_map[notification_id]
@@ -71,16 +69,15 @@ class WindowUrgencyHandler(EventHandler):
     ) -> str:
         """Send persistent notification and return notification ID"""
         try:
-            # Start notify-send with actions in background
             cmd = [
                 "notify-send",
-                "-p",  # Print notification ID
+                "-p",
                 "-u",
                 "normal",
                 "-t",
-                "0",  # Don't timeout (0 = persistent)
+                "0",
                 "-A",
-                "default=Focus",  # Action name and description
+                "default=Focus",
                 app_name,
                 window_title,
             ]
@@ -89,7 +86,6 @@ class WindowUrgencyHandler(EventHandler):
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
             )
 
-            # Read notification ID immediately (first line of output)
             if process.stdout:
                 notification_id = process.stdout.readline().strip()
             else:
@@ -97,7 +93,6 @@ class WindowUrgencyHandler(EventHandler):
 
             if notification_id:
                 self.notification_processes[notification_id] = process
-                # Start thread to listen for action responses
                 threading.Thread(
                     target=self._listen_for_action,
                     args=(notification_id, window_id, process),
@@ -120,14 +115,12 @@ class WindowUrgencyHandler(EventHandler):
     ) -> None:
         """Listen for action responses from notify-send process"""
         try:
-            # Continue reading from stdout for action responses
             if process.stdout:
                 for line in process.stdout:
                     action_name = line.strip()
                     if action_name:
                         if action_name == "default":
                             self._focus_window(window_id)
-                        # Clean up after action
                         self._cleanup_notification_process(notification_id)
                         break
 
@@ -159,7 +152,6 @@ class WindowUrgencyHandler(EventHandler):
             process.terminate()
             del self.notification_processes[notification_id]
 
-        # Clean up mappings
         if notification_id in self.notification_window_map:
             window_id = self.notification_window_map[notification_id]
             if window_id in self.active_notifications:
@@ -169,11 +161,9 @@ class WindowUrgencyHandler(EventHandler):
     def _dismiss_notification(self, notification_id: str) -> None:
         """Dismiss a notification by ID"""
         try:
-            # Use notify-send to replace notification with empty content and short timeout
             subprocess.run(
                 ["notify-send", "-r", notification_id, "-t", "1", ""], check=True
             )
-            # Clean up the notification process
             self._cleanup_notification_process(notification_id)
         except subprocess.CalledProcessError as e:
             print(
@@ -193,12 +183,10 @@ class NiriStateTracker(EventHandler):
             "outputs": {},
             "last_updated": time.time(),
         }
-        # Initialize state from niri commands
         self._load_initial_state()
         self._save_state()
 
     def should_handle(self, event: dict[str, Any]) -> bool:
-        # Handle events that affect windows, workspaces, or focus
         return any(
             key in event
             for key in [
@@ -216,7 +204,6 @@ class NiriStateTracker(EventHandler):
     def handle(self, event: dict[str, Any]) -> None:
         state_changed = False
 
-        # Handle window events
         if "WindowOpenedOrChanged" in event:
             self._handle_window_opened_or_changed(event["WindowOpenedOrChanged"])
             state_changed = True
@@ -230,7 +217,6 @@ class NiriStateTracker(EventHandler):
             self._handle_window_focus_changed(event["WindowFocusChanged"])
             state_changed = True
 
-        # Handle workspace events
         elif "WorkspaceActivated" in event:
             self._handle_workspace_activated(event["WorkspaceActivated"])
             state_changed = True
@@ -238,7 +224,6 @@ class NiriStateTracker(EventHandler):
             self._reload_workspaces()
             state_changed = True
 
-        # Handle output focus events
         elif "OutputFocusChanged" in event:
             self._handle_output_focus_changed(event["OutputFocusChanged"])
             state_changed = True
@@ -253,7 +238,6 @@ class NiriStateTracker(EventHandler):
     def _load_initial_state(self) -> None:
         """Load initial state from niri commands"""
         try:
-            # Load windows
             result = subprocess.run(
                 ["niri", "msg", "-j", "windows"],
                 capture_output=True,
@@ -262,7 +246,6 @@ class NiriStateTracker(EventHandler):
             )
             self.state["windows"] = json.loads(result.stdout)
 
-            # Load workspaces
             result = subprocess.run(
                 ["niri", "msg", "-j", "workspaces"],
                 capture_output=True,
@@ -271,7 +254,6 @@ class NiriStateTracker(EventHandler):
             )
             self.state["workspaces"] = json.loads(result.stdout)
 
-            # Load focused output
             result = subprocess.run(
                 ["niri", "msg", "-j", "focused-output"],
                 capture_output=True,
@@ -280,7 +262,6 @@ class NiriStateTracker(EventHandler):
             )
             self.state["focused_output"] = json.loads(result.stdout)
 
-            # Load outputs (monitor information)
             result = subprocess.run(
                 ["niri", "msg", "-j", "outputs"],
                 capture_output=True,
@@ -296,13 +277,11 @@ class NiriStateTracker(EventHandler):
         """Update or add window in state"""
         window_id = window_data["window"]["id"]
 
-        # Find and update existing window, or add new one
         for i, window in enumerate(self.state["windows"]):
             if window["id"] == window_id:
                 self.state["windows"][i] = window_data["window"]
                 return
 
-        # New window
         self.state["windows"].append(window_data["window"])
 
     def _handle_windows_changed(self, windows_data: dict[str, Any]) -> None:
@@ -318,11 +297,9 @@ class NiriStateTracker(EventHandler):
 
     def _handle_window_focus_changed(self, focus_data: dict[str, Any]) -> None:
         """Update window focus state"""
-        # Reset all windows to unfocused
         for window in self.state["windows"]:
             window["is_focused"] = False
 
-        # Set focused window
         if "id" in focus_data:
             focused_id = focus_data["id"]
             for window in self.state["windows"]:
@@ -335,15 +312,12 @@ class NiriStateTracker(EventHandler):
         workspace_id = workspace_data["id"]
         is_focused = workspace_data.get("focused", False)
 
-        # Reset all workspaces to inactive
         for workspace in self.state["workspaces"]:
             workspace["is_active"] = False
 
-        # Set active workspace and update focused output if this workspace is focused
         for workspace in self.state["workspaces"]:
             if workspace["id"] == workspace_id:
                 workspace["is_active"] = True
-                # If this workspace is focused, update the focused output
                 if is_focused and "output" in workspace:
                     self.state["focused_output"] = {"name": workspace["output"]}
                 break
@@ -372,7 +346,6 @@ class NiriStateTracker(EventHandler):
     def _save_state(self) -> None:
         """Save state to file atomically"""
         try:
-            # Write to temporary file first, then rename for atomicity
             temp_file = NIRI_STATE_FILE.with_suffix(".tmp")
             with open(temp_file, "w") as f:
                 json.dump(self.state, f, separators=(",", ":"))
@@ -381,15 +354,14 @@ class NiriStateTracker(EventHandler):
             print(f"Failed to save niri state: {e}", file=sys.stderr)
 
 
-def add_arguments(parser: argparse.ArgumentParser) -> None:
+def add_arguments(_parser: argparse.ArgumentParser) -> None:
     """Add stream monitor-specific arguments to the parser."""
     # No specific arguments needed for stream monitor currently
     pass
 
 
-def main(args: argparse.Namespace) -> int:
+def main(_args: argparse.Namespace) -> int:
     """Monitor niri event stream with configurable handlers"""
-    # Initialize handlers
     handlers: list[EventHandler] = [
         WindowUrgencyHandler(),
         NiriStateTracker(),
@@ -411,7 +383,6 @@ def main(args: argparse.Namespace) -> int:
             try:
                 event = json.loads(line)
 
-                # Run all handlers that match the event
                 for handler in handlers:
                     if handler.should_handle(event):
                         handler.handle(event)

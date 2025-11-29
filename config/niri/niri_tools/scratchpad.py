@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -27,20 +28,15 @@ def convert_coordinates_to_pixels(
     outputs: dict[str, Any] | None = None,
     monitor_name: str | None = None,
 ) -> tuple[int, int]:
-    """Convert coordinate strings (which may include percentages) to absolute pixel values"""
     x_str, y_str = coords
-
-    # Get monitor dimensions from cached output data if available
     monitor_width, monitor_height = _get_monitor_dimensions(outputs, monitor_name)
 
-    # Convert X coordinate
     if x_str.endswith("%"):
         x_percent = float(x_str[:-1])
         x = int(monitor_width * x_percent / 100)
     else:
         x = int(x_str)
 
-    # Convert Y coordinate
     if y_str.endswith("%"):
         y_percent = float(y_str[:-1])
         y = int(monitor_height * y_percent / 100)
@@ -53,7 +49,6 @@ def convert_coordinates_to_pixels(
 def _get_monitor_dimensions(
     outputs: dict[str, Any] | None = None, monitor_name: str | None = None
 ) -> tuple[int, int]:
-    """Get monitor dimensions from cached outputs, with fallback to default 4K"""
     if outputs and monitor_name and monitor_name in outputs:
         output_info = outputs[monitor_name]
         logical = output_info.get("logical", {})
@@ -62,7 +57,6 @@ def _get_monitor_dimensions(
         if width and height:
             return width, height
 
-    # Fallback: try to get focused monitor dimensions
     if outputs:
         for output_name, output_info in outputs.items():
             logical = output_info.get("logical", {})
@@ -77,13 +71,26 @@ def _get_monitor_dimensions(
     raise ValueError("No monitor dimensions found")
 
 
-# Shared regex cache for compiled patterns
 _REGEX_CACHE: dict[str, re.Pattern] = {}
 
 
-class ScratchpadState:
-    """Manage scratchpad state persistence"""
+def run_concurrent(commands: list[list[str]]) -> list[subprocess.CompletedProcess]:
+    if not commands:
+        return []
 
+    def run_cmd(cmd: list[str]) -> subprocess.CompletedProcess:
+        return subprocess.run(cmd, check=True)
+
+    if len(commands) == 1:
+        return [run_cmd(commands[0])]
+
+    with ThreadPoolExecutor(max_workers=len(commands)) as executor:
+        results = list(executor.map(run_cmd, commands))
+
+    return results
+
+
+class ScratchpadState:
     def __init__(self, name: str):
         self.name = name
         self.state_file = STATE_DIR / f"{name}.json"
@@ -92,16 +99,13 @@ class ScratchpadState:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
 
     def save_window_id(self, window_id: int, app_id: str) -> None:
-        """Save scratchpad window information"""
         state = {"window_id": window_id, "app_id": app_id, "created_at": time.time()}
         with open(self.state_file, "w") as f:
             json.dump(state, f)
-        # Invalidate cache after writing
         self._cached_state = None
         self._cache_mtime = None
 
     def get_window_id(self) -> int | None:
-        """Get stored window ID if it exists and is valid"""
         if not self.state_file.exists():
             return None
 
@@ -112,14 +116,12 @@ class ScratchpadState:
             window_id = state.get("window_id")
             if window_id:
                 return window_id
-            # Clean up invalid state
             self.clear_state()
             return None
         except (json.JSONDecodeError, FileNotFoundError):
             return None
 
     def get_window_id_cached(self) -> int | None:
-        """Get stored window ID if it exists and is valid using cached window data"""
         if not self.state_file.exists():
             return None
 
@@ -131,21 +133,18 @@ class ScratchpadState:
             window_id = state.get("window_id")
             if window_id:
                 return window_id
-            # Clean up invalid state
             self.clear_state()
             return None
         except (json.JSONDecodeError, FileNotFoundError):
             return None
 
     def _get_cached_state(self) -> dict[str, Any] | None:
-        """Get state with file system caching"""
         if not self.state_file.exists():
             return None
 
         try:
             current_mtime = self.state_file.stat().st_mtime
 
-            # Use cached state if file hasn't changed
             if (
                 self._cached_state is not None
                 and self._cache_mtime is not None
@@ -153,7 +152,6 @@ class ScratchpadState:
             ):
                 return self._cached_state
 
-            # Read and cache state
             with open(self.state_file) as f:
                 self._cached_state = json.load(f)
             self._cache_mtime = current_mtime
@@ -163,29 +161,24 @@ class ScratchpadState:
             return None
 
     def clear_state(self) -> None:
-        """Remove state file"""
         if self.state_file.exists():
             self.state_file.unlink()
-        # Clear cache
         self._cached_state = None
         self._cache_mtime = None
 
 
 class UnifiedScratchpadState:
-    """Manage unified state for all scratchpads"""
-
     def __init__(self):
         self.state_file = UNIFIED_STATE_FILE
         self._cached_state: dict[str, Any] | None = None
         self._cache_mtime: float | None = None
 
     def _load_state(self) -> dict[str, Any]:
-        """Load or create unified state"""
         if not self.state_file.exists():
             return {
-                "windows": {},  # window_id -> scratchpad_name mapping
-                "last_used": {},  # scratchpad_name -> timestamp
-                "visible": [],  # list of currently visible scratchpad names
+                "windows": {},
+                "last_used": {},
+                "visible": [],
             }
 
         try:
@@ -199,35 +192,29 @@ class UnifiedScratchpadState:
             }
 
     def _save_state(self, state: dict[str, Any]) -> None:
-        """Save unified state to disk"""
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.state_file, "w") as f:
             json.dump(state, f, indent=2)
-        # Invalidate cache
         self._cached_state = None
         self._cache_mtime = None
 
     def register_window(self, window_id: int, scratchpad_name: str) -> None:
-        """Register a window as belonging to a scratchpad"""
         state = self._load_state()
         state["windows"][str(window_id)] = scratchpad_name
         state["last_used"][scratchpad_name] = time.time()
         self._save_state(state)
 
     def unregister_window(self, window_id: int) -> None:
-        """Remove a window from the registry"""
         state = self._load_state()
         window_id_str = str(window_id)
         if window_id_str in state["windows"]:
             scratchpad_name = state["windows"][window_id_str]
             del state["windows"][window_id_str]
-            # Remove from visible list if present
             if scratchpad_name in state["visible"]:
                 state["visible"].remove(scratchpad_name)
             self._save_state(state)
 
     def mark_visible(self, scratchpad_name: str) -> None:
-        """Mark a scratchpad as currently visible"""
         state = self._load_state()
         if scratchpad_name not in state["visible"]:
             state["visible"].append(scratchpad_name)
@@ -235,31 +222,25 @@ class UnifiedScratchpadState:
         self._save_state(state)
 
     def mark_hidden(self, scratchpad_name: str) -> None:
-        """Mark a scratchpad as hidden"""
         state = self._load_state()
         if scratchpad_name in state["visible"]:
             state["visible"].remove(scratchpad_name)
-        # Update last_used so the most recently hidden scratchpad is restored next
         state["last_used"][scratchpad_name] = time.time()
         self._save_state(state)
 
     def get_scratchpad_for_window(self, window_id: int) -> str | None:
-        """Get the scratchpad name for a given window ID"""
         state = self._load_state()
         return state["windows"].get(str(window_id))
 
     def get_most_recent_scratchpad(self) -> str | None:
-        """Get the name of the most recently used scratchpad that isn't currently visible"""
         state = self._load_state()
         if not state["last_used"]:
             return None
 
-        # Sort by timestamp, most recent first
         sorted_scratchpads = sorted(
             state["last_used"].items(), key=lambda x: x[1], reverse=True
         )
 
-        # Find first one that's not currently visible
         for name, _ in sorted_scratchpads:
             if name not in state["visible"]:
                 return name
@@ -267,30 +248,24 @@ class UnifiedScratchpadState:
         return None
 
     def clean_stale_windows(self, existing_window_ids: list[int]) -> None:
-        """Remove entries for windows that no longer exist"""
         state = self._load_state()
         existing_ids_str = {str(wid) for wid in existing_window_ids}
 
-        # Find windows to remove
         to_remove = []
         for window_id_str in state["windows"]:
             if window_id_str not in existing_ids_str:
                 to_remove.append(window_id_str)
 
-        # Remove stale entries
         if to_remove:
             for window_id_str in to_remove:
                 scratchpad_name = state["windows"][window_id_str]
                 del state["windows"][window_id_str]
-                # Also remove from visible list if present
                 if scratchpad_name in state["visible"]:
                     state["visible"].remove(scratchpad_name)
             self._save_state(state)
 
 
 class NiriState:
-    """Load Niri state from cached file written by niri-tools monitor"""
-
     def __init__(self):
         self.windows: list[dict[str, Any]] = []
         self.workspaces: list[dict[str, Any]] = []
@@ -299,7 +274,6 @@ class NiriState:
         self._loaded = False
 
     def load(self) -> None:
-        """Load niri state from cached file"""
         if self._loaded:
             return
 
@@ -327,8 +301,6 @@ class NiriState:
 
 
 class ScratchpadManager:
-    """Manage scratchpad creation, showing, and hiding"""
-
     def __init__(
         self,
         name: str,
@@ -364,52 +336,39 @@ class ScratchpadManager:
         self.width = width
         self.height = height
 
-        # Parse position specifications into a dictionary
         self.position_map: dict[str | None, tuple[str, str] | None] = {}
         if position_specs:
             for spec in position_specs:
                 output_name, coords = parse_position_spec(spec)
                 self.position_map[output_name] = coords
         elif position:
-            # Legacy single position support
             self.position_map[None] = parse_position(position)
 
         self.state = ScratchpadState(name)
         self.unified_state = UnifiedScratchpadState()
 
-        # Validate that exactly one matching method is provided (only if command is provided)
         if command is not None and not ((app_id is None) ^ (title is None)):
             raise ValueError("Must provide exactly one of app_id or title")
 
     def toggle_scratchpad(self) -> bool:
-        """Main toggle function - show/hide/create scratchpad"""
-        # Load all niri state from cached file (extremely fast)
         niri_state = NiriState()
         niri_state.load()
 
         window_id = self.state.get_window_id_cached()
 
         if window_id is None:
-            # Scratchpad doesn't exist
             if self.command is None:
-                # No command provided, just exit quietly
                 return True
-            # Command provided, create it
             print(f"Creating new scratchpad '{self.name}'")
             return self._create_scratchpad()
 
-        # Scratchpad exists, check its current state
         window_info = self._get_window_info(window_id, niri_state.windows)
         if not window_info:
-            # Window no longer exists in state, clean up
             self.state.clear_state()
             if self.command is None:
-                # No command provided, just exit quietly
                 return True
-            # Command provided, create new
             return self._create_scratchpad()
 
-        # Get current workspace info using cached data
         current_workspace_info = self._get_current_workspace_info(niri_state)
         if not current_workspace_info:
             print("Failed to get current workspace info", file=sys.stderr)
@@ -422,20 +381,16 @@ class ScratchpadManager:
         is_focused = window_info.get("is_focused", False)
 
         if is_focused:
-            # Window is focused, hide it
             print(f"Hiding scratchpad '{self.name}'")
             return self._hide_scratchpad(window_id)
         elif window_workspace_id != current_workspace_id:
-            # Window is on different workspace (possibly different monitor), show it
             print(f"Showing scratchpad '{self.name}'")
             return self._show_scratchpad(window_id) and self._focus_window(window_id)
         else:
-            # Window is on current workspace but not focused, focus it
             print(f"Focusing scratchpad '{self.name}'")
             return self._focus_window(window_id)
 
     def _create_scratchpad(self) -> bool:
-        """Create new scratchpad"""
         handler = ScratchpadHandler(
             self.command,
             self.state,
@@ -462,14 +417,11 @@ class ScratchpadManager:
         return True
 
     def _hide_scratchpad(self, window_id: int) -> bool:
-        """Move scratchpad to hidden workspace"""
         try:
-            # Use scratchpad workspace name (niri creates it automatically)
             scratchpad_workspace = SCRATCHPAD_WORKSPACE
 
             print(f"Moving window {window_id} to workspace '{scratchpad_workspace}'")
 
-            # Move to scratchpad workspace with no focus follow
             subprocess.run(
                 [
                     "niri",
@@ -487,7 +439,6 @@ class ScratchpadManager:
                 check=True,
             )
 
-            # Update unified state
             self.unified_state.mark_hidden(self.name)
 
             print("Successfully moved window to scratchpad workspace")
@@ -497,9 +448,7 @@ class ScratchpadManager:
             return False
 
     def _show_scratchpad(self, window_id: int) -> bool:
-        """Move scratchpad to current workspace and configure it"""
         try:
-            # Get current workspace info from cached state
             niri_state = NiriState()
             niri_state.load()
             workspace_info = self._get_current_workspace_info(niri_state)
@@ -524,7 +473,6 @@ class ScratchpadManager:
                 check=True,
             )
 
-            # Update unified state
             self.unified_state.mark_visible(self.name)
             self.unified_state.register_window(window_id, self.name)
 
@@ -534,7 +482,6 @@ class ScratchpadManager:
             return False
 
     def _focus_window(self, window_id: int) -> bool:
-        """Focus the scratchpad window"""
         try:
             subprocess.run(
                 ["niri", "msg", "action", "focus-window", "--id", str(window_id)],
@@ -546,9 +493,7 @@ class ScratchpadManager:
             return False
 
     def _configure_floating_window(self, window_id: int) -> None:
-        """Configure window as floating, optionally resized and positioned"""
         try:
-            # Move window to floating layout (this is idempotent - won't break if already floating)
             subprocess.run(
                 [
                     "niri",
@@ -561,9 +506,9 @@ class ScratchpadManager:
                 check=True,
             )
 
-            # Only resize if width/height are specified
+            resize_cmds: list[list[str]] = []
             if self.width is not None:
-                subprocess.run(
+                resize_cmds.append(
                     [
                         "niri",
                         "msg",
@@ -572,11 +517,10 @@ class ScratchpadManager:
                         "--id",
                         str(window_id),
                         self.width,
-                    ],
-                    check=True,
+                    ]
                 )
             if self.height is not None:
-                subprocess.run(
+                resize_cmds.append(
                     [
                         "niri",
                         "msg",
@@ -585,11 +529,12 @@ class ScratchpadManager:
                         "--id",
                         str(window_id),
                         self.height,
-                    ],
-                    check=True,
+                    ]
                 )
 
-            # Only position if positions are specified
+            if resize_cmds:
+                run_concurrent(resize_cmds)
+
             if self.position_map:
                 self._position_window(window_id)
 
@@ -597,29 +542,22 @@ class ScratchpadManager:
             print(f"Failed to configure floating window: {e}", file=sys.stderr)
 
     def _position_window(self, window_id: int) -> None:
-        """Position window based on user preference"""
         try:
-            # Get monitor info
             niri_state = NiriState()
             niri_state.load()
             monitor_name = niri_state.focused_output.get("name")
 
-            # Look for output-specific position first
             position_coords = self.position_map.get(monitor_name)
 
-            # If no output-specific position, use fallback (None key)
             if position_coords is None and monitor_name not in self.position_map:
                 position_coords = self.position_map.get(None)
 
-            # If we have a position to apply (checking against explicit None)
             if monitor_name in self.position_map or None in self.position_map:
                 if position_coords is None:
-                    # Center position
                     subprocess.run(
                         ["niri", "msg", "action", "center-window"], check=True
                     )
                 else:
-                    # Convert coordinates to absolute pixels if needed
                     x, y = convert_coordinates_to_pixels(
                         position_coords, niri_state.outputs, monitor_name
                     )
@@ -644,20 +582,16 @@ class ScratchpadManager:
     def _get_window_info(
         self, window_id: int, windows: list[dict[str, Any]]
     ) -> dict[str, Any] | None:
-        """Get window information using cached window data"""
-        # Use next() with default for early termination
         return next((w for w in windows if w["id"] == window_id), None)
 
     def _get_current_workspace_info(
         self, niri_state: NiriState
     ) -> tuple[int, int, str] | None:
-        """Get current active workspace info using cached data: (id, index, monitor_name) on the focused monitor"""
         try:
             focused_monitor = niri_state.focused_output.get("name")
             if not focused_monitor:
                 return None
 
-            # Find the active workspace on the focused monitor with early termination
             workspace = next(
                 (
                     w
@@ -676,8 +610,6 @@ class ScratchpadManager:
 
 
 class ScratchpadHandler(EventHandler):
-    """Handle scratchpad application launching and window management"""
-
     def __init__(
         self,
         command: list[str] | None,
@@ -720,7 +652,6 @@ class ScratchpadHandler(EventHandler):
         self.launch_time = 0.0
         self.unified_state = UnifiedScratchpadState()
 
-        # Validate that exactly one matching method is provided
         if not ((app_id is None) ^ (title is None)):
             raise ValueError("Must provide exactly one of app_id or title")
 
@@ -730,7 +661,6 @@ class ScratchpadHandler(EventHandler):
     def handle(self, event: dict[str, Any]) -> None:
         window_data = event["WindowOpenedOrChanged"]["window"]
 
-        # Check if this is the window we're waiting for
         if self.waiting_for_window and self._matches_window(window_data):
             window_id = window_data["id"]
 
@@ -745,43 +675,33 @@ class ScratchpadHandler(EventHandler):
 
             print(f"Detected window matching {match_info} (ID: {window_id})")
 
-            # Save the window state (use app_id if available, otherwise use title)
             save_id = self.app_id or f"title:{self.title}"
             self.state.save_window_id(window_id, save_id)
 
-            # Register with unified state if we have a scratchpad name
             if self.scratchpad_name:
                 self.unified_state.register_window(window_id, self.scratchpad_name)
                 self.unified_state.mark_visible(self.scratchpad_name)
 
-            # Configure the window
             self._configure_new_window(window_id)
 
-            # Reset waiting state
             self.waiting_for_window = False
 
     def _matches_window(self, window_data: dict[str, Any]) -> bool:
-        """Check if window matches our criteria (app_id or title)"""
         if self.app_id_regex:
-            # Match by app_id regex
             window_app_id = window_data.get("app_id", "")
             return bool(self.app_id_regex.search(window_app_id))
         elif self.app_id:
-            # Match by exact app_id
             window_app_id = window_data.get("app_id", "")
             return window_app_id == self.app_id
         elif self.title_regex:
-            # Match by title regex
             window_title = window_data.get("title", "")
             return bool(self.title_regex.search(window_title))
         elif self.title:
-            # Match by exact title
             window_title = window_data.get("title", "")
             return window_title == self.title
         return False
 
     def launch_application(self) -> bool:
-        """Launch the application and start monitoring for its window"""
         if not self.command:
             return True
         try:
@@ -795,22 +715,22 @@ class ScratchpadHandler(EventHandler):
             return False
 
     def _configure_new_window(self, window_id: int) -> None:
-        """Configure newly created scratchpad window"""
         try:
-            # Focus the window
             subprocess.run(
-                ["niri", "msg", "action", "focus-window", "--id", str(window_id)],
+                [
+                    "niri",
+                    "msg",
+                    "action",
+                    "move-window-to-floating",
+                    "--id",
+                    str(window_id),
+                ],
                 check=True,
             )
 
-            # Move to floating layout
-            subprocess.run(
-                ["niri", "msg", "action", "move-window-to-floating"], check=True
-            )
-
-            # Only resize if width/height are specified
+            resize_cmds: list[list[str]] = []
             if self.width is not None:
-                subprocess.run(
+                resize_cmds.append(
                     [
                         "niri",
                         "msg",
@@ -819,11 +739,10 @@ class ScratchpadHandler(EventHandler):
                         "--id",
                         str(window_id),
                         self.width,
-                    ],
-                    check=True,
+                    ]
                 )
             if self.height is not None:
-                subprocess.run(
+                resize_cmds.append(
                     [
                         "niri",
                         "msg",
@@ -832,11 +751,12 @@ class ScratchpadHandler(EventHandler):
                         "--id",
                         str(window_id),
                         self.height,
-                    ],
-                    check=True,
+                    ]
                 )
 
-            # Only position if positions are specified
+            if resize_cmds:
+                run_concurrent(resize_cmds)
+
             if self.position_map:
                 self._position_window(window_id)
 
@@ -845,29 +765,22 @@ class ScratchpadHandler(EventHandler):
             print(f"Failed to configure window: {e}", file=sys.stderr)
 
     def _position_window(self, window_id: int) -> None:
-        """Position window based on user preference"""
         try:
-            # Get monitor info
             niri_state = NiriState()
             niri_state.load()
             monitor_name = niri_state.focused_output.get("name")
 
-            # Look for output-specific position first
             position_coords = self.position_map.get(monitor_name)
 
-            # If no output-specific position, use fallback (None key)
             if position_coords is None and monitor_name not in self.position_map:
                 position_coords = self.position_map.get(None)
 
-            # If we have a position to apply (checking against explicit None)
             if monitor_name in self.position_map or None in self.position_map:
                 if position_coords is None:
-                    # Center position
                     subprocess.run(
                         ["niri", "msg", "action", "center-window"], check=True
                     )
                 else:
-                    # Convert coordinates to absolute pixels if needed
                     x, y = convert_coordinates_to_pixels(
                         position_coords, niri_state.outputs, monitor_name
                     )
@@ -891,7 +804,6 @@ class ScratchpadHandler(EventHandler):
 
 
 def monitor_events(handlers: list[EventHandler], timeout: float = 10.0) -> None:
-    """Monitor niri event stream for a limited time"""
     start_time = time.time()
 
     try:
@@ -903,7 +815,6 @@ def monitor_events(handlers: list[EventHandler], timeout: float = 10.0) -> None:
         )
 
         for line in process.stdout or []:
-            # Check timeout
             if time.time() - start_time > timeout:
                 print("Timeout reached, stopping monitoring")
                 break
@@ -915,7 +826,6 @@ def monitor_events(handlers: list[EventHandler], timeout: float = 10.0) -> None:
             try:
                 event = json.loads(line)
 
-                # Run all handlers that match the event
                 for handler in handlers:
                     if handler.should_handle(event):
                         handler.handle(event)
@@ -933,7 +843,6 @@ def monitor_events(handlers: list[EventHandler], timeout: float = 10.0) -> None:
 
 
 def parse_size(size_str: str) -> tuple[str, str]:
-    """Parse size string like '80%x60%' into (width, height)"""
     try:
         parts = size_str.split("x")
         if len(parts) != 2:
@@ -947,7 +856,6 @@ def parse_size(size_str: str) -> tuple[str, str]:
 
 
 def parse_position(position_str: str) -> tuple[str, str] | None:
-    """Parse position string like '100,50' or '10%,20%' into (x, y). Returns None for 'center'."""
     if position_str.lower() == "center":
         return None
 
@@ -966,13 +874,6 @@ def parse_position(position_str: str) -> tuple[str, str] | None:
 def parse_position_spec(
     position_spec: str,
 ) -> tuple[str | None, tuple[str, str] | None]:
-    """Parse position specification like 'DP-1=40%,60%' or '30%,30%'.
-
-    Returns (output_name, position_coords) where:
-    - output_name is None for fallback positions
-    - position_coords is None for 'center', otherwise (x, y)
-    """
-    # Check if this is an output-specific position
     if "=" in position_spec:
         parts = position_spec.split("=", 1)
         if len(parts) == 2:
@@ -980,29 +881,20 @@ def parse_position_spec(
             position_str = parts[1].strip()
             return output_name, parse_position(position_str)
 
-    # No output specified, this is a fallback position
     return None, parse_position(position_spec)
 
 
 def load_config() -> dict[str, Any]:
-    """Load scratchpad configuration from YAML file with support for includes"""
     return _load_config_recursive(CONFIG_FILE, set())
 
 
 def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, Any]:
-    """Recursively load config files, following include directives
-
-    Included files are processed first, then merged with the current file's config.
-    Scratchpads defined in the current file override those from included files.
-    """
-    # Resolve to absolute path to handle circular includes
     try:
         config_path = config_path.resolve()
     except (OSError, RuntimeError):
         print(f"Warning: Could not resolve path {config_path}", file=sys.stderr)
         return {}
 
-    # Check for circular includes
     if config_path in visited:
         print(
             f"Warning: Circular include detected for {config_path}, skipping",
@@ -1012,10 +904,8 @@ def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, A
 
     if not config_path.exists():
         if config_path == CONFIG_FILE.resolve():
-            # Main config file doesn't exist, return empty config
             return {}
         else:
-            # Included file doesn't exist, warn and skip
             print(
                 f"Warning: Included config file not found: {config_path}",
                 file=sys.stderr,
@@ -1031,27 +921,20 @@ def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, A
         if not config:
             return {}
 
-        # Initialize result with empty scratchpads dict
         result: dict[str, Any] = {"scratchpads": {}}
 
-        # Process includes if present
         includes = config.get("include", [])
         if includes:
-            # Ensure includes is a list
             if not isinstance(includes, list):
                 includes = [includes]
 
-            # Load each included file and merge in order
             for include_path_str in includes:
-                # Resolve relative paths relative to the current config file's directory
                 include_path = config_path.parent / include_path_str
                 included_config = _load_config_recursive(include_path, visited.copy())
 
-                # Merge scratchpads from included file
                 if "scratchpads" in included_config:
                     result["scratchpads"].update(included_config["scratchpads"])
 
-        # Now merge scratchpads from current file (these override included ones)
         if "scratchpads" in config:
             result["scratchpads"].update(config["scratchpads"])
 
@@ -1063,20 +946,14 @@ def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, A
 
 
 def smart_toggle() -> int:
-    """Smart toggle: hide focused scratchpad or show most recent one"""
-
-    # Load niri state
     niri_state = NiriState()
     niri_state.load()
 
-    # Load unified scratchpad state
     unified_state = UnifiedScratchpadState()
 
-    # Clean up stale windows first
     existing_window_ids = [w["id"] for w in niri_state.windows]
     unified_state.clean_stale_windows(existing_window_ids)
 
-    # Check if focused window is a scratchpad
     focused_window = None
     for window in niri_state.windows:
         if window.get("is_focused", False):
@@ -1088,10 +965,8 @@ def smart_toggle() -> int:
         scratchpad_name = unified_state.get_scratchpad_for_window(window_id)
 
         if scratchpad_name:
-            # Focused window is a scratchpad, hide it
             print(f"Hiding focused scratchpad '{scratchpad_name}'")
 
-            # Move to scratchpad workspace
             try:
                 subprocess.run(
                     [
@@ -1108,7 +983,6 @@ def smart_toggle() -> int:
                     check=True,
                 )
 
-                # Update unified state
                 unified_state.mark_hidden(scratchpad_name)
 
                 return 0
@@ -1116,28 +990,23 @@ def smart_toggle() -> int:
                 print(f"Failed to hide scratchpad: {e}", file=sys.stderr)
                 return 1
 
-    # No scratchpad is focused, show the most recent one
     most_recent = unified_state.get_most_recent_scratchpad()
 
     if most_recent:
         print(f"Showing most recent scratchpad '{most_recent}'")
 
-        # Load config to get scratchpad settings
         config = load_config()
         scratchpads = config.get("scratchpads", {})
 
         if most_recent in scratchpads:
-            # Use the regular toggle mechanism with the scratchpad name
             scratchpad_config = scratchpads[most_recent]
 
-            # Parse size from config
             size_str = scratchpad_config.get("size")
             if size_str:
                 width, height = parse_size(size_str)
             else:
                 width, height = None, None
 
-            # Parse position from config
             position_config = scratchpad_config.get("position", {})
             position_specs = []
             for output, pos in position_config.items():
@@ -1146,10 +1015,8 @@ def smart_toggle() -> int:
                 else:
                     position_specs.append(f"{output}={pos}")
 
-            # Get command from config
             command = scratchpad_config.get("command")
 
-            # Create manager with config values
             manager = ScratchpadManager(
                 name=most_recent,
                 command=command,
@@ -1160,7 +1027,6 @@ def smart_toggle() -> int:
                 position_specs=position_specs if position_specs else None,
             )
 
-            # Toggle the scratchpad (which will show it)
             return 0 if manager.toggle_scratchpad() else 1
         else:
             print(f"Scratchpad '{most_recent}' not found in config", file=sys.stderr)
@@ -1171,28 +1037,19 @@ def smart_toggle() -> int:
 
 
 def cmd_toggle(args: argparse.Namespace) -> int:
-    """Toggle a scratchpad"""
-
-    # If no name provided, handle smart toggle
     if args.name is None:
         return smart_toggle()
 
-    # Load configuration
     config = load_config()
     scratchpads = config.get("scratchpads", {})
 
-    # Check if scratchpad exists in config
     if args.name not in scratchpads:
-        # Fall back to command-line arguments if not in config
-        # Parse size into width and height if provided
         if args.size:
             width, height = parse_size(args.size)
         else:
             width, height = None, None
 
-        # When no command is provided, we also don't require app_id or title
         if args.exec is None and args.app_id is None and args.title is None:
-            # Just toggle by name
             manager = ScratchpadManager(
                 name=args.name,
                 command=None,
@@ -1203,7 +1060,6 @@ def cmd_toggle(args: argparse.Namespace) -> int:
                 position_specs=args.position,
             )
         else:
-            # Normal behavior with command
             manager = ScratchpadManager(
                 name=args.name,
                 command=args.exec,
@@ -1214,17 +1070,14 @@ def cmd_toggle(args: argparse.Namespace) -> int:
                 position_specs=args.position,
             )
     else:
-        # Use config values
         scratchpad_config = scratchpads[args.name]
 
-        # Parse size from config
         size_str = scratchpad_config.get("size")
         if size_str:
             width, height = parse_size(size_str)
         else:
             width, height = None, None
 
-        # Parse position from config
         position_config = scratchpad_config.get("position", {})
         position_specs = []
         for output, pos in position_config.items():
@@ -1233,10 +1086,8 @@ def cmd_toggle(args: argparse.Namespace) -> int:
             else:
                 position_specs.append(f"{output}={pos}")
 
-        # Get command from config
         command = scratchpad_config.get("command")
 
-        # Create manager with config values
         manager = ScratchpadManager(
             name=args.name,
             command=command,
@@ -1247,15 +1098,12 @@ def cmd_toggle(args: argparse.Namespace) -> int:
             position_specs=position_specs if position_specs else None,
         )
 
-    # Toggle the scratchpad
     success = manager.toggle_scratchpad()
 
     return 0 if success else 1
 
 
 def cmd_hide(_args: argparse.Namespace) -> int:
-    """Hide the focused scratchpad"""
-    # Determine if the focused window is a scratchpad
     niri_state = NiriState()
     niri_state.load()
 
@@ -1269,14 +1117,10 @@ def cmd_hide(_args: argparse.Namespace) -> int:
         print("No focused window found", file=sys.stderr)
         return 1
 
-    # TODO: check scratchpad state to ensure it's actually a scratchpad,
-    # rather than just a floating window
-    # neet to unify scratchpad state into a single file to do this efficiently
     if not scratchpad_window.get("is_floating", False):
         print("Focused window is not a scratchpad", file=sys.stderr)
         return 1
 
-    # Hide the scratchpad
     subprocess.run(
         [
             "niri",
@@ -1296,7 +1140,6 @@ def cmd_hide(_args: argparse.Namespace) -> int:
 
 
 def cmd_list(_args: argparse.Namespace) -> int:
-    """List all configured scratchpads"""
     config = load_config()
     scratchpads = config.get("scratchpads", {})
 
@@ -1338,16 +1181,14 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
     toggle = sub.add_parser("toggle", help="Toggle a scratchpad")
 
-    """Add scratchpad-specific arguments to the parser."""
     toggle.add_argument(
         "name",
         type=str,
-        nargs="?",  # Make name optional
+        nargs="?",
         default=None,
         help="Name of the scratchpad. If not provided, will hide focused scratchpad or show most recent one",
     )
 
-    # Optional arguments for overriding config or defining scratchpads not in config
     match_group = toggle.add_mutually_exclusive_group(required=False)
     match_group.add_argument(
         "--app-id",
@@ -1390,8 +1231,6 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def main(args: argparse.Namespace) -> int:
-    """Main scratchpad toggle function"""
-
     if args.scratchpad_command == "toggle":
         return cmd_toggle(args)
     elif args.scratchpad_command == "hide":
