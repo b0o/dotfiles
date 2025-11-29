@@ -1,5 +1,4 @@
 use hooks
-# use completion [commandline-fuzzy-complete-dwim]
 use comark *
 # use awtrix
 
@@ -9,19 +8,24 @@ $env.config.completions = {
   partial: true
 }
 
+def _complete_skim [] {
+  use completion [commandline-fuzzy-complete-dwim]
+  commandline-fuzzy-complete-dwim
+}
+
 $env.config.keybindings ++= [
-  # {
-  #   name: fuzzy_complete_dwim
-  #   modifier: none
-  #   keycode: char_á # mapped to ctrl+tab in ghostty
-  #   mode: [emacs vi_insert]
-  #   event: [
-  #     {
-  #       send: executehostcommand
-  #       cmd: commandline-fuzzy-complete-dwim
-  #     }
-  #   ]
-  # }
+  {
+    name: fuzzy_complete_dwim
+    modifier: none
+    keycode: char_á # mapped to ctrl+tab in ghostty
+    mode: [emacs vi_insert]
+    event: [
+      {
+        send: executehostcommand
+        cmd: _complete_skim
+      }
+    ]
+  }
   {
     name: completion_menu
     modifier: alt
