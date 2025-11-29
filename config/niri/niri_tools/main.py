@@ -3,16 +3,18 @@ Niri window manager tools - unified CLI entry point.
 """
 
 import argparse
+import asyncio
 import sys
 
-from . import scratchpad, stream_monitor
+from . import client
+from .daemon import server
 
 
 def create_parser() -> argparse.ArgumentParser:
     """Create the main argument parser with subcommands."""
     parser = argparse.ArgumentParser(
         prog="niri-tools",
-        description="Niri window manager tools - unified CLI for scratchpad and stream monitoring",
+        description="Niri window manager tools - unified CLI for scratchpad and daemon",
     )
 
     subparsers = parser.add_subparsers(
@@ -21,19 +23,20 @@ def create_parser() -> argparse.ArgumentParser:
         required=True,
     )
 
+    # Daemon command
+    subparsers.add_parser(
+        "daemon",
+        help="Run the niri-tools daemon",
+        description="Run the daemon that handles scratchpads and urgency notifications",
+    )
+
+    # Scratchpad command (routes to client)
     scratchpad_parser = subparsers.add_parser(
         "scratchpad",
         help="Manage scratchpad windows",
-        description="Toggle show/hide scratchpad windows",
+        description="Toggle show/hide scratchpad windows (requires daemon)",
     )
-    scratchpad.add_arguments(scratchpad_parser)
-
-    monitor_parser = subparsers.add_parser(
-        "monitor",
-        help="Monitor niri event stream",
-        description="Monitor niri event stream for urgency notifications and state tracking",
-    )
-    stream_monitor.add_arguments(monitor_parser)
+    client.add_arguments(scratchpad_parser)
 
     return parser
 
@@ -44,10 +47,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        if args.command == "scratchpad":
-            return scratchpad.main(args)
-        elif args.command == "monitor":
-            return stream_monitor.main(args)
+        if args.command == "daemon":
+            return asyncio.run(server.run_daemon())
+        elif args.command == "scratchpad":
+            return client.main(args)
         else:
             print(f"Unknown command: {args.command}", file=sys.stderr)
             parser.print_help()
