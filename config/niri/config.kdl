@@ -351,7 +351,6 @@ binds {
   XF86AudioPrev               hotkey-overlay-title="Play: Prev"                 { spawn "zsh" "-c" "audioctl -n play prev"; }
   XF86AudioNext               hotkey-overlay-title="Play: Next"                 { spawn "zsh" "-c" "audioctl -n play next"; }
 
-
   Super+XF86AudioNext         hotkey-overlay-title="Audio: Next Sink"           { spawn "zsh" "-c" "audioctl -n sink next"; }
   Super+XF86AudioPrev         hotkey-overlay-title="Audio: Prev Sink"           { spawn "zsh" "-c" "audioctl -n sink prev"; }
   Super+Shift+XF86AudioMute   hotkey-overlay-title="Audio: Unify Sinks"         { spawn "zsh" "-c" "audioctl -n sink unify"; }
