@@ -32,6 +32,7 @@ with pkgs; [
   atuin # shell history manager with sync
   carapace # multi-shell completion generator
   vivid # themeable LS_COLORS generator
+  usage # completions for mise
 
   # Modern CLI utilities
   bat # cat clone with syntax highlighting and Git integration

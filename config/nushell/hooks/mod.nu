@@ -23,12 +23,26 @@ def hook-init [name: string, hook: record] {
 
   let module = $hook | get -o module | default false
   let overlay = $hook | get -o overlay | default false
-
-  if $overlay and (not $module) {
-    print -e $"Warning: Hook '($name)': overlay=true requires module to be set. Ignoring overlay setting."
+  let lazy = $hook | get -o lazy | default false
+  let on_load = $hook | get -o on_load
+  if ($on_load | is-not-empty) and (not ($on_load | describe | str starts-with "closure")) {
+    error make -u {
+      msg: $"hooks: ($name): on_load must be a closure, got: ($on_load | describe)"
+    }
   }
 
-  (try {
+  if $overlay and (not $module) {
+    error make -u {
+      msg: $"hooks: ($name): overlay=true requires module=true"
+    }
+  }
+  if $lazy and $overlay {
+    error make -u {
+      msg: $"hooks: ($name): lazy=true and overlay=true are mutually exclusive"
+    }
+  }
+
+  let generated = (try {
     # Check if cmd is a closure or a command
     let is_closure = ($hook.cmd | describe) =~ '^closure'
 
@@ -55,11 +69,21 @@ def hook-init [name: string, hook: record] {
       }
     }
 
+    let on_load = if ($on_load | is-not-empty) {
+      # NOTE: wrapping in export-env makes this work with both `use` (as in module = true) and `source` / autoload scenarios
+      "export-env { do --env " + (view source $on_load) + " }"
+    }
+
+    let out = [
+      $res.stdout
+      $on_load
+    ] | where { is-not-empty } | str join "\n"
+
     if $module {
       # Save command output to module file
       mkdir ($hooks_dir | path join "hooks")
       let mod_path = module-path $name
-      $res.stdout | save -f $mod_path
+      $out | save -f $mod_path
 
       # Create hook file that uses or overlays the module
       if $overlay {
@@ -69,16 +93,20 @@ def hook-init [name: string, hook: record] {
           $"# Unload ($name) overlay"
           $"alias \"hooks unload ($name)\" = overlay hide ($name)"
         ] | str join "\n"
+      } else if $lazy {
+        ""
       } else {
         $"use ($mod_path)"
       }
     } else {
-      # Save command output directly
-      $res.stdout
+      $out
     }
   } catch { |e|
     $"error make -u {\n  msg: \"hooks: ($name): failed to initialize: ($e.msg)\\nFix the issue and then run 'hooks clean ($name)' and restart Nushell, or disable the hook.\"\n}"
-  }) | save -f (hook-path $name)
+  })
+  if ($generated | is-not-empty) {
+    $generated | save -f (hook-path $name)
+  }
 }
 
 def get-manifest [] {
@@ -127,8 +155,15 @@ def hook-enabled [name: string, hook: record] {
 #     depends?: string                # Command that must be installed; if not found, hook is quietly disabled
 #     env?: record                    # Environment variables to set before running the command
 #     module?: bool = false           # If true, save as a module
+#     lazy?: bool = false             # If true, don't load the module immediately, use `hooks load <name>` to load the module
+#                                     # Mutually exclusive with `overlay`
 #     overlay?: bool = false          # If true (requires module), don't load the module immediately,
-#                                       create aliases `hooks load/unload <name>` to load/unload the module as an overlay
+#                                     # create aliases `hooks load/unload <name>` to load/unload the module as an overlay
+#                                     # Mutually exclusive with `lazy`
+#     on_load?: closure               # Closure to run after the hook is loaded (for overlays, runs after `hooks load <name>`)
+#                                     # Note: the closure is run in the context of the hook module, variables captured at the
+#                                     # lambda definition will not be available, but variables/functions from the generated
+#                                     # hook module will be available.
 #   }
 # }
 # All hooks are automatically regenerated daily

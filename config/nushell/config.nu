@@ -11,16 +11,23 @@ $env.config.completions = {
 
 $env.config.keybindings ++= [
   {
-      name: fuzzy_complete_dwim
-      modifier: none
-      keycode: char_á # mapped to ctrl+tab in ghostty
-      mode: [emacs vi_insert]
-      event: [
-        {
-          send: executehostcommand
-          cmd: commandline-fuzzy-complete-dwim
-        }
-      ]
+    name: fuzzy_complete_dwim
+    modifier: none
+    keycode: char_á # mapped to ctrl+tab in ghostty
+    mode: [emacs vi_insert]
+    event: [
+      {
+        send: executehostcommand
+        cmd: commandline-fuzzy-complete-dwim
+      }
+    ]
+  }
+  {
+    name: completion_menu
+    modifier: alt
+    keycode: tab
+    mode: emacs
+    event: { send: menu name: ide_completion_menu }
   }
   {
     name: insert_fzf_result
@@ -54,13 +61,29 @@ $env.config.hooks.pre_prompt ++= [
   }
 ]
 
+$env.config.use_kitty_protocol = true
+
 hooks use {
   # TODO: use atuin daemon
   atuin: {
     enabled: true
     depends: atuin
+    env: {
+      ATUIN_NOBIND: true
+    }
     cmd: [atuin init nu]
-  },
+    on_load: {||
+      $env.config.keybindings ++= [
+        {
+          name: atuin
+          modifier: control
+          keycode: char_r
+          mode: [emacs, vi_normal, vi_insert]
+          event: { send: executehostcommand cmd: (_atuin_search_cmd) }
+        }
+      ]
+    }
+  }
   carapace: {
     enabled: true
     depends: carapace
@@ -68,7 +91,7 @@ hooks use {
     env: {
       CARAPACE_BRIDGES: 'zsh,fish,bash'
     }
-  },
+  }
   starship: {
     enabled: true
     depends: starship

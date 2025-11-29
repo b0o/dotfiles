@@ -91,7 +91,7 @@ alias pprm = pnpm remove
 alias pprmf = pnpm remove --filter
 alias pprmff = pnpm remove --filter (pnpm-pick-workspace -n -R)
 alias pwr = cd (pnpm-workspace-root)
-alias pw = cd (pnpm-pick-workspace)
+alias ppw = cd (pnpm-pick-workspace)
 
 # bun
 alias b = bun
