@@ -428,7 +428,7 @@ class ScratchpadManager:
         elif window_workspace_id != current_workspace_id:
             # Window is on different workspace (possibly different monitor), show it
             print(f"Showing scratchpad '{self.name}'")
-            return self._show_scratchpad(window_id)
+            return self._show_scratchpad(window_id) and self._focus_window(window_id)
         else:
             # Window is on current workspace but not focused, focus it
             print(f"Focusing scratchpad '{self.name}'")
@@ -507,9 +507,10 @@ class ScratchpadManager:
                 print("Failed to get current workspace info", file=sys.stderr)
                 return False
 
-            _workspace_id, workspace_idx, monitor_name = workspace_info
+            _workspace_id, _workspace_idx, monitor_name = workspace_info
 
-            # Step 1: Move window to the target monitor
+            self._configure_floating_window(window_id)
+
             subprocess.run(
                 [
                     "niri",
@@ -522,26 +523,6 @@ class ScratchpadManager:
                 ],
                 check=True,
             )
-
-            # Step 2: Ensure window is on the active workspace of that monitor
-            # Use workspace index for this command as it's more reliable
-            subprocess.run(
-                [
-                    "niri",
-                    "msg",
-                    "action",
-                    "move-window-to-workspace",
-                    "--window-id",
-                    str(window_id),
-                    "--focus",
-                    "false",
-                    str(workspace_idx),
-                ],
-                check=True,
-            )
-
-            # Configure as floating and centered
-            self._configure_floating_window(window_id)
 
             # Update unified state
             self.unified_state.mark_visible(self.name)
@@ -567,15 +548,17 @@ class ScratchpadManager:
     def _configure_floating_window(self, window_id: int) -> None:
         """Configure window as floating, optionally resized and positioned"""
         try:
-            # Focus the window
-            subprocess.run(
-                ["niri", "msg", "action", "focus-window", "--id", str(window_id)],
-                check=True,
-            )
-
             # Move window to floating layout (this is idempotent - won't break if already floating)
             subprocess.run(
-                ["niri", "msg", "action", "move-window-to-floating"], check=True
+                [
+                    "niri",
+                    "msg",
+                    "action",
+                    "move-window-to-floating",
+                    "--id",
+                    str(window_id),
+                ],
+                check=True,
             )
 
             # Only resize if width/height are specified
