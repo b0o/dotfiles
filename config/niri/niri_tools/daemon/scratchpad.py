@@ -116,7 +116,11 @@ class ScratchpadManager:
             await self._move_to_scratchpad_workspace(self.state.focused_window_id)
 
     async def _spawn_scratchpad(self, name: str, config: ScratchpadConfig) -> None:
-        """Spawn a new scratchpad window."""
+        """Spawn a new scratchpad window via niri.
+
+        Uses 'niri msg action spawn' so the process is parented by niri,
+        not the daemon. This way scratchpads survive daemon restarts.
+        """
         if name in self.state.pending_spawns:
             print(f"Scratchpad '{name}' already spawning", file=sys.stderr)
             return
@@ -126,12 +130,8 @@ class ScratchpadManager:
         try:
             if config.command:
                 print(f"Launching {' '.join(config.command)}...")
-                await asyncio.create_subprocess_exec(
-                    *config.command,
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
-                )
-                # Don't wait for it - it's a GUI app
+                # Use niri spawn so process is parented by niri, not daemon
+                await self._run_niri_action("spawn", "--", *config.command)
         except Exception as e:
             print(f"Failed to spawn scratchpad: {e}", file=sys.stderr)
             self.state.pending_spawns.discard(name)
