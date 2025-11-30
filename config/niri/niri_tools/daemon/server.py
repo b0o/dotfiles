@@ -240,16 +240,19 @@ class DaemonServer:
                 pass
 
     def _reload_config(self) -> None:
-        """Reload configuration from file."""
+        """Reload configuration from file. Keeps previous config on failure."""
         try:
+            configs = load_scratchpad_configs()
+            # Only update state if loading succeeded
+            self.state.scratchpad_configs = configs
             if CONFIG_FILE.exists():
                 self.state.config_mtime = CONFIG_FILE.stat().st_mtime
-
-            configs = load_scratchpad_configs()
-            self.state.scratchpad_configs = configs
             print(f"Loaded {len(configs)} scratchpad configs")
 
         except Exception as e:
+            # Keep previous config, just update mtime to avoid retry loop
+            if CONFIG_FILE.exists():
+                self.state.config_mtime = CONFIG_FILE.stat().st_mtime
             error_msg = f"Failed to load config: {e}"
             print(error_msg, file=sys.stderr)
             notify_config_error(error_msg)

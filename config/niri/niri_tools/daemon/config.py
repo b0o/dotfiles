@@ -130,8 +130,11 @@ def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, A
 
         return result
 
-    except (yaml.YAMLError, OSError) as e:
-        print(f"Failed to load config from {config_path}: {e}", file=sys.stderr)
+    except yaml.YAMLError as e:
+        # Re-raise YAML parse errors so caller can handle them
+        raise ValueError(f"Failed to parse {config_path}: {e}") from e
+    except OSError as e:
+        print(f"Failed to read config from {config_path}: {e}", file=sys.stderr)
         return {}
 
 
