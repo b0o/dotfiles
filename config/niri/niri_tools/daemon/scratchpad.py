@@ -150,6 +150,7 @@ class ScratchpadManager:
                 self.state.register_scratchpad_window(name, window.id)
                 self.state.mark_scratchpad_visible(name)
                 await self._configure_window(window.id, config)
+                self.state.save_scratchpad_state()
                 return
 
     def _matches_config(self, window: WindowInfo, config: ScratchpadConfig) -> bool:
@@ -168,6 +169,7 @@ class ScratchpadManager:
         """Hide a scratchpad by moving to hidden workspace."""
         await self._move_to_scratchpad_workspace(window_id)
         self.state.mark_scratchpad_hidden(name)
+        self.state.save_scratchpad_state()
 
     async def _show_scratchpad(
         self, name: str, window_id: int, config: ScratchpadConfig
@@ -190,6 +192,7 @@ class ScratchpadManager:
 
         self.state.mark_scratchpad_visible(name)
         self.state.register_scratchpad_window(name, window_id)
+        self.state.save_scratchpad_state()
 
     async def _configure_window(self, window_id: int, config: ScratchpadConfig) -> None:
         """Configure a window as floating with size and position."""

@@ -10,6 +10,7 @@ runtime_dir = os.environ.get("XDG_RUNTIME_DIR", "/tmp")
 
 # Socket and file paths
 SOCKET_PATH = Path(runtime_dir) / "niri-tools.sock"
+STATE_FILE = Path(runtime_dir) / "niri-tools-state.json"
 
 # Scratchpad constants
 SCRATCHPAD_WORKSPACE = "󰪷"

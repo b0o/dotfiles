@@ -22,13 +22,18 @@ class DaemonServer:
         self.urgency_handler = UrgencyHandler(self.state)
         self.server: asyncio.Server | None = None
         self.running = False
+        self._needs_reconciliation = False  # True if we loaded state and need to reconcile
 
     async def start(self) -> None:
         """Start the daemon."""
         print("Starting niri-tools daemon...")
 
-        # Load initial state
+        # Load initial state from niri
         self.state.load_initial_state()
+
+        # Try to restore scratchpad state from disk
+        if self.state.load_scratchpad_state():
+            self._needs_reconciliation = True
 
         # Load config
         self._reload_config()
@@ -154,10 +159,29 @@ class DaemonServer:
             if is_new:
                 await self.scratchpad_manager.handle_window_opened(window)
 
+        elif "WindowsChanged" in event:
+            # Full window list - used for reconciliation on startup
+            windows_data = event["WindowsChanged"]["windows"]
+            window_ids = set()
+            for w_data in windows_data:
+                window = WindowInfo.from_niri(w_data)
+                self.state.windows[window.id] = window
+                window_ids.add(window.id)
+                if window.is_focused:
+                    self.state.focused_window_id = window.id
+
+            # If we loaded state from disk, reconcile with actual windows
+            if self._needs_reconciliation:
+                self._needs_reconciliation = False
+                self.state.reconcile_with_windows(window_ids)
+
         elif "WindowClosed" in event:
             window_id = event["WindowClosed"]["id"]
             self.state.windows.pop(window_id, None)
+            was_scratchpad = window_id in self.state.window_to_scratchpad
             self.state.unregister_scratchpad_window(window_id)
+            if was_scratchpad:
+                self.state.save_scratchpad_state()
 
         elif "WindowFocusChanged" in event:
             focus_data = event["WindowFocusChanged"]

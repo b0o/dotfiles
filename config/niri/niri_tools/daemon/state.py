@@ -1,13 +1,25 @@
 """Daemon state management - holds all niri and scratchpad state in memory."""
 
 import json
+import os
 import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..common import STATE_FILE
 from .config import ScratchpadConfig
+
+
+def get_niri_session_id() -> str | None:
+    """Get the current niri session identifier from NIRI_SOCKET env var."""
+    niri_socket = os.environ.get("NIRI_SOCKET")
+    if niri_socket:
+        # NIRI_SOCKET looks like /run/user/1000/niri.1234.0.sock
+        # We use the whole path as the session ID since it includes the PID
+        return niri_socket
+    return None
 
 
 @dataclass
@@ -205,3 +217,97 @@ class DaemonState:
         if not candidates:
             return None
         return max(candidates, key=lambda x: x[1].last_used)[0]
+
+    def save_scratchpad_state(self) -> None:
+        """Save scratchpad state to disk for persistence across restarts."""
+        session_id = get_niri_session_id()
+        if not session_id:
+            return
+
+        # Build state to persist
+        state_data = {
+            "niri_session": session_id,
+            "scratchpads": {},
+            "window_to_scratchpad": {},
+        }
+
+        for name, sp_state in self.scratchpads.items():
+            if sp_state.window_id is not None:
+                state_data["scratchpads"][name] = {
+                    "window_id": sp_state.window_id,
+                    "visible": sp_state.visible,
+                    "last_used": sp_state.last_used,
+                }
+
+        # Convert int keys to strings for JSON
+        for window_id, name in self.window_to_scratchpad.items():
+            state_data["window_to_scratchpad"][str(window_id)] = name
+
+        try:
+            temp_file = STATE_FILE.with_suffix(".tmp")
+            with open(temp_file, "w") as f:
+                json.dump(state_data, f, separators=(",", ":"))
+            temp_file.replace(STATE_FILE)
+        except OSError as e:
+            print(f"Failed to save scratchpad state: {e}", file=sys.stderr)
+
+    def load_scratchpad_state(self) -> bool:
+        """Load scratchpad state from disk. Returns True if state was loaded."""
+        if not STATE_FILE.exists():
+            return False
+
+        session_id = get_niri_session_id()
+        if not session_id:
+            return False
+
+        try:
+            with open(STATE_FILE) as f:
+                state_data = json.load(f)
+
+            # Verify this state is for the current niri session
+            if state_data.get("niri_session") != session_id:
+                print("State file is from a different niri session, ignoring")
+                STATE_FILE.unlink()
+                return False
+
+            # Load scratchpad states
+            for name, sp_data in state_data.get("scratchpads", {}).items():
+                self.scratchpads[name] = ScratchpadState(
+                    window_id=sp_data.get("window_id"),
+                    visible=sp_data.get("visible", False),
+                    last_used=sp_data.get("last_used", 0.0),
+                )
+
+            # Load window mappings (convert string keys back to int)
+            for window_id_str, name in state_data.get("window_to_scratchpad", {}).items():
+                self.window_to_scratchpad[int(window_id_str)] = name
+
+            print(f"Restored {len(self.scratchpads)} scratchpad states from disk")
+            return True
+
+        except (json.JSONDecodeError, OSError, KeyError, ValueError) as e:
+            print(f"Failed to load scratchpad state: {e}", file=sys.stderr)
+            return False
+
+    def reconcile_with_windows(self, window_ids: set[int]) -> None:
+        """Reconcile loaded scratchpad state with actual windows.
+
+        Removes any scratchpad mappings for windows that no longer exist.
+        Should be called after loading state and receiving WindowsChanged event.
+        """
+        # Find orphaned window IDs
+        orphaned = [
+            wid for wid in self.window_to_scratchpad
+            if wid not in window_ids
+        ]
+
+        for window_id in orphaned:
+            name = self.window_to_scratchpad.pop(window_id, None)
+            if name and name in self.scratchpads:
+                print(f"Scratchpad '{name}' window {window_id} no longer exists, clearing")
+                self.scratchpads[name].window_id = None
+                self.scratchpads[name].visible = False
+
+        if orphaned:
+            # Save updated state
+            self.save_scratchpad_state()
