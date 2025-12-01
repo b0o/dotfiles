@@ -194,14 +194,6 @@ scratchpads:
       DP-2: 36%,5%
       DP-1: 2%,5%
 
-  element:
-    app_id: Element
-    command: ["gtk-launch", "io.element.Element"]
-    size: 50%x90%
-    position:
-      DP-2: 42%,5%
-      DP-1: 8%,5%
-
   parsec:
     app_id: parsecd
     command: ["xdg-launch", "parsecd"]

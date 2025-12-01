@@ -385,7 +385,6 @@ binds {
   Mod+C                       hotkey-overlay-title="Scratchpad: Command Center" { spawn "zsh" "-c" "niri-tools scratchpad toggle term-cc"; }
   Mod+Shift+C                 hotkey-overlay-title="Scratchpad: Claude"         { spawn "zsh" "-c" "niri-tools scratchpad toggle web-claude"; }
   Mod+Alt+F                   hotkey-overlay-title="Scratchpad: Figma"          { spawn "zsh" "-c" "niri-tools scratchpad toggle figma"; }
-  Mod+Shift+E                 hotkey-overlay-title="Scratchpad: Element"        { spawn "zsh" "-c" "niri-tools scratchpad toggle element"; }
   Mod+Alt+Grave               hotkey-overlay-title="Scratchpad: Parsec"         { spawn "zsh" "-c" "niri-tools scratchpad toggle parsec"; }
 
   Mod+Alt+Slash               hotkey-overlay-title="Scratchpad: Toggle"         { spawn "zsh" "-c" "niri-tools scratchpad toggle"; }
