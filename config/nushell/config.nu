@@ -1,6 +1,5 @@
 use hooks
 use comark *
-# use awtrix
 
 $env.config.completions = {
   algorithm: fuzzy
@@ -82,9 +81,9 @@ hooks use {
     cmd: [carapace _carapace nushell]
     env: {
       CARAPACE_BRIDGES: 'zsh,fish,bash'
-      CARAPACE_ENV: 0
-      CARAPACE_UNFILTERED: 1
-      CARAPACE_MERGEFLAGS: 0
+      CARAPACE_ENV: false
+      CARAPACE_UNFILTERED: true
+      CARAPACE_MERGEFLAGS: false
     }
   }
   starship: {
