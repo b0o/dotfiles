@@ -161,6 +161,21 @@ scratchpads:
       DP-2: 42%,5%
       DP-1: 8%,5%
 
+  web-matrix:
+    app_id: chrome-bcngdmpegpihnheapppgoniglphkpfhm-alt
+    command:
+      [
+        "xdg-launch",
+        "-A",
+        "app-window",
+        "google-chrome",
+        "bcngdmpegpihnheapppgoniglphkpfhm",
+      ]
+    size: 50%x90%
+    position:
+      DP-2: 42%,5%
+      DP-1: 8%,5%
+
   term-cc:
     app_id: com.mitchellh.ghostty
     command:

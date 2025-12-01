@@ -434,6 +434,10 @@ menu:
             alias: "Mod4+D"
             desc: "Discord"
             cmd: nope niri-tools scratchpad toggle web-discord
+          - key: "e"
+            alias: "Mod4+E"
+            desc: "Matrix"
+            cmd: nope niri-tools scratchpad toggle web-matrix
           - key: "m"
             alias: "Mod4+M"
             desc: "Web"
