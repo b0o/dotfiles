@@ -45,6 +45,7 @@ on-notify=exec mpv /usr/share/sounds/freedesktop/stereo/audio-volume-change.oga
 
 [actionable]
 format=<span color="#ff9969"> </span> <b>%s</b>\n   %b
+on-button-left=exec makoctl menu -- rofi -dmenu -p 'Choose Action: '
 
 [urgency=high !actionable]
 format=<span color="#ff688edd"> </span> <b>%s</b>\n   %b
