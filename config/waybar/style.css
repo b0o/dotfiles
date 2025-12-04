@@ -115,6 +115,7 @@ tooltip {
 #mpris,
 #window,
 #clock,
+#bluetooth,
 #pulseaudio,
 #tray > .passive,
 #tray > .active {
@@ -131,6 +132,7 @@ tooltip {
 #mpris,
 #window,
 #clock,
+#bluetooth,
 #pulseaudio {
   padding: 0 10px;
 }
@@ -144,12 +146,14 @@ tooltip {
 #mpris:hover,
 #window:hover,
 #clock:hover,
+#bluetooth:hover,
 #pulseaudio:hover {
   background-color: @med_bg;
 }
 
 #idle_inhibitor,
 #systemd-failed-units,
+#bluetooth,
 #pulseaudio {
   color: @velvet;
 }

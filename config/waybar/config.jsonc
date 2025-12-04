@@ -15,6 +15,7 @@
       "custom/command-center",
       "mpris",
       "pulseaudio",
+      "bluetooth",
       "idle_inhibitor",
       "systemd-failed-units",
       "custom/mullvad",
