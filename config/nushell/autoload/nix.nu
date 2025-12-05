@@ -83,6 +83,7 @@ export module fp {
   export alias dev = develop
   export alias sh = shell
   export alias up = update
+  export alias upd = update
 }
 
 use fp
