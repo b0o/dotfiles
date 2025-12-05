@@ -201,36 +201,7 @@ menu:
         cmd: darkmode toggle
       - key: "i"
         desc: Copy window info
-        cmd: |
-          zsh -c '
-            info="$(niri msg --json pick-window)"
-            if [[ "$info" == "null" ]]; then
-              exit
-            fi
-            id=$(jq -r .id <<< "$info")
-            title=$(jq -r .title <<< "$info")
-            app_id=$(jq -r .app_id <<< "$info")
-            pid=$(jq -r .pid <<< "$info")
-            workspace_id=$(jq -r .workspace_id <<< "$info")
-            is_focused=$(jq -r .is_focused <<< "$info")
-            is_floating=$(jq -r .is_floating <<< "$info")
-            is_urgent=$(jq -r .is_urgent <<< "$info")
-            shell="$([[ /proc/$pid/exe -ef $(command -v xwayland-satellite) ]] && echo xwayland || echo wayland)"
-            # msg="id: $id\ntitle: $title\napp_id: $app_id\npid: $pid\nworkspace_id: $workspace_id\nis_focused: $is_focused\nis_floating: $is_floating\nis_urgent: $is_urgent\nshell: $shell"
-            msg=(
-              "id: $id"
-              "   title: $title"
-              "   app_id: $app_id"
-              "   pid: $pid"
-              "   workspace_id: $workspace_id"
-              "   is_focused: $is_focused"
-              "   is_floating: $is_floating"
-              "   is_urgent: $is_urgent"
-              "   shell: $shell"
-            )
-            notify-send -t 0 "$app_id" "$(printf "%s\n" "${msg[@]}")"
-            wl-copy <<< "$msg"
-          '
+        cmd: $XDG_CONFIG_HOME/niri/bin/inspect window-info
       - key: "w"
         desc: Window/Workspace
         submenu:
@@ -506,8 +477,8 @@ menu:
       - key: "Print"
         desc: Screenshot Window or Region
         alias: "r"
-        cmd: $XDG_CONFIG_HOME/niri/bin/screenshot.nu capture
+        cmd: $XDG_CONFIG_HOME/niri/bin/screenshot capture
       - key: "S"
         alias: "s"
         desc: Pick Screenshot
-        cmd: $XDG_CONFIG_HOME/niri/bin/screenshot.nu pick
+        cmd: $XDG_CONFIG_HOME/niri/bin/screenshot pick

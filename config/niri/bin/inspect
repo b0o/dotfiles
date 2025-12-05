@@ -1,0 +1,84 @@
+#!/usr/bin/env -S nu --stdin
+
+# Inspection tools for niri
+def main [] {
+  ^$env.CURRENT_FILE "--help"
+}
+
+# Get info about a specific window
+# Human-readable output is copied to clipboard as text/plain
+# JSON output is copied to clipboard as application/json
+def "main window-info" [] {
+  let info = (niri msg --json pick-window | from json)
+
+  if $info == null {
+    return
+  }
+
+  let id = $info.id
+  let title = $info.title
+  let app_id = $info.app_id
+  let pid = $info.pid
+  let workspace_id = $info.workspace_id
+  let is_focused = $info.is_focused
+  let is_floating = $info.is_floating
+  let is_urgent = $info.is_urgent
+
+  let ws_path = which xwayland-satellite | get -o 0.path
+  let win_exe = ls -l $"/proc/($pid)/exe" | get -o 0.target
+
+  let shell = if ($win_exe | is-not-empty) and ($ws_path | is-not-empty) {
+    if ($win_exe == $ws_path) {
+      "xwayland"
+    } else {
+      "wayland"
+    }
+  } else "unknown"
+
+  let size = if ($info.layout.window_size? != null) {
+    $info.layout.window_size | str join "x"
+  } else {
+    ""
+  }
+
+  let msg = $"
+    id: ($id)
+    title: ($title | str substring 0..25)
+    app_id: ($app_id)
+    pid: ($pid)
+    workspace_id: ($workspace_id)
+    is_focused: ($is_focused)
+    is_floating: ($is_floating)
+    is_urgent: ($is_urgent)
+    shell: ($shell)
+    size: ($size)
+  "
+
+  let info_json = ($info | to json)
+
+  let res = (notify-send -t 30000 $app_id $msg
+    -A $"id=Copy ID \(($id)\)"
+    -A $"title=Copy Title \(($title)\)"
+    -A $"app_id=Copy App ID \(($app_id)\)"
+    -A $"pid=Copy PID \(($pid)\)"
+    -A $"workspace_id=Copy Workspace ID \(($workspace_id)\)"
+    -A $"size=Copy Size \(($size)\)"
+    -A $"json=Copy JSON"
+  | complete)
+  if $res.exit_code != 0 {
+    return
+  }
+  let action = $res.stdout | str trim
+
+  print $action
+
+  match $action {
+    "id" => { wl-copy $"($id)" }
+    "title" => { wl-copy $title }
+    "app_id" => { wl-copy $app_id }
+    "pid" => { wl-copy $"($pid)" }
+    "workspace_id" => { wl-copy $"($workspace_id)" }
+    "size" => { wl-copy $size }
+    "json" => { wl-copy $info_json }
+  }
+}

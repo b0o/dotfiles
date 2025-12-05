@@ -1,0 +1,260 @@
+#!/usr/bin/env -S nu --stdin
+use rofi
+
+# Screenshot utility for niri
+# NOTE: Depends on wl-copy from https://github.com/b0o/wl-clipboard-rs/tree/feat-cli-copy-multi
+# for multi-selection support.
+def main [] {
+  ^$env.CURRENT_FILE "--help"
+}
+
+let default_dir = (
+  $env.XDG_SCREENSHOTS_DIR?
+| default ($env.HOME | path join "media/screenshots")
+)
+
+def dismiss-notifications [] {
+  let lines = makoctl list | lines
+  let notif_idx = $lines | enumerate | where {|it|
+    ($it.item | str starts-with "Notification") and ($it.item | str contains "Screenshot captured")
+  } | each {|it|
+    let next_line = $lines | get ($it.index + 1) | default ""
+    if ($next_line | str contains "App name: niri") { $it.index } else { null }
+  } | compact | get -o 0 | default null
+
+  if $notif_idx != null {
+    let id = $lines | get $notif_idx | parse "Notification {id}: {rest}" | get id | first
+    makoctl dismiss -n $id
+  }
+}
+
+def make-montage [
+  files: list<path>
+  --full-size  # Preserve original image sizes (default: 256x256 thumbnails)
+] {
+  if ($files | length) == 1 {
+    return ($files | first)
+  }
+  let tmp = mktemp --suffix .png
+  let geom = if $full_size { "+4+4" } else { "256x256+4+4" }
+  montage ...$files -geometry $geom -background none $tmp
+  $tmp
+}
+
+def confirm-delete [files: list<path>] {
+  let count = $files | length
+  let icon = make-montage $files
+  let prompt = if $count == 1 { "Confirm Delete" } else { $"Delete ($count) files?" }
+  let mesg = $files | each {|f| $"rm ($f)"} | str join "\n"
+
+  let result = (rofi
+    --preview
+    --options ["Delete", "Cancel"]
+    --icon $icon
+    --prompt $prompt
+    --mesg $mesg
+    --placeholder ""
+    --lines 2)
+  if $count > 1 { rm $icon }
+  if $result.exit_code != 0 {
+    return
+  }
+  if ($result.stdout | str trim) == "Delete" {
+    $files | each {|f| rm $f }
+    let msg = if $count == 1 {
+      $files | first | path basename
+    } else {
+      $"Deleted ($count) screenshots"
+    }
+    notify-send -a screenshot -i $icon "Screenshot Deleted" $msg
+  }
+}
+
+# Execute an action on files. Returns true if picker should rerun.
+def do-action [action: string, files: list<path>] {
+  let count = $files | length
+  match $action {
+    "Open" => {
+      $files | each {|f| xdg-open $f }
+      false
+    }
+    "Copy" => {
+      if $count == 1 {
+        # Single file: copy image data and path
+        let f = $files | first
+        wl-copy -F auto $f -L text/plain $f
+        notify-send -a screenshot -i $f "Copied" "Screenshot copied to clipboard"
+      } else {
+        # Multiple files: copy montage image + paths as text
+        let montage = make-montage --full-size $files
+        let paths = $files | str join "\n"
+        wl-copy -F auto $montage -L text/plain $paths
+        notify-send -a screenshot -i $montage "Copied" $"($count) screenshots copied to clipboard"
+        rm $montage
+      }
+      false
+    }
+    "Edit" => {
+      $files | each {|f| satty --filename $f }
+      false
+    }
+    "Delete" => {
+      confirm-delete $files
+      true
+    }
+  }
+}
+
+def pick-action [files: list<path>] {
+  let count = $files | length
+  let icon = if $count == 1 { $files | first } else { make-montage $files }
+  let prompt = if $count == 1 { "Action" } else { $"Action \(($count))" }
+  let res = (rofi
+    --preview
+    --options ["Open", "Copy", "Edit", "Delete"]
+    --icon $icon
+    --prompt $prompt
+    --placeholder ""
+    --lines 4)
+  if $count > 1 { rm $icon }
+  if $res.exit_code == 1 {
+    true
+  } else if $res.exit_code != 0 {
+    false
+  } else {
+    do-action ($res.stdout | str trim) $files
+  }
+}
+
+# Interactive screenshot capture: select region, save to file and copy to clipboard
+def "main capture" [
+  --dir: path
+] {
+  let dir = $dir | default $default_dir
+  let selection = slurp | complete
+  if $selection.exit_code != 0 or ($selection.stdout | str trim | is-empty) {
+    return
+  }
+  let selection = $selection.stdout | str trim
+
+  let parsed = $selection | parse "{x},{y} {w}x{h}" | first
+  let w = $parsed.w | into int
+  let h = $parsed.h | into int
+
+  let timestamp = date now | format date "%Y-%m-%d_%H-%M-%S"
+
+  let out = if $w == 1 and $h == 1 {
+    # Single click - pick a window
+    let focused = niri msg -j focused-window | from json | get id
+    job spawn { niri msg -j pick-window | from json | job send 0 }
+    ydotool click 0x00 0xC0 | complete
+    let selected = job recv
+    niri msg action focus-window --id $focused
+
+    if ($selected | is-empty) {
+      return
+    }
+
+    let app_id = $selected.app_id | str replace -ra "[^a-zA-Z0-9._-]" "_" | str trim --char "_"
+    let path = $dir | path join $"($timestamp)_($app_id).png"
+
+    let result = niri msg action screenshot-window --id $selected.id --path $path | complete
+    if $result.exit_code != 0 {
+      notify-send -a screenshot -u critical "Screenshot Failed" "Failed to save screenshot"
+      return
+    }
+
+    # Wait for file to be created with timeout
+    mut attempts = 0
+    while not ($path | path exists) and $attempts < 100 {
+      dismiss-notifications
+      sleep 5ms
+      $attempts += 1
+    }
+    dismiss-notifications
+    if not ($path | path exists) {
+      notify-send -a screenshot -u critical "Screenshot Failed" "Timed out waiting for file"
+      return
+    }
+
+    $path
+  } else {
+    # Region screenshot
+    let path = $dir | path join $"($timestamp).png"
+    let result = grim -g $selection $path | complete
+    if $result.exit_code != 0 {
+      notify-send -a screenshot -u critical "Screenshot Failed" "Failed to save screenshot"
+      return
+    }
+    $path
+  }
+
+  wl-copy -F auto $out -L text/plain $out
+
+  let action = notify-send -a screenshot -i $out --action=default="Edit" "Screenshot Saved" $"Saved to ($out)" | str trim
+  if $action == "default" {
+    satty --filename $out
+  }
+}
+
+# Interactive screenshot picker: browse and manage existing screenshots
+def "main pick" [--dir: path] {
+  let dir = $dir | default $default_dir
+
+  # Build rofi input: filename\0icon\x1fpath
+  let files = ls --mime-type --threads $dir | where {
+    get type | str starts-with image/
+  } | sort-by -r modified | get name
+
+  if ($files | is-empty) {
+    notify-send -a screenshot "No Screenshots" "No screenshots found in the directory"
+    return
+  }
+
+  let rofi_input = $files | each {|f|
+    let basename = $f | path basename
+    $"($basename)\u{0}icon\u{1f}($f)"
+  } | str join "\n"
+
+  let res = (rofi
+    --preview
+    --multi-select
+    --input $rofi_input
+    --prompt "Screenshot"
+    --win-scale 2
+    --list-width "35%"
+    --element-icon-size 60
+    --mesg "<span size='small' alpha='70%'>&lt;C-Space&gt; select / &lt;C-e&gt; edit / &lt;C-c&gt; copy / &lt;C-BackSpace&gt; delete / &lt;Cr&gt; menu / &lt;C-Cr&gt; open</span>"
+    --extra [
+      -kb-move-end ""
+      -kb-cancel "Escape"
+      -kb-remove-word-back ""
+      -kb-accept-custom ""
+      -kb-secondary-copy ""
+      -kb-row-select ""
+      -kb-accept-alt "Control+space"
+      -kb-custom-1 "Control+e"
+      -kb-custom-2 "Control+c"
+      -kb-custom-3 "Control+BackSpace"
+      -kb-custom-4 "Control+Return"
+    ])
+
+  let code = $res.exit_code
+  let selected = $res.stdout | str trim | lines | where { not ($in | is-empty) }
+  if ($selected | is-empty) {
+    return
+  }
+  let paths = $selected | each {|s| $dir | path join $s }
+
+  let rerun = match $code {
+    0 => { pick-action $paths }         # Enter - show action menu
+    10 => { do-action "Edit" $paths }   # C-e
+    11 => { do-action "Copy" $paths }   # C-c
+    12 => { do-action "Delete" $paths } # C-BackSpace
+    13 => { do-action "Open" $paths }   # C-Return
+    _ => { false }
+  }
+  if $rerun {
+    main pick --dir=$dir
+  }
+}
