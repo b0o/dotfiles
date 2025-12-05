@@ -393,6 +393,12 @@ menu:
             alias: "Mod4+S"
             desc: "Toggle"
             cmd: niri-tools scratchpad toggle
+          - key: "+"
+            desc: "Adopt"
+            cmd: niri-tools scratchpad adopt
+          - key: "-"
+            desc: "Disown"
+            cmd: niri-tools scratchpad disown
           - key: "b"
             alias: "Mod4+B"
             desc: "Books"
