@@ -38,11 +38,12 @@ export def m, [
   comark-init
   validate-alias $alias
   let bookmark_path = ((comark-dir) | path join $alias)
+  let target = if ($dest | is-empty) { $env.PWD } else { $dest | path expand --no-symlink=(not $expand_symlinks) }
 
-  if ($bookmark_path | path exists) {
+  if ($bookmark_path | path exists --no-symlink) {
     if not $force {
       print -e $"bookmark exists: ($alias) -> (resolve-bookmark $alias)"
-      let reply = (input $"Remove bookmark? \(Y/n) " | str trim | str downcase)
+      let reply = (input $"Overwrite bookmark ($alias) with ($target)? \(Y/n) " | str trim | str downcase)
       if $reply not-in ["y", "Y", ""] {
         print -e $"Cancelled"
         return
@@ -51,7 +52,6 @@ export def m, [
     r, $alias
   }
 
-  let target = if ($dest | is-empty) { $env.PWD } else { $dest | path expand --no-symlink=(not $expand_symlinks) }
   ^ln -s $target $bookmark_path
   print $"($alias) -> ($target)"
 }
