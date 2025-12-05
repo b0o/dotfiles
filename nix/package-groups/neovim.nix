@@ -22,4 +22,5 @@ with pkgs; [
   # Misc
   just-lsp # lsp server for just files
   tombi # TOML Formatter / Linter / Language Server
+  vscode-langservers-extracted # vscode-{css,eslint,html,json,markdown}-langserver
 ]
