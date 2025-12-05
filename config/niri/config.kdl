@@ -134,6 +134,7 @@ window-rule {
   match app-id=r#"firefox$"# title="^Picture-in-Picture$"
   match app-id="org.gnome.Nautilus"
   match app-id="feh"
+  match app-id="zenity"
   match app-id="eog" // Eye of GNOME image viewer
   match title="Task Manager - Google Chrome"
   open-floating true
