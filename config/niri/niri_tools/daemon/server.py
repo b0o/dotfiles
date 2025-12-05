@@ -125,6 +125,11 @@ class DaemonServer:
         elif cmd == "menu":
             await self.scratchpad_manager.menu()
 
+        elif cmd == "close":
+            window_id = command.get("window_id")
+            confirm = command.get("confirm", True)
+            await self.scratchpad_manager.close(window_id, confirm=confirm)
+
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
 

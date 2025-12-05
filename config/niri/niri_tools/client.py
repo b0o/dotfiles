@@ -143,6 +143,20 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
     sub.add_parser("menu", help="Show scratchpad menu with rofi")
 
+    close = sub.add_parser("close", help="Close a scratchpad window")
+    close.add_argument(
+        "-w",
+        "--window-id",
+        type=int,
+        default=None,
+        help="Window ID to close (default: focused window)",
+    )
+    close.add_argument(
+        "--no-confirm",
+        action="store_true",
+        help="Skip confirmation prompt",
+    )
+
 
 def main(args: argparse.Namespace) -> int:
     """Handle scratchpad commands by sending to daemon."""
@@ -171,6 +185,12 @@ def main(args: argparse.Namespace) -> int:
 
     elif args.scratchpad_command == "menu":
         return send_command({"cmd": "menu"})
+
+    elif args.scratchpad_command == "close":
+        command = {"cmd": "close", "confirm": not args.no_confirm}
+        if args.window_id is not None:
+            command["window_id"] = args.window_id
+        return send_command(command)
 
     else:
         print(f"Unknown command: {args.scratchpad_command}", file=sys.stderr)

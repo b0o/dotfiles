@@ -219,8 +219,82 @@ class ScratchpadManager:
         self.state.save_scratchpad_state()
         print(f"Window {window_id} disowned from scratchpad '{name}'")
 
+    async def close(self, window_id: int | None, *, confirm: bool = True) -> None:
+        """Close a scratchpad window.
+
+        Args:
+            window_id: Window ID to close (None = focused window)
+            confirm: Whether to show confirmation prompt
+        """
+        # Resolve window ID
+        if window_id is None:
+            window_id = self.state.focused_window_id
+            if window_id is None:
+                await self._notify_error("No focused window to close")
+                return
+
+        window = self.state.windows.get(window_id)
+        if not window:
+            await self._notify_error(f"Window {window_id} not found")
+            return
+
+        # Check if window is a scratchpad
+        name = self.state.get_scratchpad_for_window(window_id)
+        if not name:
+            await self._notify_error(f"Window {window_id} is not a scratchpad")
+            return
+
+        if confirm:
+            confirmed = await self._confirm_close(name, window)
+            if not confirmed:
+                return
+
+        print(f"Closing scratchpad '{name}' (window {window_id})")
+        await self._run_niri_action("close-window", "--id", str(window_id))
+
+    async def _confirm_close(self, name: str, window: WindowInfo) -> bool:
+        """Show confirmation prompt for closing a scratchpad. Returns True if confirmed."""
+        # Show the scratchpad first to give user context
+        config = self.state.scratchpad_configs.get(name)
+        if config:
+            await self._show_scratchpad(name, window.id, config)
+
+        try:
+            title = window.title or window.app_id or name
+            proc = await asyncio.create_subprocess_exec(
+                "rofi",
+                "-dmenu",
+                "-p",
+                f"Close '{name}'?",
+                "-mesg",
+                f"<span size='small'>{title}</span>",
+                "-lines",
+                "2",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            input_data = b"Close\nCancel"
+            stdout, _ = await proc.communicate(input=input_data)
+
+            if proc.returncode != 0:
+                return False
+
+            selected = stdout.decode().strip()
+            return selected == "Close"
+
+        except Exception as e:
+            print(f"Failed to run rofi: {e}", file=sys.stderr)
+            return False
+
     async def menu(self) -> None:
-        """Show scratchpad menu with rofi and toggle the selected one."""
+        """Show scratchpad menu with rofi.
+
+        Keybindings:
+            Enter: Toggle scratchpad
+            C-d: Disown scratchpad window
+            C-q: Close scratchpad window
+        """
         items: list[tuple[str, str]] = []  # (display_text, name)
         for name in sorted(self.state.scratchpad_configs.keys()):
             has_window = self._scratchpad_has_window(name)
@@ -240,6 +314,18 @@ class ScratchpadManager:
                 "Scratchpad",
                 "-format",
                 "i",  # Return index
+                "-mesg",
+                "<span size='small' alpha='70%'>"
+                "&lt;Cr&gt; toggle / &lt;C-d&gt; disown / &lt;C-BackSpace&gt; close"
+                "</span>",
+                "-kb-remove-char-forward",
+                "Delete",
+                "-kb-remove-word-back",
+                "Control+Alt+h",
+                "-kb-custom-1",
+                "Control+d",
+                "-kb-custom-2",
+                "Control+BackSpace",
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -247,8 +333,9 @@ class ScratchpadManager:
             input_data = "\n".join(display for display, _ in items).encode()
             stdout, _ = await proc.communicate(input=input_data)
 
-            if proc.returncode != 0:
-                # User cancelled
+            exit_code = proc.returncode
+            if exit_code == 1:
+                # User cancelled (Escape)
                 return
 
             index_str = stdout.decode().strip()
@@ -256,9 +343,28 @@ class ScratchpadManager:
                 return
 
             index = int(index_str)
-            if 0 <= index < len(items):
-                _, name = items[index]
+            if not (0 <= index < len(items)):
+                return
+
+            _, name = items[index]
+            scratchpad_state = self.state.scratchpads.get(name)
+            window_id = scratchpad_state.window_id if scratchpad_state else None
+
+            if exit_code == 0:
+                # Enter - toggle
                 await self.toggle(name)
+            elif exit_code == 10:
+                # C-d - disown
+                if window_id is not None:
+                    await self.disown(window_id)
+                else:
+                    await self._notify_error(f"Scratchpad '{name}' has no window")
+            elif exit_code == 11:
+                # C-q - close
+                if window_id is not None:
+                    await self.close(window_id, confirm=True)
+                else:
+                    await self._notify_error(f"Scratchpad '{name}' has no window")
 
         except Exception as e:
             print(f"Failed to run rofi: {e}", file=sys.stderr)
