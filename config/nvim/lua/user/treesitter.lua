@@ -53,6 +53,7 @@ require('nvim-treesitter.configs').setup {
     'python',
     'query',
     'regex',
+    'rust',
     'svelte',
     'swift',
     'toml',
