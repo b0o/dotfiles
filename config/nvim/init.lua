@@ -40,5 +40,5 @@ require('lazy').setup({
 very_lazy(function()
   require 'user.mappings'
   require 'user.autocmds'
-  require 'user.util.smart-size'.enable_autoresize()
+  require('user.util.smart-size').enable_autoresize()
 end)
