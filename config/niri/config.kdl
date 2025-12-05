@@ -117,6 +117,7 @@ screenshot-path "~/Documents/screenshots/%Y-%m-%d_%H-%M-%S.png"
 spawn-at-startup "xwayland-satellite"
 spawn-at-startup "zsh" "-c" "brightness -d"
 spawn-at-startup "zsh" "-c" "niri-tools daemon"
+spawn-at-startup "zsh" "-c" "swayidle -C \"${XDG_CONFIG_HOME:-$HOME/.config}/niri/swayidle.conf\""
 spawn-at-startup "waybar"
 spawn-at-startup "librepods"
 
