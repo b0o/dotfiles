@@ -6,7 +6,7 @@
     "app_exit": "！", // ctrl+shift+q
     "editor_open": "<leader>ctrl+e,ctrl+g",
     "theme_list": "none",
-    "sidebar_toggle": "alt+shift+ò",
+    "sidebar_toggle": "ò", // alt+shift+\
     "username_toggle": "none",
     "status_view": "<leader>s",
     "session_export": "<leader>x",
@@ -46,5 +46,17 @@
     "history_next": "shift+f2", // ctrl+shift+n
     "tool_details": "<leader>d",
     "terminal_suspend": "none",
+  },
+  "lsp": {
+    "pyright": {
+      "disabled": true,
+    },
+    "basedpyright": {
+      "command": [
+        "basedpyright-langserver",
+        "--stdio",
+      ],
+      "extensions": [".py", ".pyi"],
+    },
   },
 }
