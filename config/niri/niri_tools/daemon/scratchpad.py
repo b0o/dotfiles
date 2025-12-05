@@ -139,14 +139,14 @@ class ScratchpadManager:
         existing_name = self.state.get_scratchpad_for_window(window_id)
         if existing_name:
             await self._notify_error(
-                f"Window {window_id} is already scratchpad '{existing_name}'"
+                f"Window {window_id} is already scratchpad {existing_name}"
             )
             return
 
         # Get available scratchpads (those without existing windows)
         available = self._get_available_scratchpads()
         if not available:
-            await self._notify_error("No scratchpads available (all have windows)")
+            await self._notify_error("No scratchpads available")
             return
 
         # Resolve scratchpad name
@@ -167,7 +167,7 @@ class ScratchpadManager:
             # Verify the window still exists
             if scratchpad_state.window_id in self.state.windows:
                 await self._notify_error(
-                    f"Scratchpad '{name}' already has window {scratchpad_state.window_id}"
+                    f"Scratchpad {name} already has window {scratchpad_state.window_id}"
                 )
                 return
             # Window no longer exists, clear it
@@ -175,14 +175,14 @@ class ScratchpadManager:
 
         # Adopt the window
         config = self.state.scratchpad_configs[name]
-        print(f"Adopting window {window_id} as scratchpad '{name}'")
+        print(f"Adopting window {window_id} as scratchpad {name}")
 
         self.state.register_scratchpad_window(name, window_id)
         self.state.mark_scratchpad_visible(name)
         await self._configure_window(window_id, config)
         self.state.save_scratchpad_state()
 
-        print(f"Window {window_id} adopted as scratchpad '{name}'")
+        print(f"Window {window_id} adopted as scratchpad {name}")
 
     async def disown(self, window_id: int | None) -> None:
         """Disown a scratchpad window and tile it.
@@ -299,7 +299,8 @@ class ScratchpadManager:
         for name in sorted(self.state.scratchpad_configs.keys()):
             has_window = self._scratchpad_has_window(name)
             icon = "" if has_window else ""
-            items.append((f"{icon}  {name}", name))
+            color = "#B48EFA" if has_window else "#9587af"
+            items.append((f'<span color="{color}">{icon}</span>  {name}', name))
 
         if not items:
             print("No scratchpads configured")
@@ -312,6 +313,7 @@ class ScratchpadManager:
                 "-dmenu",
                 "-p",
                 "Scratchpad",
+                "-markup-rows",
                 "-format",
                 "i",  # Return index
                 "-mesg",
@@ -358,13 +360,13 @@ class ScratchpadManager:
                 if window_id is not None:
                     await self.disown(window_id)
                 else:
-                    await self._notify_error(f"Scratchpad '{name}' has no window")
+                    await self._notify_error(f"Scratchpad {name} not found")
             elif exit_code == 11:
-                # C-q - close
+                # C-BackSpace - close
                 if window_id is not None:
                     await self.close(window_id, confirm=True)
                 else:
-                    await self._notify_error(f"Scratchpad '{name}' has no window")
+                    await self._notify_error(f"Scratchpad {name} not found")
 
         except Exception as e:
             print(f"Failed to run rofi: {e}", file=sys.stderr)
