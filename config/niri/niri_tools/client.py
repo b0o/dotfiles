@@ -141,6 +141,8 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         help="Window ID to disown (default: focused window)",
     )
 
+    sub.add_parser("menu", help="Show scratchpad menu with rofi")
+
 
 def main(args: argparse.Namespace) -> int:
     """Handle scratchpad commands by sending to daemon."""
@@ -166,6 +168,9 @@ def main(args: argparse.Namespace) -> int:
         if args.window_id is not None:
             command["window_id"] = args.window_id
         return send_command(command)
+
+    elif args.scratchpad_command == "menu":
+        return send_command({"cmd": "menu"})
 
     else:
         print(f"Unknown command: {args.scratchpad_command}", file=sys.stderr)

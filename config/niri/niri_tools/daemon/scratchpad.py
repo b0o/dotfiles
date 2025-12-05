@@ -219,6 +219,57 @@ class ScratchpadManager:
         self.state.save_scratchpad_state()
         print(f"Window {window_id} disowned from scratchpad '{name}'")
 
+    async def menu(self) -> None:
+        """Show scratchpad menu with rofi and toggle the selected one."""
+        items: list[tuple[str, str]] = []  # (display_text, name)
+        for name in sorted(self.state.scratchpad_configs.keys()):
+            has_window = self._scratchpad_has_window(name)
+            icon = "" if has_window else ""
+            items.append((f"{icon}  {name}", name))
+
+        if not items:
+            print("No scratchpads configured")
+            return
+
+        # Show rofi menu
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "rofi",
+                "-dmenu",
+                "-p",
+                "Scratchpad",
+                "-format",
+                "i",  # Return index
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            input_data = "\n".join(display for display, _ in items).encode()
+            stdout, _ = await proc.communicate(input=input_data)
+
+            if proc.returncode != 0:
+                # User cancelled
+                return
+
+            index_str = stdout.decode().strip()
+            if not index_str:
+                return
+
+            index = int(index_str)
+            if 0 <= index < len(items):
+                _, name = items[index]
+                await self.toggle(name)
+
+        except Exception as e:
+            print(f"Failed to run rofi: {e}", file=sys.stderr)
+
+    def _scratchpad_has_window(self, name: str) -> bool:
+        """Check if a scratchpad has an existing window."""
+        scratchpad_state = self.state.scratchpads.get(name)
+        if scratchpad_state is None or scratchpad_state.window_id is None:
+            return False
+        return scratchpad_state.window_id in self.state.windows
+
     def _get_available_scratchpads(self) -> list[str]:
         """Get scratchpad names that don't have existing windows."""
         available = []
