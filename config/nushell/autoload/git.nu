@@ -33,3 +33,5 @@ alias gigg = gig -w
 
 alias gwc = cd (gw-current)
 alias gwco = gw-current
+
+alias gcclb = gccl --bare
