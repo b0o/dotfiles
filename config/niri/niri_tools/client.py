@@ -116,17 +116,41 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
     sub.add_parser("hide", help="Hide the focused scratchpad")
 
+    adopt = sub.add_parser("adopt", help="Adopt an existing window as a scratchpad")
+    adopt.add_argument(
+        "-w",
+        "--window-id",
+        type=int,
+        default=None,
+        help="Window ID to adopt (default: focused window)",
+    )
+    adopt.add_argument(
+        "-n",
+        "--name",
+        type=str,
+        default=None,
+        help="Scratchpad name to adopt as (default: prompt with rofi)",
+    )
+
 
 def main(args: argparse.Namespace) -> int:
     """Handle scratchpad commands by sending to daemon."""
     if args.scratchpad_command == "toggle":
-        command = {"cmd": "toggle"}
+        command: dict[str, str | int | None] = {"cmd": "toggle"}
         if args.name:
             command["name"] = args.name
         return send_command(command)
 
     elif args.scratchpad_command == "hide":
         return send_command({"cmd": "hide"})
+
+    elif args.scratchpad_command == "adopt":
+        command = {"cmd": "adopt"}
+        if args.window_id is not None:
+            command["window_id"] = args.window_id
+        if args.name is not None:
+            command["name"] = args.name
+        return send_command(command)
 
     else:
         print(f"Unknown command: {args.scratchpad_command}", file=sys.stderr)

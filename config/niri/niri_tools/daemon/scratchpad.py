@@ -1,6 +1,7 @@
 """Scratchpad management logic for the daemon."""
 
 import asyncio
+import subprocess
 import sys
 
 from ..common import SCRATCHPAD_WORKSPACE
@@ -114,6 +115,125 @@ class ScratchpadManager:
         else:
             # Not a tracked scratchpad, but still floating - hide it anyway
             await self._move_to_scratchpad_workspace(self.state.focused_window_id)
+
+    async def adopt(self, window_id: int | None, name: str | None) -> None:
+        """Adopt an existing window as a scratchpad.
+
+        Args:
+            window_id: Window ID to adopt (None = focused window)
+            name: Scratchpad name (None = prompt with rofi)
+        """
+        # Resolve window ID
+        if window_id is None:
+            window_id = self.state.focused_window_id
+            if window_id is None:
+                await self._notify_error("No focused window to adopt")
+                return
+
+        window = self.state.windows.get(window_id)
+        if not window:
+            await self._notify_error(f"Window {window_id} not found")
+            return
+
+        # Check if window is already a scratchpad
+        existing_name = self.state.get_scratchpad_for_window(window_id)
+        if existing_name:
+            await self._notify_error(
+                f"Window {window_id} is already scratchpad '{existing_name}'"
+            )
+            return
+
+        # Get available scratchpads (those without existing windows)
+        available = self._get_available_scratchpads()
+        if not available:
+            await self._notify_error("No scratchpads available (all have windows)")
+            return
+
+        # Resolve scratchpad name
+        if name is None:
+            name = await self._prompt_scratchpad_name(available)
+            if name is None:
+                # User cancelled
+                return
+
+        # Validate scratchpad name
+        if name not in self.state.scratchpad_configs:
+            await self._notify_error(f"Unknown scratchpad: {name}")
+            return
+
+        # Check if chosen scratchpad already has a window
+        scratchpad_state = self.state.scratchpads.get(name)
+        if scratchpad_state and scratchpad_state.window_id is not None:
+            # Verify the window still exists
+            if scratchpad_state.window_id in self.state.windows:
+                await self._notify_error(
+                    f"Scratchpad '{name}' already has window {scratchpad_state.window_id}"
+                )
+                return
+            # Window no longer exists, clear it
+            self.state.unregister_scratchpad_window(scratchpad_state.window_id)
+
+        # Adopt the window
+        config = self.state.scratchpad_configs[name]
+        print(f"Adopting window {window_id} as scratchpad '{name}'")
+
+        self.state.register_scratchpad_window(name, window_id)
+        self.state.mark_scratchpad_visible(name)
+        await self._configure_window(window_id, config)
+        self.state.save_scratchpad_state()
+
+        print(f"Window {window_id} adopted as scratchpad '{name}'")
+
+    def _get_available_scratchpads(self) -> list[str]:
+        """Get scratchpad names that don't have existing windows."""
+        available = []
+        for name in self.state.scratchpad_configs:
+            scratchpad_state = self.state.scratchpads.get(name)
+            if scratchpad_state is None or scratchpad_state.window_id is None:
+                available.append(name)
+            elif scratchpad_state.window_id not in self.state.windows:
+                # Window no longer exists
+                available.append(name)
+        return sorted(available)
+
+    async def _prompt_scratchpad_name(self, available: list[str]) -> str | None:
+        """Prompt user to select a scratchpad name using rofi."""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "rofi",
+                "-dmenu",
+                "-p",
+                "Adopt as scratchpad",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            input_data = "\n".join(available).encode()
+            stdout, _ = await proc.communicate(input=input_data)
+
+            if proc.returncode != 0:
+                # User cancelled or error
+                return None
+
+            selected = stdout.decode().strip()
+            if selected and selected in available:
+                return selected
+            return None
+
+        except Exception as e:
+            print(f"Failed to run rofi: {e}", file=sys.stderr)
+            return None
+
+    async def _notify_error(self, message: str) -> None:
+        """Show an error notification."""
+        print(f"Error: {message}", file=sys.stderr)
+        try:
+            subprocess.run(
+                ["notify-send", "-u", "critical", "Scratchpad Error", message],
+                check=False,
+            )
+        except Exception:
+            pass
 
     async def _spawn_scratchpad(self, name: str, config: ScratchpadConfig) -> None:
         """Spawn a new scratchpad window via niri.
@@ -238,20 +358,27 @@ class ScratchpadManager:
             else:
                 output = self.state.outputs.get(output_name or "")
                 if output:
-                    x, y = convert_coordinates_to_pixels(coords, output.width, output.height)
+                    x, y = convert_coordinates_to_pixels(
+                        coords, output.width, output.height
+                    )
                     await self._run_niri_action(
                         "move-floating-window",
-                        "--id", str(window_id),
-                        "--x", str(x),
-                        "--y", str(y),
+                        "--id",
+                        str(window_id),
+                        "--x",
+                        str(x),
+                        "--y",
+                        str(y),
                     )
 
     async def _move_to_scratchpad_workspace(self, window_id: int) -> None:
         """Move a window to the hidden scratchpad workspace."""
         await self._run_niri_action(
             "move-window-to-workspace",
-            "--window-id", str(window_id),
-            "--focus", "false",
+            "--window-id",
+            str(window_id),
+            "--focus",
+            "false",
             SCRATCHPAD_WORKSPACE,
         )
 
@@ -263,12 +390,18 @@ class ScratchpadManager:
         """Run a niri msg action command."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "niri", "msg", "action", action, *args,
+                "niri",
+                "msg",
+                "action",
+                action,
+                *args,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
             )
             _, stderr = await proc.communicate()
             if proc.returncode != 0:
-                print(f"niri action {action} failed: {stderr.decode()}", file=sys.stderr)
+                print(
+                    f"niri action {action} failed: {stderr.decode()}", file=sys.stderr
+                )
         except Exception as e:
             print(f"Failed to run niri action {action}: {e}", file=sys.stderr)

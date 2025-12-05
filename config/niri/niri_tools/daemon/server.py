@@ -22,7 +22,9 @@ class DaemonServer:
         self.urgency_handler = UrgencyHandler(self.state)
         self.server: asyncio.Server | None = None
         self.running = False
-        self._needs_reconciliation = False  # True if we loaded state and need to reconcile
+        self._needs_reconciliation = (
+            False  # True if we loaded state and need to reconcile
+        )
 
     async def start(self) -> None:
         """Start the daemon."""
@@ -111,6 +113,11 @@ class DaemonServer:
         elif cmd == "hide":
             await self.scratchpad_manager.hide()
 
+        elif cmd == "adopt":
+            window_id = command.get("window_id")
+            name = command.get("name")
+            await self.scratchpad_manager.adopt(window_id, name)
+
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
 
@@ -119,7 +126,10 @@ class DaemonServer:
         while self.running:
             try:
                 proc = await asyncio.create_subprocess_exec(
-                    "niri", "msg", "-j", "event-stream",
+                    "niri",
+                    "msg",
+                    "-j",
+                    "event-stream",
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
@@ -235,7 +245,10 @@ class DaemonServer:
         """Reload workspace list from niri."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "niri", "msg", "-j", "workspaces",
+                "niri",
+                "msg",
+                "-j",
+                "workspaces",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
