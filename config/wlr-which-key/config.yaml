@@ -374,6 +374,7 @@ menu:
       - key: "b"
         desc: Bluetooth
         submenu:
+          # TODO: convert cmds to nushell
           - key: "a"
             desc: Connect Airpods
             cmd: airpods -n connect
@@ -386,6 +387,12 @@ menu:
           - key: "F"
             desc: Disconnect Fosi
             cmd: fosi -n disconnect
+          - key: "s"
+            desc: Connect Sennheiser
+            cmd: sennheiser -n connect
+          - key: "S"
+            desc: Disconnect Sennheiser
+            cmd: sennheiser -n disconnect
       - key: "s"
         desc: Scratchpads
         submenu:
@@ -427,6 +434,10 @@ menu:
             alias: "Mod4+P"
             desc: "Pass"
             cmd: niri-tools scratchpad toggle pass
+          - key: "a"
+            alias: "Mod4+A"
+            desc: "Web Alt"
+            cmd: niri-tools scratchpad toggle web-alt
       - key: "t"
         desc: Toggle Tabbed
         cmd: niri msg action toggle-column-tabbed-display
