@@ -184,6 +184,41 @@ class ScratchpadManager:
 
         print(f"Window {window_id} adopted as scratchpad '{name}'")
 
+    async def disown(self, window_id: int | None) -> None:
+        """Disown a scratchpad window and tile it.
+
+        Args:
+            window_id: Window ID to disown (None = focused window)
+        """
+        # Resolve window ID
+        if window_id is None:
+            window_id = self.state.focused_window_id
+            if window_id is None:
+                await self._notify_error("No focused window to disown")
+                return
+
+        window = self.state.windows.get(window_id)
+        if not window:
+            await self._notify_error(f"Window {window_id} not found")
+            return
+
+        # Check if window is a scratchpad
+        name = self.state.get_scratchpad_for_window(window_id)
+        if not name:
+            await self._notify_error(f"Window {window_id} is not a scratchpad")
+            return
+
+        print(f"Disowning scratchpad '{name}' (window {window_id})")
+
+        # Unregister from scratchpad tracking
+        self.state.unregister_scratchpad_window(window_id)
+
+        # Move to tiling
+        await self._run_niri_action("move-window-to-tiling", "--id", str(window_id))
+
+        self.state.save_scratchpad_state()
+        print(f"Window {window_id} disowned from scratchpad '{name}'")
+
     def _get_available_scratchpads(self) -> list[str]:
         """Get scratchpad names that don't have existing windows."""
         available = []

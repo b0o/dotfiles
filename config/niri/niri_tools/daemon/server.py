@@ -118,6 +118,10 @@ class DaemonServer:
             name = command.get("name")
             await self.scratchpad_manager.adopt(window_id, name)
 
+        elif cmd == "disown":
+            window_id = command.get("window_id")
+            await self.scratchpad_manager.disown(window_id)
+
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
 

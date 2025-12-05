@@ -132,6 +132,15 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
         help="Scratchpad name to adopt as (default: prompt with rofi)",
     )
 
+    disown = sub.add_parser("disown", help="Disown a scratchpad window and tile it")
+    disown.add_argument(
+        "-w",
+        "--window-id",
+        type=int,
+        default=None,
+        help="Window ID to disown (default: focused window)",
+    )
+
 
 def main(args: argparse.Namespace) -> int:
     """Handle scratchpad commands by sending to daemon."""
@@ -150,6 +159,12 @@ def main(args: argparse.Namespace) -> int:
             command["window_id"] = args.window_id
         if args.name is not None:
             command["name"] = args.name
+        return send_command(command)
+
+    elif args.scratchpad_command == "disown":
+        command = {"cmd": "disown"}
+        if args.window_id is not None:
+            command["window_id"] = args.window_id
         return send_command(command)
 
     else:
