@@ -702,6 +702,7 @@ keybind = ctrl+z=text:\u{001A}
 # keybind = ctrl+shift+right=next_tab
 # keybind = ctrl+enter=toggle_fullscreen
 
+keybind = ctrl+shift+e=unbind
 keybind = alt+shift+n=new_window
 keybind = ctrl+plus=increase_font_size:1
 keybind = ctrl+minus=decrease_font_size:1
