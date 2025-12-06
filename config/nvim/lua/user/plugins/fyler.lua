@@ -9,7 +9,7 @@ very_lazy(function()
   local ft = maputil.ft
 
   map('n', xk '<C-S-\\>', function()
-    local cur = require 'fyler.views.finder'._current
+    local cur = require('fyler.views.finder')._current
     if cur and cur.win:is_visible() then
       fyler.close()
     else
@@ -46,8 +46,8 @@ very_lazy(function()
   )
 
   ft('fyler', function(bufmap)
-    local parser = require "fyler.views.finder.parser"
-    local finder = require 'fyler.views.finder'._current
+    local parser = require 'fyler.views.finder.parser'
+    local finder = require('fyler.views.finder')._current
     if not finder then
       return
     end
@@ -86,37 +86,37 @@ end)
 ---@type LazySpec[]
 return {
   {
-    "A7Lavinraj/fyler.nvim",
+    'A7Lavinraj/fyler.nvim',
     -- dev = true,
-    dependencies = { "nvim-mini/mini.icons" },
+    dependencies = { 'nvim-mini/mini.icons' },
     cmd = 'Fyler',
     opts = {
       views = {
         finder = {
           close_on_select = false,
           win = {
-            kind = "split_left_most",
-            kinds = { split_left_most = { width = "30" } },
+            kind = 'split_left_most',
+            kinds = { split_left_most = { width = '30' } },
             win_opts = {
               cursorline = true,
             },
           },
           mappings = {
-            ["<Cr>"] = "Select",
-            ["q"] = "CloseView",
-            ["<C-t>"] = "SelectTab",
-            ["<C-v>"] = "SelectVSplit",
-            ["<C-x>"] = "SelectSplit",
-            ["^"] = "GotoParent",
-            ["="] = "GotoCwd",
-            ["."] = "GotoNode",
-            ["#"] = "CollapseAll",
+            ['<Cr>'] = 'Select',
+            ['q'] = 'CloseView',
+            ['<C-t>'] = 'SelectTab',
+            ['<C-v>'] = 'SelectVSplit',
+            ['<C-x>'] = 'SelectSplit',
+            ['^'] = 'GotoParent',
+            ['='] = 'GotoCwd',
+            ['.'] = 'GotoNode',
+            ['#'] = 'CollapseAll',
           },
           watcher = {
             enabled = true,
           },
-        }
-      }
-    }
-  }
+        },
+      },
+    },
+  },
 }
