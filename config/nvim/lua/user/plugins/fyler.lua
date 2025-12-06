@@ -75,7 +75,7 @@ very_lazy(function()
 
     bufmap('n', '<Tab>', function()
       local entry, ref_id = get_selected()
-      if not entry or not entry:isdir() then
+      if not entry or not entry:is_directory() then
         return
       end
       toggle_dir(entry, ref_id)
