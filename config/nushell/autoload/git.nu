@@ -1,6 +1,6 @@
 alias git = hub # important: set this before the `use` line so that we always use hub
 
-export use ./git *
+export use git *
 
 # see ~/.config/git/alias.config for git alias definitions
 alias g = git

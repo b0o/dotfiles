@@ -224,25 +224,10 @@ export def --env gw [
   --prefill-cwd (-C)           # Prefill fzf with current worktree
   --header (-H): string        # Custom fzf header
 ] {
-  let selection = (gw-select $target --ignore-cwd=$ignore_cwd --prefill-cwd=$prefill_cwd --header=$header)
-
-  if $selection == null {
-    return
+  let selection = gw-select $target --ignore-cwd=$ignore_cwd --prefill-cwd=$prefill_cwd --header=$header
+  if ($selection | is-not-empty) {
+    cd -P $selection.path
   }
-
-  let bare_str = if $selection.is_bare {
-    " (bare)"
-  } else {
-    ""
-  }
-
-  let display_name = if $selection.worktree == "" {
-    "repo root"
-  } else {
-    $selection.worktree
-  }
-
-  cd -P $selection.path
 }
 
 # Switch to the root of the git repo
@@ -554,11 +539,11 @@ def complete-gh-pr [spans: list<string>] {
 
   # Return completions directly (no wrapping in options/completions structure)
   let pr_completions = $prs | par-each {|pr|
-    use ../xtras
+    use xtras/format.nu
     let number = ($pr.number | into int)
     let isDraft = ($pr.isDraft | into bool)
     let state = ($pr.state | str trim)
-    let createdAgo = ((date now) - ($pr.createdAt | into datetime)) | xtras format duration human
+    let createdAgo = ((date now) - ($pr.createdAt | into datetime)) | format duration human
     let icon = (get-icon $state $isDraft)
     let status = (match $state {
       "OPEN" => (if $isDraft { "Draft" } else { "Open" }),
