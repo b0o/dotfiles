@@ -88,9 +88,12 @@ return {
   {
     'A7Lavinraj/fyler.nvim',
     -- dev = true,
-    dependencies = { 'nvim-mini/mini.icons' },
     cmd = 'Fyler',
     opts = {
+      integrations = {
+        icon = 'nvim_web_devicons',
+        winpick = 'nvim-window-picker',
+      },
       views = {
         finder = {
           close_on_select = false,
