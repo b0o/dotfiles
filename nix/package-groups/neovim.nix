@@ -15,13 +15,16 @@ with pkgs; [
 
   ### Lanugage Servers / Tools
   # Nix
-  nil # language server
   alejandra # black-inspired formatting
+  nil # language server
   statix # linter
 
-  # Misc
+  ## LSPs
   just-lsp # lsp server for just files
   tombi # TOML Formatter / Linter / Language Server
   vscode-langservers-extracted # vscode-{css,eslint,html,json,markdown}-langserver
+
+  ## Formatters
+  dprint # multi-language formatter
   stylua # lua formatter
 ]
