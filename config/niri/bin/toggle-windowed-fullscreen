@@ -1,0 +1,154 @@
+#!/usr/bin/env -S nu --stdin
+
+# Add this user script to your browser to add a special indicator to the page title when in fullscreen mode
+#
+# // ==UserScript==
+# // @name         Fullscreen Title Indicator
+# // @namespace    http://tampermonkey.net/
+# // @version      1.0
+# // @description  Appends ↔️↕️ to page title while in fullscreen mode
+# // @author       You
+# // @match        *://*/*
+# // @grant        none
+# // @run-at       document-start
+# // ==/UserScript==
+#
+# (function() {
+#     'use strict';
+#
+#     const INDICATOR = ' ↔️↕️';
+#     let isFullscreen = false;
+#     let observer = null;
+#     let originalTitle = document.title;
+#
+#     function hasIndicator(title) {
+#         return title.endsWith(INDICATOR);
+#     }
+#
+#     function addIndicator() {
+#         if (!hasIndicator(document.title)) {
+#             originalTitle = document.title;
+#             document.title = document.title + INDICATOR;
+#         }
+#     }
+#
+#     function removeIndicator() {
+#         if (hasIndicator(document.title)) {
+#             document.title = document.title.slice(0, -INDICATOR.length);
+#         }
+#         originalTitle = document.title;
+#     }
+#
+#     function updateTitle() {
+#         if (isFullscreen) {
+#             addIndicator();
+#         } else {
+#             removeIndicator();
+#         }
+#     }
+#
+#     function checkFullscreen() {
+#         return !!(document.fullscreenElement ||
+#                   document.webkitFullscreenElement ||
+#                   document.mozFullScreenElement ||
+#                   document.msFullscreenElement);
+#     }
+#
+#     function onFullscreenChange() {
+#         isFullscreen = checkFullscreen();
+#         updateTitle();
+#     }
+#
+#     // Watch for title changes via MutationObserver
+#     function setupTitleObserver() {
+#         const titleEl = document.querySelector('title');
+#         if (!titleEl) {
+#             // If no title element yet, wait for it
+#             const headObserver = new MutationObserver(() => {
+#                 if (document.querySelector('title')) {
+#                     headObserver.disconnect();
+#                     setupTitleObserver();
+#                 }
+#             });
+#             if (document.head) {
+#                 headObserver.observe(document.head, { childList: true });
+#             } else {
+#                 document.addEventListener('DOMContentLoaded', () => {
+#                     if (document.querySelector('title')) {
+#                         setupTitleObserver();
+#                     } else {
+#                         headObserver.observe(document.head, { childList: true });
+#                     }
+#                 });
+#             }
+#             return;
+#         }
+#
+#         observer = new MutationObserver((mutations) => {
+#             for (const m of mutations) {
+#                 if (m.type === 'childList' || m.type === 'characterData') {
+#                     // Title changed externally, re-apply indicator if needed
+#                     if (isFullscreen && !hasIndicator(document.title)) {
+#                         addIndicator();
+#                     } else if (!isFullscreen && hasIndicator(document.title)) {
+#                         removeIndicator();
+#                     }
+#                 }
+#             }
+#         });
+#
+#         observer.observe(titleEl, {
+#             childList: true,
+#             characterData: true,
+#             subtree: true
+#         });
+#     }
+#
+#     // Listen for fullscreen changes (all vendor prefixes)
+#     document.addEventListener('fullscreenchange', onFullscreenChange);
+#     document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+#     document.addEventListener('mozfullscreenchange', onFullscreenChange);
+#     document.addEventListener('MSFullscreenChange', onFullscreenChange);
+#
+#     // Initialize
+#     if (document.readyState === 'loading') {
+#         document.addEventListener('DOMContentLoaded', () => {
+#             setupTitleObserver();
+#             onFullscreenChange(); // Check initial state
+#         });
+#     } else {
+#         setupTitleObserver();
+#         onFullscreenChange();
+#     }
+# })();
+
+const marker = "↔️↕️"
+
+const special_app_ids = [
+  "^google-chrome$",
+  "^chrome-.*",
+]
+
+def title-has-marker [title: string] {
+  $title | str contains $marker
+}
+
+def is-special-app [app_id: string] {
+  $special_app_ids | any {|id| $app_id =~ $id }
+}
+
+def main [] {
+  let focused = niri msg -j focused-window | from json
+  if ($focused | is-empty) {
+    return
+  }
+  niri msg action toggle-windowed-fullscreen
+  if (is-special-app $focused.app_id) {
+    if (title-has-marker $focused.title) {
+      ydotool key --key-delay 10 1:1 1:0
+    } else {
+      sleep 0.35sec
+      ydotool type F
+    }
+  }
+}

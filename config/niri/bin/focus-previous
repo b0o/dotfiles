@@ -1,0 +1,56 @@
+#!/usr/bin/env -S nu --stdin
+
+# Focus the most recently focused window which is still visible on another monitor
+def "main monitor" [] {
+  # Optimization: run niri msg workspaces/windows in parallel
+  let state = (
+    [workspaces windows]
+    | par-each { { $in: (niri msg -j $in | from json) } }
+    | into record
+  )
+  let wins = (
+    $state.workspaces
+    | where { $in.is_active and not $in.is_focused }
+    | get -o active_window_id
+  )
+  if ($wins | is-empty) {
+    return
+  }
+  let recent = (
+    $state.windows
+    | where id in $wins
+    | sort-by -r focus_timestamp.secs
+    | first
+    | get -o id
+  )
+  if ($recent | is-empty) {
+    return
+  }
+  niri msg action focus-window --id $recent
+}
+
+# Focus the most recently focused window in the current workspace
+def "main workspace-window" [
+  --multi-layer # Consider windows on another layer (floating/tiling) than the focused window as candidates
+] {
+  let wins = niri msg -j windows | from json
+  let focused = $wins | where is_focused | first
+  if ($focused | is-empty) {
+    return
+  }
+  let workspace_wins = ($wins | where {
+    (not $in.is_focused and $in.workspace_id == $focused.workspace_id and ($multi_layer or $in.is_floating == $focused.is_floating))
+  })
+  if ($workspace_wins | is-empty) {
+    return
+  }
+  let recent = $workspace_wins | sort-by -r focus_timestamp.secs | first
+  if ($recent | is-empty) {
+    return
+  }
+  niri msg action focus-window --id $recent.id
+}
+
+def main [] {
+  ^$env.CURRENT_FILE "--help"
+}
