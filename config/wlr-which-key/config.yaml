@@ -147,18 +147,14 @@ menu:
         alias: "Mod4+x"
         desc: Transcribe (Copy)
         cmd: |
-          zsh -c '
-            wlr-which-key -k "t z" &
-            whispertool --exec "wl-copy"
-          '
+          wlr-which-key -k "t z" &
+          whispertool --exec "wl-copy"
       - key: "t"
         alias: "Mod4+t"
         desc: Transcribe (Type)
         cmd: |
-          zsh -c '
-            wlr-which-key -k "t z" &
-            whispertool --exec "paste -sd \" \" | tr -d \"\\n\" | ydotool type -d5 -H5 --file=-"
-          '
+          wlr-which-key -k "t z" &
+          whispertool --exec "paste -sd \" \" | tr -d \"\\n\" | ydotool type -d5 -H5 --file=-"
   - key: "x"
     desc: Command Center
     submenu:
@@ -166,10 +162,8 @@ menu:
         alias: "Mod4+x"
         desc: Transcribe (Command Center)
         cmd: |
-          zsh -c '
-            wlr-which-key -k "t z" &
-            whispertool --exec "{ paste -sd \" \" | tr -d \"\\n\" && echo \". Respond with concise speech messages. If possible, split response into multiple calls to speak tool, and make sure to give status updates using speak tool before long-running actions.\"; } | ~/proj/command-center/bin/tmux-cmd.py send-msg"
-          '
+          wlr-which-key -k "t z" &
+          whispertool --exec "{ paste -sd \" \" | tr -d \"\\n\" && echo \". Respond with concise speech messages. If possible, split response into multiple calls to speak tool, and make sure to give status updates using speak tool before long-running actions.\"; } | ~/proj/command-center/bin/tmux-cmd.py send-msg"
       - key: "c"
         desc: Clear Command Center
         cmd: /home/maddy/proj/command-center/bin/tmux-cmd.py clear
@@ -182,10 +176,8 @@ menu:
       - key: "v"
         desc: Transcribe + Clipboard
         cmd: |
-          zsh -c '
-            wlr-which-key -k "t z" &
-            whispertool --exec "{ paste -sd \" \" | tr -d \"\\n\"; echo; echo \"Here is the clipboard content in backticks:\"; echo \"\\\`\\\`\\\`\"; wl-paste; echo \"\\\`\\\`\\\`\"; echo; echo \"Respond with concise speech messages. If possible, split response into multiple calls to speak tool, and make sure to give status updates using speak tool before long-running actions.\"; } | /home/maddy/proj/command-center/bin/tmux-cmd.py send-msg"
-          '
+          wlr-which-key -k "t z" &
+          whispertool --exec "{ paste -sd \" \" | tr -d \"\\n\"; echo; echo \"Here is the clipboard content in backticks:\"; echo \"\\\`\\\`\\\`\"; wl-paste; echo \"\\\`\\\`\\\`\"; echo; echo \"Respond with concise speech messages. If possible, split response into multiple calls to speak tool, and make sure to give status updates using speak tool before long-running actions.\"; } | /home/maddy/proj/command-center/bin/tmux-cmd.py send-msg"
       - key: "/"
         desc: Transcribe + Clipboard
         submenu:
@@ -207,21 +199,19 @@ menu:
           - key: "n"
             desc: "Rename Workspace"
             cmd: |
-              zsh -c '
-                name=$(rofi -dmenu -kb-custom-1 "Ctrl+x" -p "Workspace Name" -i -l 0 -mesg "ctrl+x: unset name" -filter "$(niri msg -j workspaces | jq "map(select(.is_focused))[0].name // \" \"")" )
-                code=$?
-                # if user hit ctrl+x to unset name, rofi will return code 10
-                # if code is 10 or name is empty (either empty string or all whitespace)
-                if [[ $code -eq 10 || $name =~ ^[[:space:]]*$ ]]; then
-                  niri msg action unset-workspace-name
-                elif [[ $code -eq 0 ]]; then
-                  # trim leading and trailing whitespace
-                  name=${name#"${name%%[![:space:]]*}"}
-                  name=${name%"${name##*[![:space:]]}"}
-                  # set workspace name
-                  niri msg action set-workspace-name "$name"
-                fi
-              '
+              name=$(rofi -dmenu -kb-custom-1 "Ctrl+x" -p "Workspace Name" -i -l 0 -mesg "ctrl+x: unset name" -filter "$(niri msg -j workspaces | jq "map(select(.is_focused))[0].name // \" \"")" )
+              code=$?
+              # if user hit ctrl+x to unset name, rofi will return code 10
+              # if code is 10 or name is empty (either empty string or all whitespace)
+              if [[ $code -eq 10 || $name =~ ^[[:space:]]*$ ]]; then
+                niri msg action unset-workspace-name
+              elif [[ $code -eq 0 ]]; then
+                # trim leading and trailing whitespace
+                name=${name#"${name%%[![:space:]]*}"}
+                name=${name%"${name##*[![:space:]]}"}
+                # set workspace name
+                niri msg action set-workspace-name "$name"
+              fi
           # TODO: move to workspace
           - key: "r"
             desc: Resize
@@ -355,21 +345,19 @@ menu:
           - key: "r"
             desc: "Rename Workspace"
             cmd: |
-              zsh -c '
-                name=$(rofi -dmenu -kb-custom-1 "Ctrl+x" -p "Rename Workspace" -i -l 0 -mesg "ctrl+x: unset name" -filter "$(niri msg -j workspaces | jq "map(select(.is_focused))[0].name // \" \"")" )
-                code=$?
-                # if user hit ctrl+x to unset name, rofi will return code 10
-                # if code is 10 or name is empty (either empty string or all whitespace)
-                if [[ $code -eq 10 || $name =~ ^[[:space:]]*$ ]]; then
-                  niri msg action unset-workspace-name
-                elif [[ $code -eq 0 ]]; then
-                  # trim leading and trailing whitespace
-                  name=${name#"${name%%[![:space:]]*}"}
-                  name=${name%"${name##*[![:space:]]}"}
-                  # set workspace name
-                  niri msg action set-workspace-name "$name"
-                fi
-              '
+              name=$(rofi -dmenu -kb-custom-1 "Ctrl+x" -p "Rename Workspace" -i -l 0 -mesg "ctrl+x: unset name" -filter "$(niri msg -j workspaces | jq "map(select(.is_focused))[0].name // \" \"")" )
+              code=$?
+              # if user hit ctrl+x to unset name, rofi will return code 10
+              # if code is 10 or name is empty (either empty string or all whitespace)
+              if [[ $code -eq 10 || $name =~ ^[[:space:]]*$ ]]; then
+                niri msg action unset-workspace-name
+              elif [[ $code -eq 0 ]]; then
+                # trim leading and trailing whitespace
+                name=${name#"${name%%[![:space:]]*}"}
+                name=${name%"${name##*[![:space:]]}"}
+                # set workspace name
+                niri msg action set-workspace-name "$name"
+              fi
       - key: "b"
         desc: Bluetooth
         submenu:
@@ -424,6 +412,10 @@ menu:
             alias: "Mod4+E"
             desc: "Matrix"
             cmd: nope niri-tools scratchpad toggle web-matrix
+          - key: "f"
+            alias: "Mod4+F"
+            desc: "Figma"
+            cmd: niri-tools scratchpad toggle figma
           - key: "m"
             alias: "Mod4+M"
             desc: "Web"

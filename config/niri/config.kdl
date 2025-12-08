@@ -21,10 +21,19 @@ cursor {
   hide-when-typing
 }
 
-// Left monitor (BenQ EW3280U)
+// Left monitor (LG 27 1080p)
+output "DP-3" {
+  mode "1920x1080@60.00"
+  position x=0 y=0
+  scale 1
+  transform "270"
+}
+
+
+// Main monitor (BenQ EW3280U)
 output "DP-2" {
   mode "3840x2160@59.997"
-  position x=0 y=0
+  position x=1080 y=-100
   scale 1
   focus-at-startup
   // Fix flickering in Chrome with GPU acceleration.
@@ -35,7 +44,7 @@ output "DP-2" {
 // Right monitor (Samsung U32E850)
 output "DP-1" {
   mode "3840x2160@59.997"
-  position x=3840 y=0
+  position x=4920 y=0
   scale 1
   // Fix flickering in Chrome with GPU acceleration.
   // XXX: currently causes nvidia driver to crash :(
@@ -100,13 +109,11 @@ layer-rule {
 }
 
 // Applies to overlay bg
-spawn-at-startup "zsh" "-c" "swaybg -i ~/Documents/pictures/wallpapers/purple-foliage_blur.jpg"
-// spawn-at-startup "zsh" "-c" "swaybg -i ~/Documents/pictures/wallpapers/purple-foliage.jpg"
-
+spawn-sh-at-startup "swaybg -i ~/Documents/pictures/wallpapers/purple-foliage_blur.jpg"
 // Applies to workspace bg
-spawn-at-startup "zsh" "-c" "wpaperd"
+spawn-at-startup "wpaperd"
 
-spawn-at-startup "zsh" "-c" "tailscale systray"
+spawn-at-startup "tailscale" "systray"
 
 prefer-no-csd
 gestures { hot-corners { off; }; }
@@ -115,11 +122,11 @@ hotkey-overlay { skip-at-startup; }
 screenshot-path "~/Documents/screenshots/%Y-%m-%d_%H-%M-%S.png"
 
 spawn-at-startup "xwayland-satellite"
-spawn-at-startup "zsh" "-c" "brightness -d"
-spawn-at-startup "zsh" "-c" "niri-tools daemon"
-spawn-at-startup "zsh" "-c" "swayidle -C \"${XDG_CONFIG_HOME:-$HOME/.config}/niri/swayidle.conf\""
+spawn-at-startup "brightness" "-d"
+spawn-at-startup "niri-tools" "daemon"
 spawn-at-startup "waybar"
 spawn-at-startup "librepods"
+spawn-sh-at-startup "swayidle -C $XDG_CONFIG_HOME/niri/swayidle.conf"
 
 environment {
   DISPLAY ":0"
@@ -265,10 +272,9 @@ binds {
   Mod+Shift+9 { move-window-to-workspace 9; }
   Mod+Shift+0 { move-window-to-workspace 10; }
 
-  // Switches focus between the current and the previous workspace.
-  Mod+Shift+A { focus-monitor-previous; }
+  Mod+Shift+A { spawn-sh "$XDG_CONFIG_HOME/niri/bin/focus-previous monitor"; }
+  Mod+A { spawn-sh "$XDG_CONFIG_HOME/niri/bin/focus-previous workspace-window"; }
   Mod+Ctrl+A { focus-workspace-previous; }
-  Mod+A { focus-window-previous; }
 
   // The following binds move the focused window in and out of a column.
   // If the window is alone, they will consume it into the nearby column to the side.
@@ -286,11 +292,11 @@ binds {
   // Mod+Ctrl+R { reset-window-height; }
   Mod+F { maximize-column; }
   Mod+Shift+F { fullscreen-window; }
-  Mod+Ctrl+F { toggle-windowed-fullscreen; }
+  Mod+Ctrl+F { spawn-sh "$XDG_CONFIG_HOME/niri/bin/toggle-windowed-fullscreen"; }
 
   // Expand the focused column to space not taken up by other fully visible columns.
   // Makes the column "fill the rest of the space".
-  // Mod+Ctrl+F { expand-column-to-available-width; }
+  Mod+Alt+F { expand-column-to-available-width; }
 
   Mod+Apostrophe { center-column; }
 
@@ -320,14 +326,9 @@ binds {
   // rather than stacked on top of each other.
   Mod+F3 { toggle-column-tabbed-display; }
 
-  // TODO:
-  // Print { spawn "zsh" "-c" "snag --dir $HOME/Documents/screenshots -xNR"; }
-  // Ctrl+Print { screenshot-screen; }
-  // Print      { screenshot-window; }
-
   // Awtrix
-  Mod+Shift+BracketLeft { spawn "nu" "-l" "-c" "use awtrix; awtrix next-app"; }
-  Mod+Shift+BracketRight { spawn "nu" "-l" "-c" "use awtrix; awtrix previous-app"; }
+  Mod+Shift+BracketLeft { spawn "nu" "-c" "use awtrix; awtrix next-app"; }
+  Mod+Shift+BracketRight { spawn "nu" "-c" "use awtrix; awtrix previous-app"; }
 
   // Applications such as remote-desktop clients and software KVM switches may
   // request that niri stops processing the keyboard shortcuts defined here
@@ -339,57 +340,57 @@ binds {
   // which ensures niri always processes them, even when an inhibitor is active.
   Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
 
-  Mod+Return                  hotkey-overlay-title="Terminal"                   { spawn "zsh" "-c" "ghostty"; }
-  Mod+Backslash               hotkey-overlay-title="Browser"                    { spawn "zsh" "-c" "browser"; }
-  Mod+Space                   hotkey-overlay-title="Menu"                       { spawn "zsh" "-c" "wlr-which-key"; }
+  Mod+Return                  hotkey-overlay-title="Terminal"                   { spawn-sh "ghostty"; }
+  Mod+Backslash               hotkey-overlay-title="Browser"                    { spawn-sh "browser"; }
+  Mod+Space                   hotkey-overlay-title="Menu"                       { spawn-sh "wlr-which-key"; }
 
-  XF86Sleep                   hotkey-overlay-title="Lock"                       { spawn "zsh" "-c" "niri msg action power-off-monitors && system lock"; }
+  XF86Sleep                   hotkey-overlay-title="Lock"                       { spawn-sh "niri msg action power-off-monitors && system lock"; }
 
-  XF86AudioLowerVolume        hotkey-overlay-title="Volume: Down"               { spawn "zsh" "-c" "audioctl -n vol down"; }
-  XF86AudioRaiseVolume        hotkey-overlay-title="Volume: Up"                 { spawn "zsh" "-c" "audioctl -n vol up"; }
-  XF86AudioMute               hotkey-overlay-title="Volume: Mute"               { spawn "zsh" "-c" "audioctl -n vol mute"; }
+  XF86AudioLowerVolume        hotkey-overlay-title="Volume: Down"               { spawn-sh "audioctl -n vol down"; }
+  XF86AudioRaiseVolume        hotkey-overlay-title="Volume: Up"                 { spawn-sh "audioctl -n vol up"; }
+  XF86AudioMute               hotkey-overlay-title="Volume: Mute"               { spawn-sh "audioctl -n vol mute"; }
 
-  XF86AudioPlay               hotkey-overlay-title="Play: Toggle"               { spawn "zsh" "-c" "audioctl -n play toggle"; }
-  XF86AudioPrev               hotkey-overlay-title="Play: Prev"                 { spawn "zsh" "-c" "audioctl -n play prev"; }
-  XF86AudioNext               hotkey-overlay-title="Play: Next"                 { spawn "zsh" "-c" "audioctl -n play next"; }
+  XF86AudioPlay               hotkey-overlay-title="Play: Toggle"               { spawn-sh "audioctl -n play toggle"; }
+  XF86AudioPrev               hotkey-overlay-title="Play: Prev"                 { spawn-sh "audioctl -n play prev"; }
+  XF86AudioNext               hotkey-overlay-title="Play: Next"                 { spawn-sh "audioctl -n play next"; }
 
-  Super+XF86AudioNext         hotkey-overlay-title="Audio: Next Sink"           { spawn "zsh" "-c" "audioctl -n sink next"; }
-  Super+XF86AudioPrev         hotkey-overlay-title="Audio: Prev Sink"           { spawn "zsh" "-c" "audioctl -n sink prev"; }
-  Super+Shift+XF86AudioMute   hotkey-overlay-title="Audio: Unify Sinks"         { spawn "zsh" "-c" "audioctl -n sink unify"; }
-  Super+Shift+XF86AudioNext   hotkey-overlay-title="Audio: Next Sink (Unify)"   { spawn "zsh" "-c" "audioctl -n sink -u next"; }
-  Super+Shift+XF86AudioPrev   hotkey-overlay-title="Audio: Prev Sink (Unify)"   { spawn "zsh" "-c" "audioctl -n sink -u prev"; }
+  Super+XF86AudioNext         hotkey-overlay-title="Audio: Next Sink"           { spawn-sh "audioctl -n sink next"; }
+  Super+XF86AudioPrev         hotkey-overlay-title="Audio: Prev Sink"           { spawn-sh "audioctl -n sink prev"; }
+  Super+Shift+XF86AudioMute   hotkey-overlay-title="Audio: Unify Sinks"         { spawn-sh "audioctl -n sink unify"; }
+  Super+Shift+XF86AudioNext   hotkey-overlay-title="Audio: Next Sink (Unify)"   { spawn-sh "audioctl -n sink -u next"; }
+  Super+Shift+XF86AudioPrev   hotkey-overlay-title="Audio: Prev Sink (Unify)"   { spawn-sh "audioctl -n sink -u prev"; }
 
-  Mod+Grave                   hotkey-overlay-title="KVM: Switch USB"            { spawn "zsh" "-c" "kvm usb 4"; }
-  Mod+Shift+Grave             hotkey-overlay-title="KVM: Switch USB + Montior"  { spawn "zsh" "-c" "kvm monitor input,ok usb 4"; }
+  Mod+Grave                   hotkey-overlay-title="KVM: Switch USB"            { spawn-sh "kvm usb 4"; }
+  Mod+Shift+Grave             hotkey-overlay-title="KVM: Switch USB + Montior"  { spawn-sh "kvm monitor input,ok usb 4"; }
 
-  Mod+B                       hotkey-overlay-title="Mode: Brightness"           { spawn "zsh" "-c" "wlr-which-key -k b"; }
-  Mod+Shift+N                 hotkey-overlay-title="Mode: Notifications"        { spawn "zsh" "-c" "wlr-which-key -k n"; }
-  Mod+O                       hotkey-overlay-title="Mode: Open"                 { spawn "zsh" "-c" "wlr-which-key -k o"; }
-  Mod+S                       hotkey-overlay-title="Mode: System"               { spawn "zsh" "-c" "wlr-which-key -k s"; }
-  Mod+Shift+S                 hotkey-overlay-title="Mode: Scratchpads"          { spawn "zsh" "-c" "wlr-which-key -k 'z s'"; }
-  Mod+T                       hotkey-overlay-title="Mode: Transcribe"           { spawn "zsh" "-c" "wlr-which-key -k t"; }
-  Mod+W                       hotkey-overlay-title="Mode: Windows"              { spawn "zsh" "-c" "wlr-which-key -k 'z w'"; }
-  Mod+R                       hotkey-overlay-title="Mode: Resize"               { spawn "zsh" "-c" "wlr-which-key -k 'z w r'"; }
-  Mod+X                       hotkey-overlay-title="Mode: Command Center"       { spawn "zsh" "-c" "wlr-which-key -k x"; }
-  Mod+Z                       hotkey-overlay-title="Mode: WM"                   { spawn "zsh" "-c" "wlr-which-key -k z"; }
-  Mod+Shift+W                 hotkey-overlay-title="Mode: Workspaces"           { spawn "zsh" "-c" "wlr-which-key -k 'z W'"; }
-  Mod+Period                  hotkey-overlay-title="Mode: KB Ptr"               { spawn "zsh" "-c" "wl-kbptr"; }
-  Print                       hotkey-overlay-title="Mode: Screenshot"           { spawn "zsh" "-c" "wlr-which-key -k 'Print Print'"; }
-  Mod+Print                   hotkey-overlay-title="Mode: Screenshot Select"    { spawn "zsh" "-c" "wlr-which-key -k 'Print S'"; }
+  Mod+B                       hotkey-overlay-title="Mode: Brightness"           { spawn-sh "wlr-which-key -k b"; }
+  Mod+Shift+N                 hotkey-overlay-title="Mode: Notifications"        { spawn-sh "wlr-which-key -k n"; }
+  Mod+O                       hotkey-overlay-title="Mode: Open"                 { spawn-sh "wlr-which-key -k o"; }
+  Mod+S                       hotkey-overlay-title="Mode: System"               { spawn-sh "wlr-which-key -k s"; }
+  Mod+Ctrl+S                  hotkey-overlay-title="Mode: Toggle Scratchpad"    { spawn-sh "niri-tools scratchpad toggle"; }
+  Mod+Shift+S                 hotkey-overlay-title="Mode: Scratchpads"          { spawn-sh "wlr-which-key -k 'z s'"; }
+  Mod+T                       hotkey-overlay-title="Mode: Transcribe"           { spawn-sh "wlr-which-key -k t"; }
+  Mod+W                       hotkey-overlay-title="Mode: Windows"              { spawn-sh "wlr-which-key -k 'z w'"; }
+  Mod+R                       hotkey-overlay-title="Mode: Resize"               { spawn-sh "wlr-which-key -k 'z w r'"; }
+  Mod+X                       hotkey-overlay-title="Mode: Command Center"       { spawn-sh "wlr-which-key -k x"; }
+  Mod+Z                       hotkey-overlay-title="Mode: WM"                   { spawn-sh "wlr-which-key -k z"; }
+  Mod+Shift+W                 hotkey-overlay-title="Mode: Workspaces"           { spawn-sh "wlr-which-key -k 'z W'"; }
+  Mod+Period                  hotkey-overlay-title="Mode: KB Ptr"               { spawn-sh "wl-kbptr"; }
+  Print                       hotkey-overlay-title="Mode: Screenshot"           { spawn-sh "wlr-which-key -k 'Print Print'"; }
+  Mod+Print                   hotkey-overlay-title="Mode: Screenshot Select"    { spawn-sh "wlr-which-key -k 'Print S'"; }
 
-  Mod+Slash                   hotkey-overlay-title="Scratchpad: Term"           { spawn "zsh" "-c" "niri-tools scratchpad toggle term"; }
-  Mod+M                       hotkey-overlay-title="Scratchpad: Music"          { spawn "zsh" "-c" "niri-tools scratchpad toggle music"; }
-  Mod+N                       hotkey-overlay-title="Scratchpad: Notes"          { spawn "zsh" "-c" "niri-tools scratchpad toggle term-n"; }
-  Mod+I                       hotkey-overlay-title="Scratchpad: Issues"         { spawn "zsh" "-c" "niri-tools scratchpad toggle web-i"; }
-  Mod+Shift+b                 hotkey-overlay-title="Scratchpad: Brain.fm"       { spawn "zsh" "-c" "niri-tools scratchpad toggle web-b"; }
-  Mod+D                       hotkey-overlay-title="Scratchpad: Docs"           { spawn "zsh" "-c" "niri-tools scratchpad toggle web-d"; }
-  Mod+Alt+N                   hotkey-overlay-title="Scratchpad: Kite"           { spawn "zsh" "-c" "niri-tools scratchpad toggle web-k"; }
-  Mod+C                       hotkey-overlay-title="Scratchpad: Command Center" { spawn "zsh" "-c" "niri-tools scratchpad toggle term-cc"; }
-  Mod+Shift+C                 hotkey-overlay-title="Scratchpad: Claude"         { spawn "zsh" "-c" "niri-tools scratchpad toggle web-claude"; }
-  Mod+Alt+F                   hotkey-overlay-title="Scratchpad: Figma"          { spawn "zsh" "-c" "niri-tools scratchpad toggle figma"; }
-  Mod+Alt+Grave               hotkey-overlay-title="Scratchpad: Parsec"         { spawn "zsh" "-c" "niri-tools scratchpad toggle parsec"; }
+  Mod+Slash                   hotkey-overlay-title="Scratchpad: Term"           { spawn-sh "niri-tools scratchpad toggle term"; }
+  Mod+M                       hotkey-overlay-title="Scratchpad: Music"          { spawn-sh "niri-tools scratchpad toggle music"; }
+  Mod+N                       hotkey-overlay-title="Scratchpad: Notes"          { spawn-sh "niri-tools scratchpad toggle term-n"; }
+  Mod+I                       hotkey-overlay-title="Scratchpad: Issues"         { spawn-sh "niri-tools scratchpad toggle web-i"; }
+  Mod+Shift+b                 hotkey-overlay-title="Scratchpad: Brain.fm"       { spawn-sh "niri-tools scratchpad toggle web-b"; }
+  Mod+D                       hotkey-overlay-title="Scratchpad: Docs"           { spawn-sh "niri-tools scratchpad toggle web-d"; }
+  Mod+Alt+N                   hotkey-overlay-title="Scratchpad: Kite"           { spawn-sh "niri-tools scratchpad toggle web-k"; }
+  Mod+C                       hotkey-overlay-title="Scratchpad: Command Center" { spawn-sh "niri-tools scratchpad toggle term-cc"; }
+  Mod+Shift+C                 hotkey-overlay-title="Scratchpad: Claude"         { spawn-sh "niri-tools scratchpad toggle web-claude"; }
+  Mod+Alt+Grave               hotkey-overlay-title="Scratchpad: Parsec"         { spawn-sh "niri-tools scratchpad toggle parsec"; }
 
-  Mod+Alt+Slash               hotkey-overlay-title="Scratchpad: Toggle"         { spawn "zsh" "-c" "niri-tools scratchpad toggle"; }
+  Mod+Alt+Slash               hotkey-overlay-title="Scratchpad: Toggle"         { spawn-sh "niri-tools scratchpad toggle"; }
 }
 
 include "private.kdl"
