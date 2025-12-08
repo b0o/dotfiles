@@ -34,7 +34,7 @@ add-path ([
   $"($nu.home-path)/bin"
   $"($nu.home-path)/.nix-profile/bin"
   $"($nu.home-path)/.local/bin"
-  $"($nu.home-path)/.bun/bin"
+  $"($nu.home-path)/.cache/.bun/bin"
   $"($nu.home-path)/.cargo/bin"
 ])
 
