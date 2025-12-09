@@ -326,6 +326,44 @@
         "type": "github"
       }
     },
+    "opencode": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1765281495,
+        "narHash": "sha256-HC1eFgSU3JmV8SO/yl4aiow8F6dEnvuHy1V1UIWYqz4=",
+        "owner": "b0o",
+        "repo": "opencode",
+        "rev": "2147fb159df34a304d93779626ba4525615089ca",
+        "type": "github"
+      },
+      "original": {
+        "owner": "b0o",
+        "ref": "b0o",
+        "repo": "opencode",
+        "type": "github"
+      }
+    },
+    "opentui-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1765259219,
+        "narHash": "sha256-Ww0T1uLo/06n/j22O25p9u0kC/hnY41ywONid6RGh4s=",
+        "owner": "b0o",
+        "repo": "opentui",
+        "rev": "3784a3d126bca6a2971c9508193acd059656ae8c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "b0o",
+        "ref": "b0o",
+        "repo": "opentui",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "bash-env-nushell": "bash-env-nushell",
@@ -335,6 +373,8 @@
         "niri": "niri",
         "nixpkgs": "nixpkgs",
         "nushell-nightly": "nushell-nightly",
+        "opencode": "opencode",
+        "opentui-src": "opentui-src",
         "wlr-which-key-b0o": "wlr-which-key-b0o"
       }
     },

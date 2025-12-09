@@ -2,9 +2,13 @@
   description = "Maddison's Dotfiles";
 
   inputs = {
-    # Nix
+    # Nix/NixOS
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flakey-profile.url = "github:lf-/flakey-profile";
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # Neovim
     neovim-nightly-overlay = {
@@ -27,18 +31,19 @@
       url = "github:sodiboo/niri-flake";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # NixOS
-    disko = {
-      url = "github:nix-community/disko";
+    wlr-which-key-b0o = {
+      url = "github:b0o/wlr-which-key/b0o";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # wlr-which-key
-    wlr-which-key-b0o = {
-      # on branch b0o
-      url = "github:b0o/wlr-which-key/b0o";
+    # Misc
+    opencode = {
+      url = "github:b0o/opencode/b0o";
       inputs.nixpkgs.follows = "nixpkgs";
+    };
+    opentui-src = {
+      url = "github:b0o/opentui/b0o";
+      flake = false;
     };
   };
 
