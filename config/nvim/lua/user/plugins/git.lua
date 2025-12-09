@@ -345,7 +345,10 @@ return {
     end,
   },
   {
-    'akinsho/git-conflict.nvim',
+    'b0o/git-conflict.nvim',
+    -- TODO: revert when https://github.com/akinsho/git-conflict.nvim/issues/119 is fixed
+    -- 'akinsho/git-conflict.nvim',
+    dev = true,
     opts = {
       default_commands = true,
       disable_diagnostics = true,
