@@ -39,5 +39,10 @@ return {
         smu.to_next_word = orig_to_next_word
       end, 'SuperMaven: Accept next char')
     end,
-  }
+  },
+  {
+    'NickvanDyke/opencode.nvim',
+    event = 'VeryLazy',
+    config = function() vim.g.opencode_opts = {} end,
+  },
 }
