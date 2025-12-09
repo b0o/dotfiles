@@ -45,6 +45,7 @@ with pkgs; [
   # Git tools
   hub # GitHub CLI wrapper for git
   gh # official GitHub CLI
+  lazygit # terminal UI for git repositories
 
   # AI
   pkgs.opencode-b0o
