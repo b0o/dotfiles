@@ -14,5 +14,4 @@ in
   inputs.nixpkgs.lib.composeManyExtensions [
     additions
     modifications
-    (import ./opencode.nix {inherit inputs;})
   ]
