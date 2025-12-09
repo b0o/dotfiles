@@ -20,34 +20,37 @@ export module fp {
   }
 
   # Build the flakey profile
-  export def build [
+  export def --wrapped build [
     --profile (-p): string   # Specify the profile name
     --dir (-d): string       # Specify the base directory
+    ...args: string          # Specify additional arguments to pass to nix
   ] {
     let profile = (init --profile=$profile --dir=$dir)
-    nix build $".#profile.($profile)"
+    nix build $".#profile.($profile)" ...$args
   }
 
   # Switch (activate) the flakey profile
-  export def switch [
+  export def --wrapped switch [
     --profile (-p): string   # Specify the profile name
     --dir (-d): string       # Specify the base directory
+    ...args: string          # Specify additional arguments to pass to nix
   ] {
     let profile = (init --profile=$profile --dir=$dir)
-    nix run $".#profile.($profile).switch"
+    nix run $".#profile.($profile).switch" ...$args
   }
 
   # Rollback to the previous flakey profile
-  export def rollback [
+  export def --wrapped rollback [
     --profile (-p): string   # Specify the profile name
     --dir (-d): string       # Specify the base directory
+    ...args: string          # Specify additional arguments to pass to nix
   ] {
     let profile = (init --profile=$profile --dir=$dir)
-    nix run $".#profile.($profile).rollback"
+    nix run $".#profile.($profile).rollback" ...$args
   }
 
   # Enter a development shell
-  export def develop [
+  export def --wrapped develop [
     --profile (-p): string   # Specify the profile name
     --dir (-d): string       # Specify the base directory
     ...args: string          # Specify additional arguments to pass to nix
@@ -57,7 +60,7 @@ export module fp {
   }
 
   # Enter a shell with the flakey profile's environment
-  export def shell [
+  export def --wrapped shell [
     --profile (-p): string   # Specify the profile name
     --dir (-d): string       # Specify the base directory
     ...args: string          # Specify additional arguments to pass to nix
@@ -67,7 +70,7 @@ export module fp {
   }
 
   # Update the flake.lock file
-  export def update [
+  export def --wrapped update [
     --profile (-p): string # Specify the profile name
     --dir (-d): string     # Specify the base directory
     ...inputs: string      # Specify the inputs to update (e.g. nixpkgs)
