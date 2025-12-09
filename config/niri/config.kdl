@@ -27,8 +27,14 @@ output "DP-3" {
   position x=0 y=0
   scale 1
   transform "270"
+  layout {
+    gaps 24
+    struts {
+      left 8
+      right 8
+    }
+  }
 }
-
 
 // Main monitor (BenQ EW3280U)
 output "DP-2" {
