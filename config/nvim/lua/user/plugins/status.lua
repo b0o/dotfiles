@@ -106,7 +106,10 @@ return {
             'filetype',
             'progress',
           },
-          lualine_y = { 'overseer' },
+          lualine_y = {
+            'overseer',
+            require('opencode').statusline,
+          },
           lualine_z = { 'location' },
         },
       }
