@@ -354,8 +354,8 @@ return {
             '  󰬿  ',
           },
           border = {
-            true,  -- h1
-            true,  -- h2
+            true, -- h1
+            true, -- h2
             false, -- h3
             false, -- h4
             false, -- h5
