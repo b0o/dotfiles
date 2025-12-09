@@ -42,16 +42,16 @@
   },
   "theme": {
     "primary": {
-      "dark": "blush",
-      "light": "lavender"
-    },
-    "secondary": {
       "dark": "violetBright",
       "light": "violet"
     },
-    "accent": {
+    "secondary": {
       "dark": "blue",
       "light": "indigo"
+    },
+    "accent": {
+      "dark": "blush",
+      "light": "lavender"
     },
     "error": {
       "dark": "redBright",
@@ -74,6 +74,10 @@
       "light": "black"
     },
     "textMuted": {
+      "dark": "aniseDark",
+      "light": "blackMed"
+    },
+    "placeholderText": {
       "dark": "aniseDark",
       "light": "blackMed"
     },
