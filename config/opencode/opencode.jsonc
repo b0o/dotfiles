@@ -1,5 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "autoupdate": false,
   "theme": "lavi",
   "keybinds": {
     "leader": "ctrl+x,û", // û is ctrl+.
@@ -37,7 +38,7 @@
     "agent_list": "<leader>a",
     "agent_cycle": "tab",
     "agent_cycle_reverse": "shift+tab",
-    "input_clear": "ctrl+c",
+    "input_clear": "<leader>ctrl+c",
     "input_forward_delete": "ctrl+d",
     "input_paste": "ctrl+v",
     "input_submit": "enter",
