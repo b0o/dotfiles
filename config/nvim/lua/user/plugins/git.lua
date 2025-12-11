@@ -54,6 +54,9 @@ very_lazy(function()
         and vim.fn.getline '.' == ''
       then
         neogit.open { kind = 'replace' }
+      elseif opts.kind == 'tab' then
+        vim.cmd.tabnew()
+        neogit.open { kind = 'replace' }
       else
         neogit.open { kind = opts.kind }
       end
