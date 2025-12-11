@@ -65,7 +65,8 @@ very_lazy(function()
     end
   end
 
-  map('n', '<leader>gs', open_neogit { kind = 'vsplit' }, 'Neogit')
+  map('n', '<leader>gv', open_neogit { kind = 'vsplit' }, 'Neogit (vertical split)')
+  map('n', '<leader>gx', open_neogit { kind = 'split' }, 'Neogit (horizontal split)')
   map('n', '<leader>gg', open_neogit { kind = 'replace' }, 'Neogit (replace)')
   map('n', '<leader>G', open_neogit { kind = 'tab', replace = false }, 'Neogit (tab)')
 
@@ -141,7 +142,6 @@ return {
           local gs = require 'gitsigns'
           bufmap('n', '<leader>hs', gs.stage_hunk, 'Gitsigns: Stage hunk')
           bufmap('n', '<leader>hr', gs.reset_hunk, 'Gitsigns: Reset hunk')
-          bufmap('n', '<leader>hu', gs.undo_stage_hunk, 'Gitsigns: Undo stage hunk')
           bufmap('x', '<leader>hs', gitsigns_visual_op 'stage_hunk', 'Gitsigns: Stage selected hunk(s)')
           bufmap('x', '<leader>hr', gitsigns_visual_op 'reset_hunk', 'Gitsigns: Reset selected hunk(s)')
           bufmap('x', '<leader>hu', gitsigns_visual_op 'undo_stage_hunk', 'Gitsigns: Undo stage hunk')
@@ -151,10 +151,9 @@ return {
           bufmap('n', '<leader>hb', wrap(gs.blame_line, { full = true }), 'Gitsigns: Blame hunk')
           bufmap('n', '<leader>htb', gs.toggle_current_line_blame, 'Gitsigns: Toggle current line blame')
           bufmap('n', '<leader>hd', gs.diffthis, 'Gitsigns: Diff this')
-          bufmap('n', '<leader>htd', gs.toggle_deleted, 'Gitsigns: Toggle deleted')
           bufmap('n', '<leader>hD', wrap(gs.diffthis, '~'), 'Gitsigns: Diff this against last commit')
-          bufmap('n', ']c', gs.next_hunk, 'Gitsigns: Next hunk')
-          bufmap('n', '[c', gs.prev_hunk, 'Gitsigns: Prev hunk')
+          bufmap('n', ']c', function() gs.nav_hunk 'next' end, 'Gitsigns: Next hunk') ---@diagnostic disable-line: param-type-mismatch
+          bufmap('n', '[c', function() gs.nav_hunk 'prev' end, 'Gitsigns: Prev hunk') ---@diagnostic disable-line: param-type-mismatch
           bufmap('xo', 'ih', '<Cmd><C-U>Gitsigns select_hunk<Cr>', '[TextObj] Gitsigns: Inner hunk')
         end,
         signs = {
