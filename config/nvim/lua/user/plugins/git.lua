@@ -14,12 +14,14 @@ very_lazy(function()
       if neogit_loaded then
         action()
       else
-        require('plenary.async').void(function()
-          require('neogit.lib.git').repo:dispatch_refresh {
-            source = 'popup',
-            callback = function() action() end,
-          }
-        end)()
+        require('plenary.async').void(
+          function()
+            require('neogit.lib.git').repo:dispatch_refresh {
+              source = 'popup',
+              callback = vim.schedule_wrap(action),
+            }
+          end
+        )()
       end
     end
   end
