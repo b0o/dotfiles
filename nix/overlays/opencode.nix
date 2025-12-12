@@ -161,15 +161,23 @@
 
         # Create dependency symlinks for @opentui/solid's babel dependencies
         # These point to packages in the top-level .bun cache
-        # TODO: Make these dynamic to avoid breaking when opencode updates deps
+        # Paths are resolved dynamically to handle version updates
+        bun_cache_scoped="../../../../../../../node_modules/.bun"   # for @babel/* (7 levels up)
+        bun_cache_unscoped="../../../../../../node_modules/.bun"    # for non-scoped (6 levels up)
+
+        babel_core_dir=$(ls ../../node_modules/.bun/ | grep '^@babel+core@' | head -1)
+        babel_preset_ts_dir=$(ls ../../node_modules/.bun/ | grep '^@babel+preset-typescript@' | head -1)
+        babel_preset_solid_dir=$(ls ../../node_modules/.bun/ | grep '^babel-preset-solid@' | head -1)
+        babel_module_resolver_dir=$(ls ../../node_modules/.bun/ | grep '^babel-plugin-module-resolver@' | head -1)
+
         mkdir -p ./node_modules/@opentui/solid/node_modules/@babel
-        ln -s ../../../../../../../node_modules/.bun/@babel+core@7.28.0+6c39b2892b0950f6/node_modules/@babel/core \
+        ln -s "$bun_cache_scoped/$babel_core_dir/node_modules/@babel/core" \
           ./node_modules/@opentui/solid/node_modules/@babel/core
-        ln -s ../../../../../../../node_modules/.bun/@babel+preset-typescript@7.27.1+6c39b2892b0950f6/node_modules/@babel/preset-typescript \
+        ln -s "$bun_cache_scoped/$babel_preset_ts_dir/node_modules/@babel/preset-typescript" \
           ./node_modules/@opentui/solid/node_modules/@babel/preset-typescript
-        ln -s ../../../../../../node_modules/.bun/babel-preset-solid@1.9.9+8ef28aad7564279e/node_modules/babel-preset-solid \
+        ln -s "$bun_cache_unscoped/$babel_preset_solid_dir/node_modules/babel-preset-solid" \
           ./node_modules/@opentui/solid/node_modules/babel-preset-solid
-        ln -s ../../../../../../node_modules/.bun/babel-plugin-module-resolver@5.0.2/node_modules/babel-plugin-module-resolver \
+        ln -s "$bun_cache_unscoped/$babel_module_resolver_dir/node_modules/babel-plugin-module-resolver" \
           ./node_modules/@opentui/solid/node_modules/babel-plugin-module-resolver
 
         mkdir -p ./node_modules/@opencode-ai
