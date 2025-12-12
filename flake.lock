@@ -347,6 +347,22 @@
         "type": "github"
       }
     },
+    "opentui-spinner-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1764020537,
+        "narHash": "sha256-1XPO3mRsJJfc8b8M38fTkcqclhnKXS1ov4gk2pIwZq4=",
+        "owner": "msmps",
+        "repo": "opentui-spinner",
+        "rev": "95ca2e17f058eca99cb1beaf63f87445c3128cc0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "msmps",
+        "repo": "opentui-spinner",
+        "type": "github"
+      }
+    },
     "opentui-src": {
       "flake": false,
       "locked": {
@@ -374,6 +390,7 @@
         "nixpkgs": "nixpkgs",
         "nushell-nightly": "nushell-nightly",
         "opencode": "opencode",
+        "opentui-spinner-src": "opentui-spinner-src",
         "opentui-src": "opentui-src",
         "wlr-which-key-b0o": "wlr-which-key-b0o"
       }

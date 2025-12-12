@@ -28,6 +28,27 @@ in {
         done
         chmod -R u+w ./node_modules/@opentui
 
+        # Replace opentui-spinner with our build (against our opentui fork)
+        # Need to replace both the direct module and the .bun cache entry
+        rm -rf ./node_modules/opentui-spinner
+        cp -r ${final.opentui-spinner-b0o}/lib/node_modules/opentui-spinner ./node_modules/opentui-spinner
+        chmod -R u+w ./node_modules/opentui-spinner
+
+        # opentui-spinner depends on cli-spinners - copy it from our build
+        rm -rf ./node_modules/cli-spinners
+        cp -r ${final.opentui-spinner-b0o}/lib/node_modules/cli-spinners ./node_modules/cli-spinners
+        chmod -R u+w ./node_modules/cli-spinners
+
+        # Also replace in top-level .bun cache (used by bun's module resolution)
+        chmod -R u+w ../../node_modules/.bun
+        for spinner_cache in ../../node_modules/.bun/opentui-spinner@*/node_modules/opentui-spinner; do
+          if [ -d "$spinner_cache" ]; then
+            rm -rf "$spinner_cache"
+            cp -r ${final.opentui-spinner-b0o}/lib/node_modules/opentui-spinner "$spinner_cache"
+            chmod -R u+w "$spinner_cache"
+          fi
+        done
+
         # Create dependency symlinks for @opentui/solid
         # These point to packages in the top-level .bun cache (7 levels up from @babel/core)
         mkdir -p ./node_modules/@opentui/solid/node_modules/@babel

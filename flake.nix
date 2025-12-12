@@ -45,6 +45,10 @@
       url = "github:b0o/opentui/b0o";
       flake = false;
     };
+    opentui-spinner-src = {
+      url = "github:msmps/opentui-spinner";
+      flake = false;
+    };
   };
 
   outputs = {
