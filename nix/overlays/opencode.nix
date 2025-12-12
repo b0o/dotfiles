@@ -11,6 +11,10 @@
   opentui-version = (builtins.fromJSON (builtins.readFile "${inputs.opentui-src}/packages/core/package.json")).version;
   opentui-spinner-version = (builtins.fromJSON (builtins.readFile "${inputs.opentui-spinner-src}/package.json")).version;
 
+  # FOD hashes - update these when inputs change
+  opentui-hash = "sha256-D2T7wR8ZTghXkDe22cT1vLf/rkA8gD5sIN2yXVlMiwk=";
+  opentui-spinner-hash = "sha256-Qbe7dhHSHq7JIlc32ptPlrBprEVq60k08IJ1dV6S9EY=";
+
   opentui = stdenv.mkDerivation {
     pname = "opentui";
     version = opentui-version;
@@ -20,7 +24,7 @@
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-D2T7wR8ZTghXkDe22cT1vLf/rkA8gD5sIN2yXVlMiwk=";
+    outputHash = opentui-hash;
 
     dontConfigure = true;
 
@@ -75,7 +79,7 @@
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-Qbe7dhHSHq7JIlc32ptPlrBprEVq60k08IJ1dV6S9EY=";
+    outputHash = opentui-spinner-hash;
 
     dontConfigure = true;
 
