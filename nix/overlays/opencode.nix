@@ -1,9 +1,9 @@
 # Override opencode to use opentui and opentui-spinner built from custom forks
 #
 # This overlay defines three packages:
-# - opentui-b0o: OpenTUI built from b0o/opentui fork
-# - opentui-spinner-b0o: opentui-spinner built against opentui-b0o
-# - opencode-b0o: OpenCode from b0o/opencode fork using the above custom packages as dependencies
+# - opentui: OpenTUI built from b0o/opentui fork
+# - opentui-spinner: opentui-spinner built against custom opentui
+# - opencode: OpenCode using the above custom packages
 {inputs, ...}: final: _prev: let
   inherit (final) lib stdenv bun nodejs zig_0_14 llvmPackages cacert ripgrep makeBinaryWrapper;
 
@@ -11,16 +11,16 @@
   opentui-version = (builtins.fromJSON (builtins.readFile "${inputs.opentui-src}/packages/core/package.json")).version;
   opentui-spinner-version = (builtins.fromJSON (builtins.readFile "${inputs.opentui-spinner-src}/package.json")).version;
 
-  opentui-b0o = stdenv.mkDerivation {
+  opentui = stdenv.mkDerivation {
     pname = "opentui";
-    version = "${opentui-version}-b0o";
+    version = opentui-version;
     src = inputs.opentui-src;
 
     nativeBuildInputs = [bun cacert nodejs zig_0_14 llvmPackages.bintools];
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-XzjPjvLnGUDU2Q+eyVYF5vIxBHiXxRDAt6bCRc5w1x0=";
+    outputHash = "sha256-D2T7wR8ZTghXkDe22cT1vLf/rkA8gD5sIN2yXVlMiwk=";
 
     dontConfigure = true;
 
@@ -66,9 +66,9 @@
     };
   };
 
-  opentui-spinner-b0o = stdenv.mkDerivation {
+  opentui-spinner = stdenv.mkDerivation {
     pname = "opentui-spinner";
-    version = "${opentui-spinner-version}-b0o";
+    version = opentui-spinner-version;
     src = inputs.opentui-spinner-src;
 
     nativeBuildInputs = [bun cacert];
@@ -88,14 +88,14 @@
       # Replace @opentui peer dependencies with our fork
       rm -rf node_modules/@opentui
       mkdir -p node_modules/@opentui
-      for pkg in ${opentui-b0o}/lib/node_modules/@opentui/*; do
+      for pkg in ${opentui}/lib/node_modules/@opentui/*; do
         cp -r "$pkg" "node_modules/@opentui/$(basename "$pkg")"
       done
       chmod -R u+w node_modules/@opentui
 
       # Also need solid-js from opentui
       rm -rf node_modules/solid-js
-      cp -r ${opentui-b0o}/lib/node_modules/solid-js node_modules/solid-js
+      cp -r ${opentui}/lib/node_modules/solid-js node_modules/solid-js
       chmod -R u+w node_modules/solid-js
 
       bun node_modules/tsdown/dist/run.mjs
@@ -122,7 +122,7 @@
     };
   };
 
-  opencode-b0o = inputs.opencode.packages.${final.system}.default.overrideAttrs (old: {
+  opencode = inputs.opencode.packages.${final.system}.default.overrideAttrs (old: {
     nativeBuildInputs = old.nativeBuildInputs or [] ++ [makeBinaryWrapper];
 
     buildPhase = ''
@@ -139,19 +139,19 @@
         # Replace npm @opentui with our fork BEFORE bundling
         rm -rf ./node_modules/@opentui
         mkdir -p ./node_modules/@opentui
-        for pkg in ${opentui-b0o}/lib/node_modules/@opentui/*; do
+        for pkg in ${opentui}/lib/node_modules/@opentui/*; do
           cp -r "$pkg" "./node_modules/@opentui/$(basename "$pkg")"
         done
         chmod -R u+w ./node_modules/@opentui
 
         # Replace opentui-spinner with our build (against our opentui fork)
         rm -rf ./node_modules/opentui-spinner
-        cp -r ${opentui-spinner-b0o}/lib/node_modules/opentui-spinner ./node_modules/opentui-spinner
+        cp -r ${opentui-spinner}/lib/node_modules/opentui-spinner ./node_modules/opentui-spinner
         chmod -R u+w ./node_modules/opentui-spinner
 
         # opentui-spinner depends on cli-spinners
         rm -rf ./node_modules/cli-spinners
-        cp -r ${opentui-spinner-b0o}/lib/node_modules/cli-spinners ./node_modules/cli-spinners
+        cp -r ${opentui-spinner}/lib/node_modules/cli-spinners ./node_modules/cli-spinners
         chmod -R u+w ./node_modules/cli-spinners
 
         # Also replace in top-level .bun cache (used by bun's module resolution)
@@ -159,7 +159,7 @@
         for spinner_cache in ../../node_modules/.bun/opentui-spinner@*/node_modules/opentui-spinner; do
           if [ -d "$spinner_cache" ]; then
             rm -rf "$spinner_cache"
-            cp -r ${opentui-spinner-b0o}/lib/node_modules/opentui-spinner "$spinner_cache"
+            cp -r ${opentui-spinner}/lib/node_modules/opentui-spinner "$spinner_cache"
             chmod -R u+w "$spinner_cache"
           fi
         done
@@ -212,11 +212,11 @@
       # Symlink opentui for runtime imports
       rm -rf $out/lib/opencode/node_modules/@opentui
       mkdir -p $out/lib/opencode/node_modules/@opentui
-      for pkg in ${opentui-b0o}/lib/node_modules/@opentui/*; do
+      for pkg in ${opentui}/lib/node_modules/@opentui/*; do
         ln -s "$pkg" "$out/lib/opencode/node_modules/@opentui/$(basename "$pkg")"
       done
     '';
   });
 in {
-  inherit opentui-b0o opentui-spinner-b0o opencode-b0o;
+  inherit opentui opentui-spinner opencode;
 }
