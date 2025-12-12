@@ -6,9 +6,14 @@
 # - opencode-b0o: OpenCode from b0o/opencode fork using the above custom packages as dependencies
 {inputs, ...}: final: _prev: let
   inherit (final) lib stdenv bun nodejs zig_0_14 llvmPackages cacert ripgrep makeBinaryWrapper;
+
+  # Derive versions from source package.json files
+  opentui-version = (builtins.fromJSON (builtins.readFile "${inputs.opentui-src}/packages/core/package.json")).version;
+  opentui-spinner-version = (builtins.fromJSON (builtins.readFile "${inputs.opentui-spinner-src}/package.json")).version;
+
   opentui-b0o = stdenv.mkDerivation {
     pname = "opentui";
-    version = "0.1.59-b0o";
+    version = "${opentui-version}-b0o";
     src = inputs.opentui-src;
 
     nativeBuildInputs = [bun cacert nodejs zig_0_14 llvmPackages.bintools];
@@ -63,7 +68,7 @@
 
   opentui-spinner-b0o = stdenv.mkDerivation {
     pname = "opentui-spinner";
-    version = "0.0.6-b0o";
+    version = "${opentui-spinner-version}-b0o";
     src = inputs.opentui-spinner-src;
 
     nativeBuildInputs = [bun cacert];
