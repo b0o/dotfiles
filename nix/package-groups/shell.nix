@@ -48,5 +48,5 @@ with pkgs; [
   lazygit # terminal UI for git repositories
 
   # AI
-  pkgs.opencode-b0o
+  opencode # Terminal-based AI coding agent
 ]
