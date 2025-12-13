@@ -59,5 +59,9 @@
       ],
       "extensions": [".py", ".pyi"],
     },
+    "nil_ls": {
+      "command": ["nil"],
+      "extensions": [".nix"],
+    },
   },
 }
