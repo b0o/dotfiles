@@ -6,15 +6,16 @@ return {
     build = ':TSUpdate',
     lazy = false,
     config = function()
-      require('nvim-treesitter').install {
+      local parsers = {
         'bash',
         'c',
         'capnp',
         'cmake',
         'cpp',
         'css',
+        { 'cython', install = false, filetypes = { 'pyx', 'pxd' } },
         'dockerfile',
-        -- 'dap_repl',
+        'dap_repl',
         'diff',
         'gitcommit',
         'git_rebase',
@@ -32,12 +33,12 @@ return {
         'lua',
         'make',
         'markdown',
-        'markdown_inline',
+        { 'markdown_inline', filetypes = { 'lsp_markdown' } },
         'nix',
         'nu',
         'python',
         'query',
-        'regex',
+        { 'regex', filetypes = {} },
         'rust',
         'svelte',
         'swift',
@@ -50,12 +51,27 @@ return {
         'zig',
       }
 
+      require('nvim-treesitter').install(
+        vim
+          .iter(parsers)
+          :filter(function(p) return type(p) == 'string' or p.install == nil or p.install == true end)
+          :map(function(p) return type(p) == 'string' and p or p[1] end)
+          :totable()
+      )
+
+      vim.api.nvim_create_autocmd('FileType', {
+        pattern = vim
+          .iter(parsers)
+          :map(function(p) return type(p) == 'string' and p or p.filetypes or { p[1] } end)
+          :flatten()
+          :totable(),
+        callback = function() vim.treesitter.start() end,
+      })
+
       vim.treesitter.language.register('markdown', { 'mdx' })
       local cython_parser = vim.fn.stdpath 'cache' .. '/../tree-sitter/lib/cython.so'
       if vim.fn.filereadable(cython_parser) == 1 then
-        vim.treesitter.language.add('cython', {
-          path = cython_parser,
-        })
+        vim.treesitter.language.add('cython', { path = cython_parser })
         vim.treesitter.language.register('cython', { 'pyx', 'pxd' })
       end
     end,
