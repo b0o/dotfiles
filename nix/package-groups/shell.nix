@@ -49,4 +49,7 @@ with pkgs; [
 
   # AI
   opencode # Terminal-based AI coding agent
+
+  # Services
+  google-cloud-sdk # Google Cloud CLI
 ]
