@@ -14,10 +14,11 @@ def --env default-env [defaults: record] {
 }
 
 # Add paths to PATH
-def --env add-path [paths: oneof<string, list<string>>] {
-  $env.PATH = $env.PATH
-  | append (if ($paths | describe) == "string" { [$paths] } else { $paths })
-  | uniq
+def --env add-path [paths: list<string>] {
+    $env.PATH = ($env.PATH
+        | where ($it not-in $paths)
+        | append $paths
+    )
 }
 
 default-env ({
