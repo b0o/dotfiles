@@ -278,6 +278,10 @@ binds {
   Mod+Shift+9 { move-window-to-workspace 9; }
   Mod+Shift+0 { move-window-to-workspace 10; }
 
+  Mod+Left { focus-monitor "DP-3"; }
+  Mod+Down { focus-monitor "DP-2"; }
+  Mod+Right { focus-monitor "DP-1"; }
+
   Mod+Shift+A { spawn-sh "$XDG_CONFIG_HOME/niri/bin/focus-previous monitor"; }
   Mod+A { spawn-sh "$XDG_CONFIG_HOME/niri/bin/focus-previous workspace-window"; }
   Mod+Ctrl+A { focus-workspace-previous; }
@@ -373,7 +377,6 @@ binds {
   Mod+Shift+N                 hotkey-overlay-title="Mode: Notifications"        { spawn-sh "wlr-which-key -k n"; }
   Mod+O                       hotkey-overlay-title="Mode: Open"                 { spawn-sh "wlr-which-key -k o"; }
   Mod+S                       hotkey-overlay-title="Mode: System"               { spawn-sh "wlr-which-key -k s"; }
-  Mod+Ctrl+S                  hotkey-overlay-title="Mode: Toggle Scratchpad"    { spawn-sh "niri-tools scratchpad toggle"; }
   Mod+Shift+S                 hotkey-overlay-title="Mode: Scratchpads"          { spawn-sh "wlr-which-key -k 'z s'"; }
   Mod+T                       hotkey-overlay-title="Mode: Transcribe"           { spawn-sh "wlr-which-key -k t"; }
   Mod+W                       hotkey-overlay-title="Mode: Windows"              { spawn-sh "wlr-which-key -k 'z w'"; }
@@ -385,6 +388,8 @@ binds {
   Print                       hotkey-overlay-title="Mode: Screenshot"           { spawn-sh "wlr-which-key -k 'Print Print'"; }
   Mod+Print                   hotkey-overlay-title="Mode: Screenshot Select"    { spawn-sh "wlr-which-key -k 'Print S'"; }
 
+  Mod+Ctrl+S                  hotkey-overlay-title="Scratchpad: Menu"           { spawn-sh "niri-tools scratchpad menu"; }
+  Mod+Alt+Slash               hotkey-overlay-title="Scratchpad: Toggle"         { spawn-sh "niri-tools scratchpad toggle"; }
   Mod+Slash                   hotkey-overlay-title="Scratchpad: Term"           { spawn-sh "niri-tools scratchpad toggle term"; }
   Mod+M                       hotkey-overlay-title="Scratchpad: Music"          { spawn-sh "niri-tools scratchpad toggle music"; }
   Mod+N                       hotkey-overlay-title="Scratchpad: Notes"          { spawn-sh "niri-tools scratchpad toggle term-n"; }
@@ -396,7 +401,6 @@ binds {
   Mod+Shift+C                 hotkey-overlay-title="Scratchpad: Claude"         { spawn-sh "niri-tools scratchpad toggle web-claude"; }
   Mod+Alt+Grave               hotkey-overlay-title="Scratchpad: Parsec"         { spawn-sh "niri-tools scratchpad toggle parsec"; }
 
-  Mod+Alt+Slash               hotkey-overlay-title="Scratchpad: Toggle"         { spawn-sh "niri-tools scratchpad toggle"; }
 }
 
 include "private.kdl"
