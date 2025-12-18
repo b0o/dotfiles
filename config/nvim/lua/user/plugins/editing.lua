@@ -1,5 +1,52 @@
+very_lazy(function()
+  local map = require('user.util.map').map
+  local xk = require('user.keys').xk
+
+  local comment = lazy_require 'Comment.api'
+  local todo_comments = lazy_require 'todo-comments'
+
+  map('n', '<M-/>', comment.toggle.linewise, 'Comment: Toggle')
+  map('x', '<M-/>', function()
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<ESC>', true, false, true), 'nx', false)
+    comment.toggle.linewise(vim.fn.visualmode())
+  end, 'Comment: Toggle')
+
+  local function dial(dir, mode)
+    return function()
+      require('dial.map').manipulate(dir, mode)
+      if mode == 'visual' or mode == 'gvisual' then
+        vim.cmd 'normal! gv'
+      end
+    end
+  end
+
+  map('n', '<C-a>', dial('increment', 'normal'), 'Dial: Increment')
+  map('n', '<C-x>', dial('decrement', 'normal'), 'Dial: Decrement')
+  map('n', 'g<C-a>', dial('increment', 'gnormal'), 'Dial: Increment')
+  map('n', 'g<C-x>', dial('decrement', 'gnormal'), 'Dial: Decrement')
+  map('v', '<C-a>', dial('increment', 'visual'), 'Dial: Increment')
+  map('v', '<C-x>', dial('decrement', 'visual'), 'Dial: Decrement')
+  map('v', 'g<C-a>', dial('increment', 'gvisual'), 'Dial: Increment')
+  map('v', 'g<C-x>', dial('decrement', 'gvisual'), 'Dial: Decrement')
+
+  map('n', '[t', todo_comments.jump_prev, 'Todo Comments: Previous')
+  map('n', ']t', todo_comments.jump_next, 'Todo Comments: Next')
+
+  map('nxo', '<M-s>', function() require('flash').jump() end, { desc = 'Flash' })
+
+  map('nxo', '<M-S-s>', function() require('flash').treesitter() end, { desc = 'Flash Treesitter' })
+
+  map('nxo', xk '<C-M-S-s>', function() require('flash').treesitter_search() end, { desc = 'Flash Treesitter Search' })
+
+  map('ox', 'r', function() require('flash').remote() end, { desc = 'Remote Flash' })
+
+  map('ox', 'R', function() require('flash').treesitter_search() end, { desc = 'Treesitter Search' })
+
+  map('cx', '<C-s>', function() require('flash').toggle() end, { desc = 'Toggle Flash Search' })
+end)
+
 ---@type LazySpec[]
-local spec = {
+return {
   {
     'smjonas/live-command.nvim',
     main = 'live-command',
@@ -278,52 +325,3 @@ local spec = {
     },
   },
 }
-
-very_lazy(function()
-  local map = require('user.util.map').map
-  local xk = require('user.keys').xk
-
-  local comment = lazy_require 'Comment.api'
-  local todo_comments = lazy_require 'todo-comments'
-
-  map('n', '<M-/>', comment.toggle.linewise, 'Comment: Toggle')
-  map('x', '<M-/>', function()
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<ESC>', true, false, true), 'nx', false)
-    comment.toggle.linewise(vim.fn.visualmode())
-  end, 'Comment: Toggle')
-
-  local function dial(dir, mode)
-    return function()
-      require('dial.map').manipulate(dir, mode)
-      if mode == 'visual' or mode == 'gvisual' then
-        vim.cmd 'normal! gv'
-      end
-    end
-  end
-
-  map('n', '<C-a>', dial('increment', 'normal'), 'Dial: Increment')
-  map('n', '<C-x>', dial('decrement', 'normal'), 'Dial: Decrement')
-  map('n', 'g<C-a>', dial('increment', 'gnormal'), 'Dial: Increment')
-  map('n', 'g<C-x>', dial('decrement', 'gnormal'), 'Dial: Decrement')
-  map('v', '<C-a>', dial('increment', 'visual'), 'Dial: Increment')
-  map('v', '<C-x>', dial('decrement', 'visual'), 'Dial: Decrement')
-  map('v', 'g<C-a>', dial('increment', 'gvisual'), 'Dial: Increment')
-  map('v', 'g<C-x>', dial('decrement', 'gvisual'), 'Dial: Decrement')
-
-  map('n', '[t', todo_comments.jump_prev, 'Todo Comments: Previous')
-  map('n', ']t', todo_comments.jump_next, 'Todo Comments: Next')
-
-  map('nxo', '<M-s>', function() require('flash').jump() end, { desc = 'Flash' })
-
-  map('nxo', '<M-S-s>', function() require('flash').treesitter() end, { desc = 'Flash Treesitter' })
-
-  map('nxo', xk '<C-M-S-s>', function() require('flash').treesitter_search() end, { desc = 'Flash Treesitter Search' })
-
-  map('ox', 'r', function() require('flash').remote() end, { desc = 'Remote Flash' })
-
-  map('ox', 'R', function() require('flash').treesitter_search() end, { desc = 'Treesitter Search' })
-
-  map('cx', '<C-s>', function() require('flash').toggle() end, { desc = 'Toggle Flash Search' })
-end)
-
-return spec
