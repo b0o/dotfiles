@@ -341,6 +341,8 @@ end
 map('i', '<M-,>', match_indent(-1), 'Match indent of prev line')
 map('i', '<M-.>', match_indent(1), 'Match indent of next line')
 
+map('i', xk '<M-Cr>', '<Cr><C-o>O', 'Insert indented new line at cursor')
+
 -- Clear UI state:
 -- - Clear search highlight
 -- - Clear command-line
@@ -362,7 +364,6 @@ map('n', [[<Esc>]], function()
     noft = close_noft,
     fts = {
       'notify',
-      'markdown',
       'aerial',
       'dap-float',
       'dapui_scopes',
@@ -373,6 +374,7 @@ map('n', [[<Esc>]], function()
     },
     exclude = {
       'leetcode.nvim',
+      'markdown',
     },
   }
   vim.cmd "echo ''"
@@ -585,6 +587,12 @@ local function tabnm(n)
   end
 end
 
+local last_tab = function()
+  local tabs = vim.api.nvim_list_tabpages()
+  local tabpage = tabs[#tabs]
+  vim.api.nvim_set_current_tabpage(tabpage)
+end
+
 map('n', "<M-'>", '<Cmd>tabn<Cr>', 'Tabs: Goto next')
 map('n', '<M-;>', '<Cmd>tabp<Cr>', 'Tabs: Goto prev')
 map('t', "<M-'>", '<C-\\><C-n>:tabn<Cr>', 'Tabs: Goto next')
@@ -609,7 +617,7 @@ map('n', '<M-6>', tabnm(6), 'Goto tab 6')
 map('n', '<M-7>', tabnm(7), 'Goto tab 7')
 map('n', '<M-8>', tabnm(8), 'Goto tab 8')
 map('n', '<M-9>', tabnm(9), 'Goto tab 9')
-map('n', '<M-0>', tabnm(10), 'Goto tab 10')
+map('n', '<M-0>', last_tab, 'Goto last tab')
 
 map('n', '<M-">', ':+tabm<Cr>', 'Move tab right')
 map('n', '<M-:>', ':-tabm<Cr>', 'Move tab left')
