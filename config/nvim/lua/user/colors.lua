@@ -1,3 +1,5 @@
+-- TODO: remove this file
+
 local colors = {
   bg = '#201C33',
   bg_dark = '#1E1A30',
