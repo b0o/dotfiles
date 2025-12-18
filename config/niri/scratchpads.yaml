@@ -50,23 +50,53 @@ scratchpads:
       DP-2: 50%,13%
       DP-1: 10%,13%
 
-  # TODO: Allow cycleable scratchpads
-  music:
-    app_id: chrome-ilbcbhpbmggihnbldpmmbppiclfnifck-alt # tidal
-    # app_id: chrome-jkeipnhncidnkjhpeoiehafoaabagaha-alt # apple music
-    # app_id: chrome-eikjhbkpemdappjfcmdeeeamdpkgabmk-alt # soundcloud
-    # app_id: chrome-cinhimbnkkaeohfgghhklpknlkffjgod-alt # youtube
+  music-tidal:
+    app_id: chrome-ilbcbhpbmggihnbldpmmbppiclfnifck-alt
     command:
-      [
-        "xdg-launch",
-        "-A",
-        "app-window",
-        "google-chrome",
-        "ilbcbhpbmggihnbldpmmbppiclfnifck", # tidal
-        # "jkeipnhncidnkjhpeoiehafoaabagaha", # apple music
-        # "eikjhbkpemdappjfcmdeeeamdpkgabmk", # soundcloud
-        # "cinhimbnkkaeohfgghhklpknlkffjgod", # youtube
-      ]
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - ilbcbhpbmggihnbldpmmbppiclfnifck
+    size: 38%x55%
+    position:
+      DP-2: 50%,22%
+      DP-1: 10%,22%
+
+  music-apple:
+    app_id: chrome-jkeipnhncidnkjhpeoiehafoaabagaha-alt
+    command:
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - jkeipnhncidnkjhpeoiehafoaabagaha
+    size: 38%x55%
+    position:
+      DP-2: 50%,22%
+      DP-1: 10%,22%
+
+  music-soundcloud:
+    app_id: chrome-eikjhbkpemdappjfcmdeeeamdpkgabmk-alt
+    command:
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - eikjhbkpemdappjfcmdeeeamdpkgabmk
+    size: 38%x55%
+    position:
+      DP-2: 50%,22%
+      DP-1: 10%,22%
+
+  music-youtube:
+    app_id: chrome-cinhimbnkkaeohfgghhklpknlkffjgod-alt
+    command:
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - cinhimbnkkaeohfgghhklpknlkffjgod
     size: 38%x55%
     position:
       DP-2: 50%,22%
