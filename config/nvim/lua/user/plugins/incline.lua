@@ -55,12 +55,12 @@ return {
       if vim.g.colors_name == 'lavi' then
         local lavi = require 'lavi.palette'
         extra_colors = {
-          theme_bg = lavi.bg_dark.hex,
-          fg = lavi.white.hex,
-          fg_dim = lavi.fg_dim.hex,
-          fg_nc = lavi.fg_nc.hex,
-          bg = lavi.bg_med.hex,
-          bg_nc = lavi.bg_dark.hex,
+          theme_bg = lavi.bg_dark,
+          fg = lavi.white,
+          fg_dim = lavi.fg_dim,
+          fg_nc = lavi.fg_nc,
+          bg = lavi.bg_med,
+          bg_nc = lavi.bg_dark,
         }
       elseif vim.g.colors_name == 'tokyonight' then
         local tokyonight = require 'tokyonight.colors'
@@ -423,9 +423,9 @@ return {
           return ''
         end
         return {
-          { lsp_clients_running(props.buf),    guifg = colors.green },
-          { lsp_clients_starting(props.buf),   guifg = colors.skyblue },
-          { lsp_clients_exited_ok(props.buf),  guifg = colors.grey6 },
+          { lsp_clients_running(props.buf), guifg = colors.green },
+          { lsp_clients_starting(props.buf), guifg = colors.skyblue },
+          { lsp_clients_exited_ok(props.buf), guifg = colors.grey6 },
           { lsp_clients_exited_err(props.buf), guifg = colors.red },
         }
       end
@@ -436,7 +436,7 @@ return {
             file_info.pnpm_workspace.name,
             ' ',
             guifg = file_info.pnpm_workspace.name == state.focused_workspace and extra_colors.fg_dim
-                or extra_colors.fg_nc,
+              or extra_colors.fg_nc,
           } or '',
         }
       end
@@ -545,7 +545,7 @@ return {
           local diag_disabled = not vim.diagnostic.is_enabled { bufnr = props.buf }
 
           local has_error = not diag_disabled
-              and #vim.diagnostic.get(props.buf, {
+            and #vim.diagnostic.get(props.buf, {
                 severity = vim.diagnostic.severity.ERROR,
               })
               > 0

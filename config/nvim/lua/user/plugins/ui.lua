@@ -5,7 +5,6 @@ return {
     'b0o/lavi.nvim',
     dev = true,
     lazy = false,
-    dependencies = { 'rktjmp/lush.nvim' },
     config = function()
       if (vim.env.COLORSCHEME or 'lavi') == 'lavi' then
         vim.cmd.colorscheme 'lavi'
@@ -16,6 +15,10 @@ return {
     cond = function()
       return vim.env.COLORSCHEME == nil or vim.env.COLORSCHEME == 'lavi' or vim.env.COLORSCHEME == 'lavi-light'
     end,
+  },
+  {
+    'rktjmp/lush.nvim',
+    cmd = 'Lushify',
   },
   {
     'folke/tokyonight.nvim',
