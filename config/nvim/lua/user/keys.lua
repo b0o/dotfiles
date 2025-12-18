@@ -63,11 +63,18 @@ M.xk = setmetatable({
   [ [[<M-S-,>]] ] = utf8(0x00db),
 
   [ [[<C-Cr>]] ] = '<F12>',
+  [ [[<M-Cr>]] ] = '<F13>',
   [ [[<C-S-p>]] ] = '<S-F1>',
   [ [[<C-S-n>]] ] = '<S-F2>',
   [ [[<C-,>]] ] = '<F34>',
 }, {
-  __index = function(self, k) return rawget(self, k) end,
+  __index = function(self, k)
+    local v = rawget(self, k)
+    if v == nil then
+      error('Key ' .. k .. ' not found', 2)
+    end
+    return v
+  end,
   __call = function(self, k) return self[k] end,
 })
 
