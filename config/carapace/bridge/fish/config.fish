@@ -1,3 +1,4 @@
+gh completion -s fish | source
 mise completion fish | source
 pw completion fish | source
 
