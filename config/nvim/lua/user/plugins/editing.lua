@@ -294,7 +294,10 @@ return {
     end,
   },
   {
-    'folke/todo-comments.nvim',
+    -- TODO: revert when https://github.com/folke/todo-comments.nvim/pull/381 is merged
+    'belltoy/todo-comments.nvim',
+    -- 'folke/todo-comments.nvim',
+    commit = 'dbe224bc0bd4378425cbd65602386f5846bd7354',
     event = 'VeryLazy',
     opts = {
       keywords = {
