@@ -568,17 +568,34 @@ def complete-gh-pr [spans: list<string>] {
 # Create worktree for a GitHub PR
 @complete complete-gh-pr
 export def --env gwpr [
+  --remote (-r): string = "origin"  # Use specified remote instead default
   pr?: string  # PR number or search term
 ] {
   let git_info = gw-parse
   let git_root = $git_info.git_root
+
+  let remote_info = if ($remote | is-empty) { null } else {
+    let git_remote = (git remote get-url $remote | complete)
+    if $git_remote.exit_code != 0 {
+      error make -u {msg: $"failed to get remote URL: ($git_remote.stderr)"}
+    }
+    # get ${owner}/${repo}, support ssh and https (try to match github.com/${owner}/${repo})
+    let remote_info = $git_remote.stdout | parse -r '(?P<owner>[^/:]+)/(?P<repo>[^/]+?)(?:\.git)?$' | first
+    if ($remote_info | is-empty) {
+      error make -u {msg: $"failed to parse remote URL: ($git_remote.stdout)"}
+    }
+    $remote_info
+  }
 
   # Get PR number from argument or fzf selection
   let pr_num = if $pr != null {
     $pr
   } else {
     # List PRs and let user select with fzf
-    let gh_result = (gh pr list | complete)
+    let gh_args = if $remote_info != null {
+      ["-R" $"($remote_info.owner)/$($remote_info.repo)"]
+    } else { [] }
+    let gh_result = (gh pr list ...$gh_args | complete)
     if $gh_result.exit_code != 0 {
       error make -u {msg: "failed to list PRs"}
     }
@@ -598,7 +615,7 @@ export def --env gwpr [
   }
 
   # Fetch the PR
-  let fetch_result = (git fetch origin $"refs/pull/($pr_num)/head:pull/($pr_num)" | complete)
+  let fetch_result = (git fetch $remote $"refs/pull/($pr_num)/head:pull/($pr_num)" | complete)
   if $fetch_result.exit_code != 0 {
     error make -u {msg: $"failed to fetch PR ($pr_num): ($fetch_result.stderr)"}
   }
