@@ -29,12 +29,7 @@ require('lazy').setup({
     path = vim.env.GIT_PROJECTS_DIR .. '/nvim',
     fallback = true,
   } or nil,
-  change_detection = {
-    enabled = false,
-  },
-  rocks = {
-    hererocks = true,
-  },
+  change_detection = { enabled = false },
 })
 
 very_lazy(function()
