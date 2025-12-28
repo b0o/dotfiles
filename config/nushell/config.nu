@@ -17,7 +17,7 @@ def --env default-env [defaults: record] {
 def --env add-path [paths: list<string>] {
     $env.PATH = ($env.PATH
         | where ($it not-in $paths)
-        | append $paths
+        | prepend $paths
     )
 }
 
