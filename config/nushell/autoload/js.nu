@@ -93,13 +93,6 @@ alias pprmff = pnpm remove --filter (pnpm-pick-workspace -n -R)
 alias pwr = cd (pnpm-workspace-root)
 alias ppw = cd (pnpm-pick-workspace)
 
-# bun
-# TODO: remove once https://github.com/oven-sh/bun/issues/25391 is fixed
-@complete external
-def --wrapped bun [...args] {
-  ^bun --backend=symlink ...$args
-}
-
 alias b = bun
 alias br = bun run
 alias bi = bun install
