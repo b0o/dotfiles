@@ -413,7 +413,7 @@ export def gw-current [] {
   if $path_type != "symlink" {
     error make -u {msg: "no current worktree"}
   }
-  return $current_path
+  $current_path
 }
 
 # Change "current" worktree symlink
@@ -485,6 +485,118 @@ def get-icon [
     "OPEN" => (if $isDraft { "" } else { "" }),
     "CLOSED" => "",
     "MERGED" => "󰘭",
+  }
+}
+
+def get-current-branch [] {
+  let branch_result = (git rev-parse --abbrev-ref HEAD | complete)
+  if $branch_result.exit_code != 0 {
+    error make -u {msg: "failed to get current branch"}
+  }
+  $branch_result.stdout | str trim
+}
+
+def get-remotes [] {
+  git remote -v
+    | lines
+    | each { parse --regex '(?<name>\S+)\s+(?<url>\S+)\s+\((?<kind>fetch|push)\)' }
+    | flatten
+}
+
+def get-remote-info [remote: string] {
+  get-remotes | where name == $remote | first | default null
+}
+
+def get-default-remote [] {
+  let remotes = get-remotes | where kind == 'fetch'
+  if ($remotes | length) == 1 {
+    $remotes | first
+  } else {
+    let default_repo = gh repo set-default --view | complete
+    if ($default_repo.exit_code != 0) or ($default_repo.stdout | str trim | is-empty) {
+      let fzf_result = ($remotes | get name | str join "\n"
+        | fzf --height=10% --prompt="Select remote" --no-preview | complete
+      )
+      if $fzf_result.exit_code != 0 {
+        return null
+      }
+      let selected = $fzf_result.stdout | str trim
+      $remotes | where name == $selected | first
+    } else {
+      let default_repo = $default_repo.stdout | str trim
+      let remotes = get-remotes | where { $default_repo in $in.url }
+      if ($remotes | is-not-empty) {
+        $remotes.0
+      } else {
+        null
+      }
+    }
+  }
+}
+
+def gwpr-info [
+  --remote (-r): string  # Use specified remote instead default
+  pr?: string  # PR number or search term
+  --no-detect-pr # Don't detect PR number from branch name
+] {
+  let git_info = gw-parse
+  let git_root = $git_info.git_root
+
+  let remote = if $remote != null { get-remote-info $remote } else { get-default-remote }
+
+  let remote_info = if ($remote | is-empty) { null } else {
+    let remote_info = $remote.url | parse -r '(?P<owner>[^/:]+)/(?P<repo>[^/]+?)(?:\.git)?$' | first
+    if ($remote_info | is-empty) {
+      error make -u {msg: $"failed to parse remote URL: ($remote.url)"}
+    }
+    $remote_info
+  }
+
+  # Get PR number from argument or fzf selection
+  let pr_num = if $pr != null {
+    $pr
+  } else if not $no_detect_pr {
+    # Check if we're on a `pull/<num>` branch
+    let branch = get-current-branch
+    let pull_match = ($branch | parse -r '^pull/(\d+)$')
+    if ($pull_match | is-not-empty) {
+      $pull_match.capture0.0 | into int
+    } else {
+      null
+    }
+  }
+  let pr_num = if $pr_num != null {
+    $pr_num
+  } else {
+    # List PRs and let user select with fzf
+    let gh_args = if $remote_info != null {
+      ["-R" $"($remote_info.owner)/($remote_info.repo)"]
+    } else { [] }
+    let gh_result = gh pr list ...$gh_args | complete
+    if $gh_result.exit_code != 0 {
+      error make -u {msg: "failed to list PRs"}
+    }
+
+    let fzf_result = (do {
+      $gh_result.stdout | fzf --height=10%
+    } | complete)
+
+    if $fzf_result.exit_code != 0 {
+      return
+    }
+
+    # Extract PR number (remove leading # and keep only the number)
+    let selected = ($fzf_result.stdout | str trim)
+    let pr_str = ($selected | parse -r '^#?(\d+)' | get capture0.0)
+    $pr_str | into int
+  }
+
+  return {
+    git_info: $git_info,
+    pr: $pr_num,
+    remote: $remote,
+    ref: $"refs/pull/($pr_num)/head"
+    branch: $"pull/($pr_num)"
   }
 }
 
@@ -568,62 +680,24 @@ def complete-gh-pr [spans: list<string>] {
 # Create worktree for a GitHub PR
 @complete complete-gh-pr
 export def --env gwpr [
-  --remote (-r): string = "origin"  # Use specified remote instead default
-  pr?: string  # PR number or search term
+  --remote (-r): string # Use specified remote instead default
+  pr?: string # PR number or search term
 ] {
-  let git_info = gw-parse
-  let git_root = $git_info.git_root
-
-  let remote_info = if ($remote | is-empty) { null } else {
-    let git_remote = (git remote get-url $remote | complete)
-    if $git_remote.exit_code != 0 {
-      error make -u {msg: $"failed to get remote URL: ($git_remote.stderr)"}
-    }
-    # get ${owner}/${repo}, support ssh and https (try to match github.com/${owner}/${repo})
-    let remote_info = $git_remote.stdout | parse -r '(?P<owner>[^/:]+)/(?P<repo>[^/]+?)(?:\.git)?$' | first
-    if ($remote_info | is-empty) {
-      error make -u {msg: $"failed to parse remote URL: ($git_remote.stdout)"}
-    }
-    $remote_info
-  }
-
-  # Get PR number from argument or fzf selection
-  let pr_num = if $pr != null {
-    $pr
-  } else {
-    # List PRs and let user select with fzf
-    let gh_args = if $remote_info != null {
-      ["-R" $"($remote_info.owner)/$($remote_info.repo)"]
-    } else { [] }
-    let gh_result = (gh pr list ...$gh_args | complete)
-    if $gh_result.exit_code != 0 {
-      error make -u {msg: "failed to list PRs"}
-    }
-
-    let fzf_result = (do {
-      $gh_result.stdout | fzf --height=10%
-    } | complete)
-
-    if $fzf_result.exit_code != 0 {
-      return
-    }
-
-    # Extract PR number (remove leading # and keep only the number)
-    let selected = ($fzf_result.stdout | str trim)
-    let pr_str = ($selected | parse -r '^#?(\d+)' | get capture0.0)
-    $pr_str | into int
+  let pr_info = gwpr-info --no-detect-pr --remote=$remote $pr
+  if ($pr_info | is-empty) {
+    return
   }
 
   # Fetch the PR
-  let fetch_result = (git fetch $remote $"refs/pull/($pr_num)/head:pull/($pr_num)" | complete)
+  let fetch_result = git fetch $pr_info.remote.name $"($pr_info.ref):($pr_info.branch)" | complete
   if $fetch_result.exit_code != 0 {
-    error make -u {msg: $"failed to fetch PR ($pr_num): ($fetch_result.stderr)"}
+    error make -u {msg: $"failed to fetch PR ($pr_info.pr): ($fetch_result.stderr)"}
   }
 
-  let worktree_path = [$git_root "worktree" "pull" ($pr_num | into string)] | path join
+  let worktree_path = [$pr_info.git_info.git_root "worktree" $pr_info.branch] | path join
 
   # Add worktree
-  let add_result = (git worktree add $worktree_path $"pull/($pr_num)" | complete)
+  let add_result = (git worktree add $worktree_path $pr_info.branch | complete)
   if $add_result.exit_code != 0 {
     error make -u {msg: $"failed to add worktree: ($add_result.stderr)"}
   }
@@ -634,52 +708,15 @@ export def --env gwpr [
 
 # Pull latest changes from a GitHub PR to the current branch
 @complete complete-gh-pr
-export def gppr [
-  pr?: string  # PR number or search term
+export def gwprp [
+  --remote (-r): string # Use specified remote instead default
+  pr?: string # PR number or search term
 ] {
-  # Get PR number from argument, current branch, or fzf selection
-  let pr_num = if $pr != null {
-    $pr
-  } else {
-    # Check if current branch is a pull branch
-    let branch_result = (git rev-parse --abbrev-ref HEAD | complete)
-    let from_branch = if $branch_result.exit_code == 0 {
-      let branch = ($branch_result.stdout | str trim)
-      let pull_match = ($branch | parse -r '^pull/(\d+)$')
-      if ($pull_match | is-not-empty) {
-        $pull_match.capture0.0 | into int
-      } else {
-        null
-      }
-    } else {
-      null
-    }
-
-    if $from_branch != null {
-      $from_branch
-    } else {
-      # Not on a pull branch, use fzf
-      let gh_result = (gh pr list | complete)
-      if $gh_result.exit_code != 0 {
-        error make -u {msg: "failed to list PRs"}
-      }
-
-      let fzf_result = (do {
-        $gh_result.stdout | fzf --height=10%
-      } | complete)
-
-      if $fzf_result.exit_code != 0 {
-        return
-      }
-
-      # Extract PR number (remove leading # and keep only the number)
-      let selected = ($fzf_result.stdout | str trim)
-      let pr_str = ($selected | parse -r '^#?(\d+)' | get capture0.0)
-      $pr_str | into int
-    }
+  let pr_info = gwpr-info --remote=$remote $pr
+  if ($pr_info | is-empty) or ($pr_info.remote | is-empty) or ($pr_info.ref | is-empty) {
+    return
   }
-
-  git pull origin $"refs/pull/($pr_num)/head:pull/($pr_num)"
+  git pull $pr_info.remote.name $pr_info.ref
 }
 
 # Remove a git worktree
@@ -738,4 +775,36 @@ export def gwrm [
   } else {
     error make -u {msg: $"failed to remove worktree: ($remove_result.stderr)"}
   }
+}
+
+# Git push with smart default remote and branch
+# If no remote is specified, use "origin" or the first remote with "push" access
+# If no branch is specified, use the current branch
+export def --wrapped gpp [
+  ...args: string
+] {
+  mut opts = []
+  mut positional = []
+  for item in $args {
+    if ($item | to text | str starts-with "-") {
+      $opts = $opts | append $item
+    } else {
+      $positional = $positional | append $item
+    }
+  }
+  if ($positional | length) < 2 {
+    let remotes = get-remotes | where kind == 'push'
+    let default_remote = if ($remotes | any { $in.name == "origin" }) {
+      "origin"
+    } else {
+      $remotes | first | get name
+    }
+    let default_branch = git rev-parse --abbrev-ref HEAD
+    if ($positional | length) == 0 {
+      $positional = [$default_remote $default_branch]
+    } else if ($positional | length) == 1 {
+      $positional = ($positional | append $default_branch)
+    }
+  }
+  git push ...$opts ...$positional
 }
