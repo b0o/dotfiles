@@ -356,8 +356,8 @@ binds {
 
   XF86Sleep                   hotkey-overlay-title="Lock"                       { spawn-sh "niri msg action power-off-monitors && system lock"; }
 
-  XF86AudioLowerVolume        hotkey-overlay-title="Volume: Down"               { spawn-sh "audioctl -n vol down"; }
-  XF86AudioRaiseVolume        hotkey-overlay-title="Volume: Up"                 { spawn-sh "audioctl -n vol up"; }
+  XF86AudioLowerVolume        hotkey-overlay-title="Volume: Down"               { spawn-sh "audioctl -n vol -r down"; }
+  XF86AudioRaiseVolume        hotkey-overlay-title="Volume: Up"                 { spawn-sh "audioctl -n vol -r up"; }
   XF86AudioMute               hotkey-overlay-title="Volume: Mute"               { spawn-sh "audioctl -n vol mute"; }
 
   XF86AudioPlay               hotkey-overlay-title="Play: Toggle"               { spawn-sh "audioctl -n play toggle"; }
