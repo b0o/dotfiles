@@ -7,7 +7,7 @@ return {
     lazy = false,
     config = function()
       local parsers = {
-        'bash',
+        { 'bash', filetypes = { 'sh', 'bash' } },
         'c',
         'capnp',
         'cmake',
