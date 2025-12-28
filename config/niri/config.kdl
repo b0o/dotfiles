@@ -391,7 +391,7 @@ binds {
   Mod+Ctrl+S                  hotkey-overlay-title="Scratchpad: Menu"           { spawn-sh "niri-tools scratchpad menu"; }
   Mod+Alt+Slash               hotkey-overlay-title="Scratchpad: Toggle"         { spawn-sh "niri-tools scratchpad toggle"; }
   Mod+Slash                   hotkey-overlay-title="Scratchpad: Term"           { spawn-sh "niri-tools scratchpad toggle term"; }
-  Mod+M                       hotkey-overlay-title="Scratchpad: Music"          { spawn-sh "niri-tools scratchpad toggle music"; }
+  Mod+M                       hotkey-overlay-title="Scratchpad: Music"          { spawn-sh "niri-tools scratchpad toggle music-tidal"; }
   Mod+N                       hotkey-overlay-title="Scratchpad: Notes"          { spawn-sh "niri-tools scratchpad toggle term-n"; }
   Mod+I                       hotkey-overlay-title="Scratchpad: Issues"         { spawn-sh "niri-tools scratchpad toggle web-i"; }
   Mod+Shift+b                 hotkey-overlay-title="Scratchpad: Brain.fm"       { spawn-sh "niri-tools scratchpad toggle web-b"; }
