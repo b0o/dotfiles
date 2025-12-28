@@ -42,8 +42,11 @@ menu:
         desc: QR
         submenu:
           - key: "q"
-            desc: QR
+            desc: QR from Clipboard
             cmd: gqr
+          - key: "r"
+            desc: QRCP Receive
+            cmd: rqrcp -gnc $(xdg-user-dir DOWNLOAD)
   - key: "s"
     desc: Systemd
     submenu:
