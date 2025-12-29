@@ -432,7 +432,7 @@ export def --env gwcc [
   # Build header if current link exists
   let header = if $has_current {
     # Get symlink target
-    let link_target = ($current_link | path expand | path dirname)
+    let link_target = ($current_link | path expand)
     # Expand relative to symlink directory
     let worktree_dir = [$git_root "worktree"] | path join
     let target_full = ([$worktree_dir $link_target] | path join | path expand)
