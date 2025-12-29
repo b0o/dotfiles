@@ -10,6 +10,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Ghostty
+    ghostty = {
+      url = "github:ghostty-org/ghostty";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Neovim
     neovim-nightly-overlay = {
       url = "github:nix-community/neovim-nightly-overlay";
