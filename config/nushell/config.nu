@@ -21,22 +21,24 @@ def --env add-path [paths: list<string>] {
     )
 }
 
+let home = $nu.home-dir? | default $nu.home-path
+
 default-env ({
   EDITOR: "nvim"
-  GIT_PROJECTS_DIR: $"($nu.home-dir)/git"
-  XDG_CONFIG_HOME: $"($nu.home-dir)/.config"
-  XDG_DATA_HOME: $"($nu.home-dir)/.local/share"
-  XDG_CACHE_HOME: $"($nu.home-dir)/.cache"
-  DOTFILES_HOME: $"($env.XDG_CONFIG_HOME? | default ($nu.home-dir | path join .config))/dotfiles"
+  GIT_PROJECTS_DIR: $"($home)/git"
+  XDG_CONFIG_HOME: $"($home)/.config"
+  XDG_DATA_HOME: $"($home)/.local/share"
+  XDG_CACHE_HOME: $"($home)/.cache"
+  DOTFILES_HOME: $"($env.XDG_CONFIG_HOME? | default ($home | path join .config))/dotfiles"
   GPG_TTY: (^tty | str trim)
 })
 
 add-path ([
-  $"($nu.home-dir)/bin"
-  $"($nu.home-dir)/.nix-profile/bin"
-  $"($nu.home-dir)/.local/bin"
-  $"($nu.home-dir)/.cache/.bun/bin"
-  $"($nu.home-dir)/.cargo/bin"
+  $"($home)/bin"
+  $"($home)/.nix-profile/bin"
+  $"($home)/.local/bin"
+  $"($home)/.cache/.bun/bin"
+  $"($home)/.cargo/bin"
 ])
 
 # See ./autoload/plugins.nu

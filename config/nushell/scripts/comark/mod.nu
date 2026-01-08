@@ -3,12 +3,13 @@
 
 # Get the comark directory path
 def comark-dir [] {
+  let home = $nu.home-dir? | default $nu.home-path
   $env
   | get -o COMARK_DIR
   | default (
     $env
     | get -o XDG_CONFIG_HOME
-    | default ($nu.home-dir | path join ".config")
+    | default ($home | path join ".config")
     | path join "comark"
   )
 }
@@ -943,7 +944,7 @@ export def fzf,path [] {
     let result = match $path_style.type {
       "tilde" => {
         # Convert to tilde-prefixed path
-        let home = ($nu.home-dir | path expand)
+        let home = $nu.home-dir? | default $nu.home-path | path expand
         let abs_result = ($raw_result | path expand)
         if ($abs_result | str starts-with $home) {
           $abs_result | str replace $home "~"
