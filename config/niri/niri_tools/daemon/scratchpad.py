@@ -296,10 +296,14 @@ class ScratchpadManager:
             C-q: Close scratchpad window
         """
         items: list[tuple[str, str]] = []  # (display_text, name)
-        # Sort by: 1) has window (True first), 2) alphabetically by name
+        # Sort by: 1) has window (True first), 2) MRU (most recent first), 3) alpha
         sorted_names = sorted(
             self.state.scratchpad_configs.keys(),
-            key=lambda n: (not self._scratchpad_has_window(n), n),
+            key=lambda n: (
+                not self._scratchpad_has_window(n),
+                -self._get_scratchpad_last_used(n),
+                n,
+            ),
         )
         for name in sorted_names:
             has_window = self._scratchpad_has_window(name)
@@ -382,6 +386,11 @@ class ScratchpadManager:
         if scratchpad_state is None or scratchpad_state.window_id is None:
             return False
         return scratchpad_state.window_id in self.state.windows
+
+    def _get_scratchpad_last_used(self, name: str) -> float:
+        """Get the last_used timestamp for a scratchpad (0.0 if never used)."""
+        scratchpad_state = self.state.scratchpads.get(name)
+        return scratchpad_state.last_used if scratchpad_state else 0.0
 
     def _get_available_scratchpads(self) -> list[str]:
         """Get scratchpad names that don't have existing windows."""
