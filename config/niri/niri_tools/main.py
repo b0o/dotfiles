@@ -24,11 +24,16 @@ def create_parser() -> argparse.ArgumentParser:
     )
 
     # Daemon command
-    subparsers.add_parser(
+    daemon_parser = subparsers.add_parser(
         "daemon",
         help="Run the niri-tools daemon",
         description="Run the daemon that handles scratchpads and urgency notifications",
     )
+    daemon_sub = daemon_parser.add_subparsers(dest="daemon_command")
+    daemon_sub.add_parser("start", help="Start the daemon")
+    daemon_sub.add_parser("stop", help="Stop the daemon")
+    daemon_sub.add_parser("restart", help="Restart the daemon")
+    daemon_sub.add_parser("status", help="Show daemon status")
 
     # Scratchpad command (routes to client)
     scratchpad_parser = subparsers.add_parser(
@@ -48,6 +53,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "daemon":
+            if args.daemon_command == "start":
+                return client.start_daemon()
+            if args.daemon_command == "stop":
+                return client.stop_daemon()
+            if args.daemon_command == "restart":
+                return client.restart_daemon()
+            if args.daemon_command == "status":
+                return client.daemon_status()
             return asyncio.run(server.run_daemon())
         elif args.command == "scratchpad":
             return client.main(args)

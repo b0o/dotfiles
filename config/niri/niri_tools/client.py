@@ -101,6 +101,86 @@ def send_command(command: dict) -> int:
         sock.close()
 
 
+def restart_daemon() -> int:
+    """Send restart command to the daemon, or start it if not running."""
+    sock = _try_connect()
+    if sock is None:
+        print("Daemon not running, starting...", file=sys.stderr)
+        if _spawn_daemon():
+            return 0
+        return 1
+
+    try:
+        sock.sendall((json.dumps({"cmd": "restart"}) + "\n").encode())
+        return 0
+    except Exception as e:
+        print(f"Failed to send restart command: {e}", file=sys.stderr)
+        return 1
+    finally:
+        sock.close()
+
+
+def daemon_status() -> int:
+    """Check and print the daemon status."""
+    sock = _try_connect()
+    if sock is None:
+        print("Daemon is not running")
+        return 1
+
+    try:
+        sock.sendall((json.dumps({"cmd": "status"}) + "\n").encode())
+        # Read response
+        response_data = sock.recv(4096)
+        if response_data:
+            response = json.loads(response_data.decode())
+            print("Daemon is running")
+            print(f"  PID:    {response.get('pid')} ({response.get('cmdline')})")
+            print(
+                f"  Parent: {response.get('ppid')} ({response.get('parent_cmdline')})"
+            )
+            print(f"  Socket: {response.get('socket')}")
+        else:
+            print("Daemon is running")
+        return 0
+    except Exception as e:
+        print(f"Daemon is running (failed to get details: {e})")
+        return 0
+    finally:
+        sock.close()
+
+
+def start_daemon() -> int:
+    """Start the daemon if not already running."""
+    sock = _try_connect()
+    if sock is not None:
+        sock.close()
+        print("Daemon is already running")
+        return 0
+
+    print("Starting daemon...")
+    if _spawn_daemon():
+        return 0
+    return 1
+
+
+def stop_daemon() -> int:
+    """Stop the daemon if running."""
+    sock = _try_connect()
+    if sock is None:
+        print("Daemon is not running")
+        return 0
+
+    try:
+        sock.sendall((json.dumps({"cmd": "stop"}) + "\n").encode())
+        print("Daemon stopped")
+        return 0
+    except Exception as e:
+        print(f"Failed to send stop command: {e}", file=sys.stderr)
+        return 1
+    finally:
+        sock.close()
+
+
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Add scratchpad subcommand arguments."""
     sub = parser.add_subparsers(dest="scratchpad_command")

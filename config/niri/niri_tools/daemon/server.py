@@ -25,6 +25,7 @@ class DaemonServer:
         self._needs_reconciliation = (
             False  # True if we loaded state and need to reconcile
         )
+        self._tasks: list[asyncio.Task[None]] = []
 
     async def start(self) -> None:
         """Start the daemon."""
@@ -54,22 +55,80 @@ class DaemonServer:
         print(f"Listening on {SOCKET_PATH}")
 
         # Run main loops
-        await asyncio.gather(
-            self._event_stream_loop(),
-            self._config_watch_loop(),
-            self._serve_forever(),
-        )
+        self._tasks = [
+            asyncio.create_task(self._event_stream_loop()),
+            asyncio.create_task(self._config_watch_loop()),
+            asyncio.create_task(self._serve_forever()),
+        ]
+        await asyncio.gather(*self._tasks, return_exceptions=True)
 
     async def stop(self) -> None:
         """Stop the daemon."""
+        print("Stopping daemon...")
         self.running = False
         if self.server:
             self.server.close()
-            await self.server.wait_closed()
         await self.urgency_handler.cleanup_all()
         if SOCKET_PATH.exists():
             SOCKET_PATH.unlink()
+        # Cancel all tasks - this will cause the gather() in start() to return
+        for task in self._tasks:
+            task.cancel()
         print("Daemon stopped")
+
+    async def _restart(self) -> None:
+        """Restart the daemon by spawning a new instance and stopping."""
+        print("Restarting daemon...")
+        # Spawn new daemon via niri (so it's parented by niri, not us)
+        daemon_cmd = self._get_daemon_command()
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "niri",
+                "msg",
+                "action",
+                "spawn",
+                "--",
+                *daemon_cmd,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                print(f"Failed to spawn new daemon: {stderr.decode()}", file=sys.stderr)
+                return
+        except Exception as e:
+            print(f"Failed to spawn new daemon: {e}", file=sys.stderr)
+            return
+
+        # Stop this instance
+        await self.stop()
+
+    def _get_daemon_command(self) -> list[str]:
+        """Get the command to start the daemon."""
+        argv0 = sys.argv[0]
+        if argv0.endswith("__main__.py") or argv0.endswith("niri_tools"):
+            return [sys.executable, "-m", "niri_tools", "daemon"]
+        return [argv0, "daemon"]
+
+    def _get_status(self) -> dict[str, int | str]:
+        """Get daemon status information."""
+        pid = os.getpid()
+        ppid = os.getppid()
+
+        def get_proc_cmdline(p: int) -> str:
+            try:
+                with open(f"/proc/{p}/cmdline") as f:
+                    return f.read().replace("\x00", " ").strip()
+            except OSError:
+                return ""
+
+        return {
+            "pid": pid,
+            "cmdline": get_proc_cmdline(pid),
+            "ppid": ppid,
+            "parent_cmdline": get_proc_cmdline(ppid),
+            "socket": str(SOCKET_PATH),
+        }
 
     async def _serve_forever(self) -> None:
         """Keep the server running."""
@@ -91,7 +150,10 @@ class DaemonServer:
             except json.JSONDecodeError:
                 return
 
-            await self._dispatch_command(command)
+            response = await self._dispatch_command(command)
+            if response is not None:
+                writer.write((json.dumps(response) + "\n").encode())
+                await writer.drain()
 
         except Exception as e:
             print(f"Error handling client: {e}", file=sys.stderr)
@@ -99,7 +161,7 @@ class DaemonServer:
             writer.close()
             await writer.wait_closed()
 
-    async def _dispatch_command(self, command: dict[str, Any]) -> None:
+    async def _dispatch_command(self, command: dict[str, Any]) -> dict[str, Any] | None:
         """Dispatch a command to the appropriate handler."""
         cmd = command.get("cmd")
 
@@ -130,8 +192,19 @@ class DaemonServer:
             confirm = command.get("confirm", True)
             await self.scratchpad_manager.close(window_id, confirm=confirm)
 
+        elif cmd == "restart":
+            await self._restart()
+
+        elif cmd == "stop":
+            await self.stop()
+
+        elif cmd == "status":
+            return self._get_status()
+
         else:
             print(f"Unknown command: {cmd}", file=sys.stderr)
+
+        return None
 
     async def _event_stream_loop(self) -> None:
         """Listen to niri event stream and update state."""

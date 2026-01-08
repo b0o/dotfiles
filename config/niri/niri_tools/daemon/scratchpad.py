@@ -296,7 +296,12 @@ class ScratchpadManager:
             C-q: Close scratchpad window
         """
         items: list[tuple[str, str]] = []  # (display_text, name)
-        for name in sorted(self.state.scratchpad_configs.keys()):
+        # Sort by: 1) has window (True first), 2) alphabetically by name
+        sorted_names = sorted(
+            self.state.scratchpad_configs.keys(),
+            key=lambda n: (not self._scratchpad_has_window(n), n),
+        )
+        for name in sorted_names:
             has_window = self._scratchpad_has_window(name)
             icon = "" if has_window else ""
             color = "#B48EFA" if has_window else "#9587af"
