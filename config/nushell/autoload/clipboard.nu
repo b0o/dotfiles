@@ -65,9 +65,36 @@ def xccl [count: int = 1] {
   xcc $lines
 }
 
-# Copy a file to clipboard
-def xcf [path: path] {
-  open $path | xc
+# Copy a file to clipboard (as file attachment or text)
+export def xcf [
+  path?: path          # File path (omit to read from stdin)
+  --name (-n): string   # Filename for stdin input (default: paste.txt)
+  --text (-t)           # Copy as text content instead of file reference
+] {
+  let file_path = if $path != null {
+    $path | path expand
+  } else {
+    let name = ($name | default "paste.txt")
+    let tmp = (mktemp --suffix $"-($name)")
+    $in | save -f $tmp
+    $tmp
+  }
+
+  if $text {
+    open $file_path | xc
+  } else {
+    if 'WAYLAND_DISPLAY' in $env {
+      let uri = $"file://($file_path)"
+      ^wl-copy -L 'x-special/gnome-copied-files' $"copy\n($uri)" -L 'text/uri-list' $uri
+    } else if 'DISPLAY' in $env {
+      # X11: xclip doesn't handle this well, fall back to text
+      print -e "xcf: file reference copy not supported on X11, copying as text"
+      open $file_path | xc
+    } else {
+      print -e "xcf: file reference copy requires graphical session, copying as text via OSC 52"
+      open $file_path | xc
+    }
+  }
 }
 
 alias xco = xc -o
