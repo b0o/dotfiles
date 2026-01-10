@@ -23,14 +23,10 @@
     };
 
     # Nushell
-    nushell-nightly = {
-      url = "github:JoaquinTrinanes/nushell-nightly-flake";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    bash-env-nushell = {
-      url = "github:tesujimath/bash-env-nushell";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # nushell-nightly = {
+    #   url = "github:JoaquinTrinanes/nushell-nightly-flake";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
 
     # Niri
     niri = {
@@ -79,7 +75,7 @@
     overlays = {
       default = import ./nix/overlays {inherit inputs;};
       neovim = inputs.neovim-nightly-overlay.overlays.default;
-      nushell = inputs.nushell-nightly.overlays.default;
+      # nushell = inputs.nushell-nightly.overlays.default;
       inherit (inputs.niri.overlays) niri;
     };
 
