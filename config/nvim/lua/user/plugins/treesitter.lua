@@ -44,7 +44,7 @@ return {
         'swift',
         'toml',
         'typescript',
-        'tsx',
+        { 'tsx', filetypes = { 'typescriptreact', 'javascriptreact' } },
         'vim',
         'vimdoc',
         'yaml',
