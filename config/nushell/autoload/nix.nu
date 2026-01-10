@@ -101,3 +101,19 @@ def --wrapped fp [cmd, ...args] {
   print -e "  shell (sh)    Enter a shell with the flakey profile's environment"
   print -e "  update (up)   Update the flake.lock file"
 }
+
+def _complete-hm [spans: list<string>] {
+  ^carapace home-manager nushell home-manager ...($spans | skip 1) | from json
+}
+
+@complete _complete-hm
+def --wrapped hm [...args] {
+  let dotfiles_dir = $env | get -o DOTFILES_HOME
+  if ($dotfiles_dir | is-empty) {
+    error make -u {msg: $"Error: DOTFILES_HOME is not set"}
+    return
+  }
+  let home_flake = "arch-maddy"
+  cd $dotfiles_dir
+  ^home-manager --flake $".#($home_flake)" ...$args
+}
