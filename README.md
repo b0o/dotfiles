@@ -24,6 +24,13 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
 - [`config/`](config) - Application configurations
   - Shell
     - [`nushell/`](config/nushell) - structured data shell
+      - Lazy hook system for shell integrations
+      - Comark directory/file bookmark manager
+      - Git worktree management commands
+      - Nix/home-manager wrapper commands
+      - Cross-platform clipboard utilities
+      - Fuzzy completion with skim plugin
+      - Auto-managed plugin system
     - [`starship.toml`](config/starship.toml) - shell prompt
     - [`atuin/`](config/atuin) - shell history sync and search
     - [`carapace/`](config/carapace) - shell completions
@@ -46,6 +53,12 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
     - [`ghostty/`](config/ghostty) - terminal emulator
   - Desktop
     - [`niri/`](config/niri) - wayland compositor
+      - Custom scratchpad system with 20+ app definitions
+      - Vim-style navigation (Mod+H/J/K/L)
+      - Modal key menus via wlr-which-key
+      - Multi-monitor layout (triple 4K)
+      - Window urgency notification daemon
+      - Swayidle screen lock integration
     - [`mako/`](config/mako) - notification daemon
     - [`waybar/`](config/waybar) - status bar
     - [`wlr-which-key/`](config/wlr-which-key) - keybinding hints
