@@ -23,6 +23,9 @@ with pkgs; [
   just-lsp # lsp server for just files
   tombi # TOML Formatter / Linter / Language Server
   vscode-langservers-extracted # vscode-{css,eslint,html,json,markdown}-langserver
+  svelte-language-server # svelte language server
+  tailwindcss-language-server # tailwindcss language server
+  typescript-go # tsgo - typescript language server (golang re-implementation)
 
   ## Formatters
   dprint # multi-language formatter
