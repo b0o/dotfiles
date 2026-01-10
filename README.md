@@ -18,7 +18,7 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
   - 4,000+ lines of Nushell config
   - In development since 2015, 1,250+ commits since 2018
 
-## Components
+## Structure
 
 - [`config/`](config) - Application configurations
   - Shell
@@ -69,7 +69,7 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
 - [`flake.nix`](flake.nix) - Nix flake entry point
 - [`justfile`](justfile) - Task runner commands
 
-## Setup
+## Installation
 
 ### [Home Manager](https://github.com/nix-community/home-manager)
 
