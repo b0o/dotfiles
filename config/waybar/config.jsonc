@@ -12,8 +12,8 @@
     ],
     "modules-right": [
       "custom/linear",
-      "custom/command-center",
       "mpris",
+      "custom/claude-usage",
       "pulseaudio",
       "bluetooth",
       "idle_inhibitor",

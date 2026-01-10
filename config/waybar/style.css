@@ -28,6 +28,7 @@ tooltip {
   border: 2px solid @indigo;
   padding: 16px;
 }
+
 #workspaces button {
   padding: 0 10px;
   background: transparent;
@@ -51,8 +52,8 @@ tooltip {
 }
 
 #workspaces button:hover,
-#tray > .passive:hover,
-#tray > .active:hover {
+#tray>.passive:hover,
+#tray>.active:hover {
   background: @bright_bg;
 }
 
@@ -80,6 +81,7 @@ tooltip {
 #workspaces button#niri-workspace-9.empty {
   opacity: 0;
 }
+
 #workspaces button#niri-workspace-1.empty.active,
 #workspaces button#niri-workspace-2.empty.active,
 #workspaces button#niri-workspace-3.empty.active,
@@ -108,7 +110,7 @@ tooltip {
 
 #custom-linear,
 #custom-command-center,
-#custom-claude-time,
+#custom-claude-usage,
 #custom-mullvad,
 #idle_inhibitor,
 #systemd-failed-units,
@@ -117,15 +119,15 @@ tooltip {
 #clock,
 #bluetooth,
 #pulseaudio,
-#tray > .passive,
-#tray > .active {
+#tray>.passive,
+#tray>.active {
   transition-duration: 0.2s;
   transition-property: background-color;
 }
 
 #custom-linear,
 #custom-command-center,
-#custom-claude-time,
+#custom-claude-usage,
 #custom-mullvad,
 #idle_inhibitor,
 #systemd-failed-units,
@@ -139,7 +141,7 @@ tooltip {
 
 #custom-linear:hover,
 #custom-command-center:hover,
-#custom-claude-time:hover,
+#custom-claude-usage:hover,
 #custom-mullvad:hover,
 #idle_inhibitor:hover,
 #systemd-failed-units:hover,
@@ -222,12 +224,33 @@ label:focus {
 #custom-linear.state-duplicate {
   color: @dark_fg_dim;
 }
+
 #custom-linear.error {
   color: @red;
 }
 
-#custom-claude-time {
-  color: #fda587;
+#custom-claude-usage {
+  color: @dark_fg_dim;
+}
+
+#custom-claude-usage.inactive {
+  color: @velvet;
+}
+
+#custom-claude-usage.low {
+  color: #daacc5;
+}
+
+#custom-claude-usage.med {
+  color: #f49f92;
+}
+
+#custom-claude-usage.high {
+  color: #ff9679;
+}
+
+#custom-claude-usage.critical {
+  color: #ff6953;
 }
 
 #custom-command-center {
@@ -264,9 +287,11 @@ label:focus {
   0% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.7;
   }
+
   100% {
     opacity: 1;
   }

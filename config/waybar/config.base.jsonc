@@ -103,18 +103,18 @@
     "tooltip": true,
     "restart-interval": 1,
   },
-  "custom/claude-time": {
+  "custom/claude-usage": {
     "exec": "~/.config/waybar/bin/claude-usage.py",
     "return-type": "json",
-    "interval": 30,
     "format": "{}",
     "escape": true,
     "tooltip": true,
+    "restart-interval": 1,
     "states": {
       "warning": 80,
       "critical": 95,
     },
-    "on-click": "echo",
+    "on-click": "xdg-open https://claude.ai/settings/usage",
   },
   "bluetooth": {
     "tooltip": true,
