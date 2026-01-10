@@ -20,15 +20,6 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
 
 ## Components
 
-- [`nix/`](nix) - [NixOS](https://nixos.org/) and [Home Manager](https://github.com/nix-community/home-manager) configurations
-  - [`home/`](nix/home) - Home Manager configurations
-  - [`hosts/`](nix/hosts) - NixOS host configurations
-  - [`modules/`](nix/modules) - Reusable NixOS modules
-  - [`profiles/`](nix/profiles) - Package profiles
-  - [`overlays/`](nix/overlays) - Nixpkgs overlays
-  - [`pkgs/`](nix/pkgs) - Custom packages
-- [`flake.nix`](flake.nix) - Nix flake entry point
-- [`justfile`](justfile) - Task runner commands
 - [`config/`](config) - Application configurations
   - Shell
     - [`nushell/`](config/nushell) - structured data shell
@@ -68,6 +59,15 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
     - [`satty/`](config/satty) - screenshot annotation
     - [`vivid/`](config/vivid) - LS_COLORS generator
     - [`zathura/`](config/zathura) - document viewer
+- [`nix/`](nix) - [NixOS](https://nixos.org/) and [Home Manager](https://github.com/nix-community/home-manager) configurations
+  - [`home/`](nix/home) - Home Manager configurations
+  - [`hosts/`](nix/hosts) - NixOS host configurations
+  - [`modules/`](nix/modules) - Reusable NixOS modules
+  - [`profiles/`](nix/profiles) - Package profiles
+  - [`overlays/`](nix/overlays) - Nixpkgs overlays
+  - [`pkgs/`](nix/pkgs) - Custom packages
+- [`flake.nix`](flake.nix) - Nix flake entry point
+- [`justfile`](justfile) - Task runner commands
 
 ## Setup
 
