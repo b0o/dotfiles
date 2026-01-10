@@ -7,9 +7,10 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
 ## Overview
 
 - Compositor: [Niri](https://github.com/YaLTeR/niri)
+- Terminal: [Ghostty](https://ghostty.org/)
+- Multiplexer: [Zellij](https://zellij.dev/)
 - Shell: [Nushell](https://www.nushell.sh/)
 - Editor: [Neovim](https://neovim.io/)
-- Multiplexer: [Zellij](https://zellij.dev/)
 - Colorscheme: [Lavi](https://github.com/b0o/lavi.nvim)
 - Font: [Pragmasevka Nerd Font](https://github.com/shytikov/pragmasevka)
 - Stats:
