@@ -11,7 +11,11 @@ def module-path [name: string] {
 
 def hook-hash [hook: record] {
   let date = date now | format date '%Y-%m-%d'
-  {hook: $hook, date: $date} | to json --serialize  | hash md5
+  {
+    hook: $hook
+    date: $date
+    hash: (if ($hook.hash? | describe) == "closure" { do $hook.hash })
+  } | to json --serialize  | hash md5
 }
 
 def hook-init [name: string, hook: record] {
@@ -175,6 +179,9 @@ def hook-enabled [name: string, hook: record] {
 #                                            # Note: the closure is run in the context of the hook module, variables captured at the
 #                                            # lambda definition will not be available, but variables/functions from the generated
 #                                            # hook module will be available.
+#     hash?: closure                         # Closure to generate a hash determining if the hook needs to be regenerated
+#                                            # Note: this hash will be used in calculating a second hash based on the hook configuration
+#                                            # so this is not the only thing that determines if the hook needs to be regenerated
 #   }
 # }
 # All hooks are automatically regenerated daily
@@ -291,4 +298,22 @@ export def clean-all [] {
     }
   }
   rm $manifest_path
+}
+
+export def list [] {
+  get-manifest | columns
+}
+
+export def status [] {
+  let manifest = get-manifest
+
+  ($manifest | columns) | each { |name|
+    let hook = $manifest | get $name
+    let path = hook-path $name
+    {
+      name: $name
+      path: $path
+      exists: ($path | path exists)
+    }
+  }
 }

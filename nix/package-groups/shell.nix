@@ -13,6 +13,7 @@ with pkgs; [
   fish # friendly interactive shell
   zsh # z-shell
   nushell # modern shell
+  bash-env-json # load bash environment variables as JSON, for importing into nushell
 
   # Nushell plugins
   nushellPlugins.skim

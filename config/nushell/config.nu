@@ -1,6 +1,8 @@
 use hooks
 use comark *
 
+do --env {
+
 # like load-env, but only sets the environment variable if
 # it's not already set
 def --env default-env [defaults: record] {
@@ -15,10 +17,7 @@ def --env default-env [defaults: record] {
 
 # Add paths to PATH
 def --env add-path [paths: list<string>] {
-    $env.PATH = ($env.PATH
-        | where ($it not-in $paths)
-        | prepend $paths
-    )
+  $env.PATH = $env.PATH | where ($it not-in $paths) | prepend $paths
 }
 
 let home = $nu.home-dir? | default $nu.home-path
@@ -93,7 +92,31 @@ if (($env.SSH_AUTH_SOCK? | is-empty) or (not ($env.SSH_AUTH_SOCK? | path exists)
   }
 }
 
+let hm_session_vars = $"($home)/.nix-profile/etc/profile.d/hm-session-vars.sh" | path expand
+
 hooks use {
+  hm_session_vars: {
+    enabled: true
+    depends: {
+      (
+        (which nix home-manager bash-env-json | length) == 3
+        and ($hm_session_vars | path exists)
+      )
+    }
+    hash: {
+      # Invalidate the cached hook if the session vars file changes
+      open --raw $hm_session_vars | hash md5
+    }
+    cmd: {
+      "load-env " ++ (
+        env -u __HM_SESS_VARS_SOURCED bash-env-json $hm_session_vars
+          | from json
+          | default {}
+          | get -o env
+          | to nuon
+      )
+    }
+  }
   # TODO: use atuin daemon
   atuin: {
     enabled: true
@@ -155,6 +178,7 @@ hooks use {
         --layout reverse
         --color ([
           # Lavi colorscheme
+          # TODO: generate with lush + shipwright
           bg:-1
           bg+:-1
           fg+:12
@@ -230,6 +254,7 @@ hooks use {
         ] | str join '')
         --color ([
           # Lavi colorscheme
+          # TODO: generate with lush + shipwright
           fg:#FFF1E0
           bg:#25213B
           fg+:#FFFFFF
@@ -259,4 +284,6 @@ hooks use {
       ] | str join ' ')
     }
   }
+}
+
 }
