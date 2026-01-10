@@ -9,9 +9,9 @@ very_lazy(function()
   local ft = maputil.ft
 
   map('n', xk '<C-S-\\>', function()
-    local cur = require('fyler.views.finder')._current
-    if cur and cur.win:is_visible() then
-      fyler.close()
+    local finder = require('fyler.views.finder').instance()
+    if finder and finder.win and finder.win:is_visible() then
+      finder:close()
     else
       fyler.open()
       vim.schedule(function() recent_wins.focus_most_recent() end)
@@ -45,9 +45,11 @@ very_lazy(function()
     'Fyler: Toggle Focus'
   )
 
+  map('v', xk [[<C-\>]], '<Cmd>Fyler<Cr>', 'Fyler: Open visual selection')
+
   ft('fyler', function(bufmap)
-    local parser = require 'fyler.views.finder.parser'
-    local finder = require('fyler.views.finder')._current
+    local parser = require 'fyler.views.finder.helper'
+    local finder = require('fyler.views.finder').instance()
     if not finder then
       return
     end
@@ -70,7 +72,7 @@ very_lazy(function()
       else
         finder.files:expand_node(ref_id)
       end
-      finder:dispatch_refresh()
+      finder:dispatch_refresh { force_update = true }
     end
 
     bufmap('n', '<Tab>', function()
@@ -87,7 +89,6 @@ end)
 return {
   {
     'A7Lavinraj/fyler.nvim',
-    -- dev = true,
     cmd = 'Fyler',
     opts = {
       integrations = {
@@ -115,6 +116,7 @@ return {
             ['.'] = 'GotoNode',
             ['#'] = 'CollapseAll',
           },
+          follow_current_file = true,
           watcher = {
             enabled = true,
           },
