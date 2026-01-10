@@ -5,6 +5,8 @@
 # dependencies = []
 # ///
 
+# TODO: get usage from https://claude.ai/settings/usage
+
 import json
 import subprocess
 from datetime import datetime, timezone
