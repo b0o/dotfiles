@@ -23,7 +23,18 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
     - [`carapace/`](config/carapace) - shell completions
     - [`zsh/`](config/zsh) - fallback shell
   - Editor
-    - [`nvim/`](config/nvim) - neovim
+    - [`nvim/`](config/nvim) - Neovim configuration
+      - Fully custom, written from scratch
+      - 100+ plugins managed with lazy.nvim
+      - LSP with 30+ language servers
+      - 500+ custom keymaps
+      - blink.cmp completion
+      - Telescope fuzzy finder
+      - Treesitter with textobjects
+      - Incline.nvim, lualine.nvim status lines
+      - Neogit, Gitsigns, Diffview
+      - Nvim-dap debugging, Neotest
+      - Supermaven AI completion
   - Terminal
     - [`ghostty/`](config/ghostty) - terminal emulator
   - Desktop
