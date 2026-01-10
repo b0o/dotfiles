@@ -27,6 +27,7 @@ M.formatters_by_ft = {
   typescript = { 'dprint' },
   typescriptreact = { 'dprint' },
   svelte = { 'dprint' },
+  html = { 'dprint' },
 
   dockerfile = { 'dprint' },
   json = { 'dprint' },
@@ -39,7 +40,6 @@ M.formatters_by_ft = {
 
   css = { 'prettierd', 'stylelint' },
   graphql = { 'prettierd' },
-  html = { 'prettierd' },
   less = { 'prettierd' },
   scss = { 'prettierd' },
   yaml = { 'prettierd' },
