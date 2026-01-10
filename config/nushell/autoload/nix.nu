@@ -106,14 +106,31 @@ def _complete-hm [spans: list<string>] {
   ^carapace home-manager nushell home-manager ...($spans | skip 1) | from json
 }
 
-@complete _complete-hm
-def --wrapped hm [...args] {
+def --env _hm_init [] {
   let dotfiles_dir = $env | get -o DOTFILES_HOME
   if ($dotfiles_dir | is-empty) {
     error make -u {msg: $"Error: DOTFILES_HOME is not set"}
     return
   }
-  let home_flake = "arch-maddy"
   cd $dotfiles_dir
+  let home_flake = "arch-maddy"
+  $home_flake
+}
+
+def _complete-hm-update [spans: list<string>] {
+  _hm_init
+  ^carapace nix nushell nix flake update ...($spans | skip 1) | from json
+}
+
+# Update the $DOTFILES_HOME/flake.lock
+@complete _complete-hm-update
+def --wrapped "hm update" [...args] {
+  _hm_init
+  ^nix flake update ...$args
+}
+
+@complete _complete-hm
+def --wrapped hm [...args] {
+  let home_flake = _hm_init
   ^home-manager --flake $".#($home_flake)" ...$args
 }
