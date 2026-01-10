@@ -1,6 +1,9 @@
 # Comark (Comma Bookmark) for Nushell
 # Shell bookmark manager and file search utility for quick navigation and file management
 
+# TODO: store bookmarks in json file
+# TODO: configurable default bookmark
+
 # Get the comark directory path
 def comark-dir [] {
   let home = $nu.home-dir? | default $nu.home-path
@@ -57,8 +60,24 @@ export def m, [
   print $"($alias) -> ($target)"
 }
 
+def complete-alias [] {
+  l, | each { |row|
+    {
+      value: $row.name
+      description: $row.target
+      style: (
+        if ($row.target | str ends-with '/') {
+          { fg: yellow attr: b }
+        } else {
+          { fg: green }
+        }
+      )
+    }
+  }
+}
+
 # Remove a bookmark
-export def r, [alias: string] {
+export def r, [alias: string@complete-alias] {
   comark-init
   validate-alias $alias
   let bookmark_path = ((comark-dir) | path join $alias)
@@ -134,16 +153,16 @@ export def l, [pattern?: string] {
     | sort-by name
   )
 
-  if ($bookmarks | is-empty) {
-    print -e $"no bookmarks found matching '($pattern)'"
-    return
-  }
-
   $bookmarks
 }
 
+
 # Change directory to bookmark
-export def --env cd, [alias: string] {
+export def --env cd, [alias?: string@complete-alias] {
+  if ($alias | is-empty) {
+    cd ~ # TODO: cd to "default" bookmark (when JSON file is implemented)
+    return
+  }
   comark-init
   validate-alias $alias
   let bookmark_path = ((comark-dir) | path join $alias)
@@ -1009,5 +1028,23 @@ export def fzf,path [] {
 
     commandline edit --replace $new_buffer
     commandline set-cursor $new_cursor_pos
+  }
+}
+
+export def "comark generate-autoload" [] {
+  (l, | each { |row|
+    $"# cd ($row.target)\nexport alias ,($row.name) = cd, ($row.name)"
+  }) | str join "\n"
+}
+
+export def "comark generate-autoload-hash" [] {
+  try {
+    glob $"(comark-dir)/*"
+      | par-each { $in ++ ":" ++ ($in | path expand) }
+      | sort
+      | str join "\n"
+      | hash md5
+  } catch {
+    ""
   }
 }

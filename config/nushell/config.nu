@@ -95,7 +95,7 @@ if (($env.SSH_AUTH_SOCK? | is-empty) or (not ($env.SSH_AUTH_SOCK? | path exists)
 let hm_session_vars = $"($home)/.nix-profile/etc/profile.d/hm-session-vars.sh" | path expand
 
 hooks use {
-  hm_session_vars: {
+  home-manager: {
     enabled: true
     depends: {
       (
@@ -116,6 +116,11 @@ hooks use {
           | to nuon
       )
     }
+  }
+  comark: {
+    enabled: true
+    hash: { comark generate-autoload-hash }
+    cmd: { comark generate-autoload }
   }
   # TODO: use atuin daemon
   atuin: {

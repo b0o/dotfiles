@@ -1,6 +1,10 @@
 const hooks_dir = $"($nu.data-dir)/vendor/autoload" | path expand
 const manifest_path = $"($hooks_dir)/hooks.json"
 
+# TODO: prefer using $env._nu_hooks over get-manifest
+# get-manifest should be used only for hashes and detecting
+# hooks which have been removed
+
 def hook-path [name: string] {
   $"($hooks_dir)/hooks__($name).nu"
 }
@@ -161,6 +165,32 @@ def hook-enabled [name: string, hook: record] {
   true
 }
 
+def hook-generate [
+  --force (-f)  # Force regeneration of the hook
+  name: string
+  hook: record
+  manifest: record
+] {
+  let hash = hook-hash $hook
+  let path = hook-path $name
+  let manifest_entry = $manifest | get -o $name | default {}
+  let current_hash = $manifest_entry | get -o hash | default ""
+  $hook | get -o env | default {} | load-env
+
+  if $force or ($current_hash != $hash) or (not ($path | path exists)) {
+    hook-init $name $hook
+
+    let has_module = $hook | get -o module | default false
+
+    $manifest | upsert $name {
+      hash: $hash
+      module: $has_module
+    }
+  } else {
+    $manifest
+  }
+}
+
 # Set up hooks
 # hooks should be a record of the form:
 # {
@@ -187,6 +217,9 @@ def hook-enabled [name: string, hook: record] {
 # All hooks are automatically regenerated daily
 export def --env use [hooks: record] {
   mkdir $hooks_dir
+
+  # TODO: Allow `use` to be called multiple times
+  $env._nu_hooks = $hooks
 
   mut manifest = get-manifest
   mut hooks = $hooks
@@ -221,39 +254,28 @@ export def --env use [hooks: record] {
     if not (hook-enabled $name $hook) {
       continue
     }
-
-    let hash = hook-hash $hook
-    let path = hook-path $name
-    let manifest_entry = $manifest | get -o $name | default {}
-    let current_hash = $manifest_entry | get -o hash | default ""
-    $hook | get -o env | default {} | load-env
-
-    if ($current_hash != $hash) or (not ($path | path exists)) {
-      hook-init $name $hook
-
-      let has_module = $hook | get -o module | default false
-
-      $manifest = ($manifest | upsert $name {
-        hash: $hash
-        module: $has_module
-      })
-    }
+    $manifest = hook-generate $name $hook $manifest
   }
 
   $manifest | save-manifest
 }
 
 def complete-hook-names [] {
-  get-manifest | columns
+  $env._nu_hooks? | default (get-manifest) | columns
 }
 
 # Clean up a hook by name
-export def clean [name: string@complete-hook-names] {
+export def clean [
+  --quiet (-q)  # Don't print a message
+  name: string@complete-hook-names
+] {
   let manifest = get-manifest
   let manifest_entry = $manifest | get -o $name
 
   if $manifest_entry == null {
-    print -e $"Hook does not exist: ($name)"
+    if not $quiet {
+      print -e $"Hook does not exist: ($name)"
+    }
     return
   }
 
@@ -300,10 +322,12 @@ export def clean-all [] {
   rm $manifest_path
 }
 
+# List hooks
 export def list [] {
   get-manifest | columns
 }
 
+# Get hook statuses
 export def status [] {
   let manifest = get-manifest
 
@@ -315,5 +339,26 @@ export def status [] {
       path: $path
       exists: ($path | path exists)
     }
+  }
+}
+
+# Regenerate a hook
+export def regenerate [name: string@complete-hook-names] {
+  let hook = $env._nu_hooks? | get -o $name
+  if ($hook | is-empty) {
+    error make -u {
+      msg: $"hooks: ($name): hook does not exist"
+    }
+  }
+  let manifest = get-manifest
+  clean --quiet $name
+  hook-generate --force $name $hook $manifest | save-manifest
+}
+
+# Regenerate all hooks
+export def regenerate-all [] {
+  let manifest = get-manifest
+  for name in ($env._nu_hooks? | columns) {
+    regenerate $name
   }
 }
