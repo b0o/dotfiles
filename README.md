@@ -1,6 +1,6 @@
 # dotfiles
 
-Personal configuration files managed with [Nix](https://nixos.org/)
+Maddison's configuration files, managed with [Nix](https://nixos.org/)
 
 ![Screenshot](https://github.com/user-attachments/assets/a7873a70-4b90-4e92-a11c-f262d9653f29)
 
