@@ -1,3 +1,4 @@
+docs/plans/*
 /plugin/packer_compiled.lua
 spellfile*
 private.lua
@@ -84,7 +85,7 @@ luac.out
 .AppleDouble
 .LSOverride
 
-# Icon must end with two 
+# Icon must end with two
 Icon
 
 # Thumbnails
