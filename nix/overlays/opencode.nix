@@ -5,14 +5,14 @@
 # - opentui-spinner: opentui-spinner built against custom opentui
 # - opencode: OpenCode using the above custom packages
 {inputs, ...}: final: _prev: let
-  inherit (final) lib stdenv bun nodejs zig_0_14 llvmPackages cacert ripgrep makeBinaryWrapper;
+  inherit (final) lib stdenv bun nodejs zig_0_15 llvmPackages cacert ripgrep makeBinaryWrapper;
 
   # Derive versions from source package.json files
   opentui-version = (builtins.fromJSON (builtins.readFile "${inputs.opentui-src}/packages/core/package.json")).version;
   opentui-spinner-version = (builtins.fromJSON (builtins.readFile "${inputs.opentui-spinner-src}/package.json")).version;
 
   # FOD hashes - update these when inputs change
-  opentui-hash = "sha256-D2T7wR8ZTghXkDe22cT1vLf/rkA8gD5sIN2yXVlMiwk=";
+  opentui-hash = "sha256-naOawlttYX7Cofz26Nhk3ZHOoCnZE+Tw95phzcfckIQ=";
   opentui-spinner-hash = "sha256-Qbe7dhHSHq7JIlc32ptPlrBprEVq60k08IJ1dV6S9EY=";
 
   opentui = stdenv.mkDerivation {
@@ -20,7 +20,7 @@
     version = opentui-version;
     src = inputs.opentui-src;
 
-    nativeBuildInputs = [bun cacert nodejs zig_0_14 llvmPackages.bintools];
+    nativeBuildInputs = [bun cacert nodejs zig_0_15 llvmPackages.bintools];
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
@@ -35,6 +35,8 @@
       bun install --frozen-lockfile
 
       patchShebangs node_modules/typescript/bin
+      patchShebangs packages/core/node_modules/typescript/bin
+      patchShebangs packages/solid/node_modules/typescript/bin
 
       (cd packages/core && bun run build)
       (cd packages/solid && bun run build)
@@ -43,15 +45,16 @@
     installPhase = ''
       mkdir -p $out/lib/node_modules/@opentui
 
-      cp -r packages/core/dist $out/lib/node_modules/@opentui/core
-      cp -r packages/solid/dist $out/lib/node_modules/@opentui/solid
-      cp -r node_modules/solid-js $out/lib/node_modules/solid-js
-      cp -r node_modules/yoga-layout $out/lib/node_modules/yoga-layout
+      cp -Lr packages/core/dist $out/lib/node_modules/@opentui/core
+      cp -Lr packages/core/node_modules/yoga-layout $out/lib/node_modules/yoga-layout
+
+      cp -Lr packages/solid/dist $out/lib/node_modules/@opentui/solid
+      cp -Lr packages/solid/node_modules/solid-js $out/lib/node_modules/solid-js
 
       # The zig build process puts the core-{platform}-{arch} into the node_modules/@opentui/ directory
       # (these are not from NPM). We need to copy them over.
       for pkg in packages/core/node_modules/@opentui/core-*; do
-        [ -d "$pkg" ] && cp -r "$pkg" $out/lib/node_modules/@opentui/
+        [ -d "$pkg" ] && cp -Lr "$pkg" $out/lib/node_modules/@opentui/
       done
 
       # Strip debug info from native libraries to ensure reproducibility
@@ -93,13 +96,13 @@
       rm -rf node_modules/@opentui
       mkdir -p node_modules/@opentui
       for pkg in ${opentui}/lib/node_modules/@opentui/*; do
-        cp -r "$pkg" "node_modules/@opentui/$(basename "$pkg")"
+        cp -Lr "$pkg" "node_modules/@opentui/$(basename "$pkg")"
       done
       chmod -R u+w node_modules/@opentui
 
       # Also need solid-js from opentui
       rm -rf node_modules/solid-js
-      cp -r ${opentui}/lib/node_modules/solid-js node_modules/solid-js
+      cp -Lr ${opentui}/lib/node_modules/solid-js node_modules/solid-js
       chmod -R u+w node_modules/solid-js
 
       bun node_modules/tsdown/dist/run.mjs
@@ -108,12 +111,12 @@
     installPhase = ''
       mkdir -p $out/lib/node_modules/opentui-spinner
 
-      cp -r dist $out/lib/node_modules/opentui-spinner/
+      cp -Lr dist $out/lib/node_modules/opentui-spinner/
       cp package.json $out/lib/node_modules/opentui-spinner/
 
       # Copy cli-spinners dependency
       mkdir -p $out/lib/node_modules
-      cp -r node_modules/cli-spinners $out/lib/node_modules/
+      cp -Lr node_modules/cli-spinners $out/lib/node_modules/
 
       find $out -exec touch -h -d '@0' {} + 2>/dev/null || true
     '';
@@ -126,8 +129,8 @@
     };
   };
 
-  opencode = inputs.opencode.packages.${final.system}.default.overrideAttrs (old: {
-    nativeBuildInputs = old.nativeBuildInputs or [] ++ [makeBinaryWrapper];
+  opencode = inputs.opencode.packages.${final.stdenv.hostPlatform.system}.default.overrideAttrs (old: {
+    nativeBuildInputs = (old.nativeBuildInputs or []) ++ [makeBinaryWrapper];
 
     buildPhase = ''
       runHook preBuild
@@ -211,6 +214,7 @@
         --add-flags "$out/lib/opencode/dist/src/index.js" \
         --prefix PATH : ${lib.makeBinPath [ripgrep]} \
         --set OTUI_TREE_SITTER_WORKER_PATH "$out/lib/opencode/dist/node_modules/@opentui/core/parser.worker.js" \
+        --set OPENCODE_DISABLE_LSP_DOWNLOAD true \
         --argv0 opencode
 
       # Symlink opentui for runtime imports

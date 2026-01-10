@@ -39,7 +39,6 @@
     "agent_cycle": "tab",
     "agent_cycle_reverse": "shift+tab",
     "input_clear": "<leader>ctrl+c",
-    "input_forward_delete": "ctrl+d",
     "input_paste": "ctrl+v",
     "input_submit": "enter",
     "input_newline": "shift+enter,ctrl+j",
@@ -47,7 +46,14 @@
     "history_next": "shift+f2", // ctrl+shift+n
     "tool_details": "<leader>d",
     "terminal_suspend": "none",
+    "messages_next": "<leader>j",
+    "messages_previous": "<leader>k",
+    "variant_cycle": "ctrl+t",
+    "session_rename": "<leader>ctrl+r",
+    "model_cycle_favorite": "<leader>ctrl+n",
+    "model_cycle_favorite_reverse": "<leader>ctrl+p",
   },
+  "model": "anthropic/claude-opus-4-5",
   "lsp": {
     "pyright": {
       "disabled": true,
@@ -65,7 +71,8 @@
     },
   },
   "plugin": [
-    "opencode-openai-codex-auth@4.2.0",
+    // Update using `bunx opencode-openai-codex-auth@latest` from this directory
+    "opencode-openai-codex-auth",
   ],
   "provider": {
     "openai": {
@@ -627,6 +634,224 @@
               "reasoning.encrypted_content",
             ],
             "store": false,
+          },
+        },
+        "gpt-5.2": {
+          "name": "GPT 5.2 (OAuth)",
+          "limit": {
+            "context": 272000,
+            "output": 128000,
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+            ],
+            "output": [
+              "text",
+            ],
+          },
+          "variants": {
+            "none": {
+              "reasoningEffort": "none",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "low": {
+              "reasoningEffort": "low",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "medium": {
+              "reasoningEffort": "medium",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+            "xhigh": {
+              "reasoningEffort": "xhigh",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+          },
+        },
+        "gpt-5.2-codex": {
+          "name": "GPT 5.2 Codex (OAuth)",
+          "limit": {
+            "context": 272000,
+            "output": 128000,
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+            ],
+            "output": [
+              "text",
+            ],
+          },
+          "variants": {
+            "low": {
+              "reasoningEffort": "low",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "medium": {
+              "reasoningEffort": "medium",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+            "xhigh": {
+              "reasoningEffort": "xhigh",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+          },
+        },
+        "gpt-5.1-codex-max": {
+          "name": "GPT 5.1 Codex Max (OAuth)",
+          "limit": {
+            "context": 272000,
+            "output": 128000,
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+            ],
+            "output": [
+              "text",
+            ],
+          },
+          "variants": {
+            "low": {
+              "reasoningEffort": "low",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+            "medium": {
+              "reasoningEffort": "medium",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+            "xhigh": {
+              "reasoningEffort": "xhigh",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+          },
+        },
+        "gpt-5.1-codex": {
+          "name": "GPT 5.1 Codex (OAuth)",
+          "limit": {
+            "context": 272000,
+            "output": 128000,
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+            ],
+            "output": [
+              "text",
+            ],
+          },
+          "variants": {
+            "low": {
+              "reasoningEffort": "low",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "medium": {
+              "reasoningEffort": "medium",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+          },
+        },
+        "gpt-5.1-codex-mini": {
+          "name": "GPT 5.1 Codex Mini (OAuth)",
+          "limit": {
+            "context": 272000,
+            "output": 128000,
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+            ],
+            "output": [
+              "text",
+            ],
+          },
+          "variants": {
+            "medium": {
+              "reasoningEffort": "medium",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "medium",
+            },
+          },
+        },
+        "gpt-5.1": {
+          "name": "GPT 5.1 (OAuth)",
+          "limit": {
+            "context": 272000,
+            "output": 128000,
+          },
+          "modalities": {
+            "input": [
+              "text",
+              "image",
+            ],
+            "output": [
+              "text",
+            ],
+          },
+          "variants": {
+            "none": {
+              "reasoningEffort": "none",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "low": {
+              "reasoningEffort": "low",
+              "reasoningSummary": "auto",
+              "textVerbosity": "low",
+            },
+            "medium": {
+              "reasoningEffort": "medium",
+              "reasoningSummary": "auto",
+              "textVerbosity": "medium",
+            },
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "detailed",
+              "textVerbosity": "high",
+            },
           },
         },
       },
