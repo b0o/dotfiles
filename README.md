@@ -1,6 +1,6 @@
 # dotfiles
 
-Maddison's configuration files, managed with [Nix](https://nixos.org/)
+Maddison's dotfiles, managed with [Nix](https://nixos.org/)
 
 ![Screenshot](https://github.com/user-attachments/assets/a7873a70-4b90-4e92-a11c-f262d9653f29)
 
@@ -53,10 +53,9 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
     - [`ghostty/`](config/ghostty) - terminal emulator
   - Desktop
     - [`niri/`](config/niri) - wayland compositor
-      - Custom scratchpad system with 20+ app definitions
-      - Vim-style navigation (Mod+H/J/K/L)
+      - Custom floating scratchpad system
+      - Custom screenshot utility with history and annotations
       - Modal key menus via wlr-which-key
-      - Multi-monitor layout (triple 4K)
       - Window urgency notification daemon
       - Swayidle screen lock integration
     - [`mako/`](config/mako) - notification daemon
