@@ -213,10 +213,10 @@ local servers = function()
     },
     -- 'taplo',
     'tombi',
-    {
-      'tsgo',
-      on_attach = function(client, bufnr) require('twoslash-queries').attach(client, bufnr) end,
-    },
+    -- {
+    --   'tsgo',
+    --   on_attach = function(client, bufnr) require('twoslash-queries').attach(client, bufnr) end,
+    -- },
     { --NOTE: ts_ls is typescript-language-server, which is a wrapper around tsserver
       'ts_ls',
       on_attach = function(client, bufnr) require('twoslash-queries').attach(client, bufnr) end,
