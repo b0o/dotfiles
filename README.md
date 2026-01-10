@@ -6,41 +6,42 @@ Personal configuration files managed with [Nix](https://nixos.org/)
 
 ## Components
 
-- `config/` - Application configurations (symlinked via Stow)
-- `nix/` - [NixOS](https://nixos.org/) and [Home Manager](https://github.com/nix-community/home-manager) configurations
-- `flake.nix` - Nix flake entry point
-- `justfile` - Task runner commands
+- [`config/`](config) - Application configurations (symlinked via Stow)
+- [`nix/`](nix) - [NixOS](https://nixos.org/) and [Home Manager](https://github.com/nix-community/home-manager) configurations
+- [`flake.nix`](flake.nix) - Nix flake entry point
+- [`justfile`](justfile) - Task runner commands
 
 ### Application Configs
 
 - Colorscheme
   - [lavi](https://github.com/b0o/lavi.nvim) - my custom colorscheme
-- Shell
-  - [nushell](config/nushell) - structured data shell
-  - [starship](config/starship.toml) - shell prompt
-  - [atuin](config/atuin) - shell history sync and search
-  - [carapace](config/carapace) - shell completions
-  - [zsh](config/zsh) - fallback shell
-- Editor
-  - [nvim](config/nvim) - neovim
-- Terminal
-  - [ghostty](config/ghostty) - terminal emulator
-- Desktop
-  - [niri](config/niri) - wayland compositor
-  - [mako](config/mako) - notification daemon
-  - [waybar](config/waybar) - status bar
-  - [wlr-which-key](config/wlr-which-key) - keybinding hints
-  - [rofi](config/rofi) - application launcher
-- Dev Tools
-  - [git](config/git) - version control
-  - [opencode](config/opencode) - AI coding assistant
-- Utilities
-  - [bat](config/bat) - cat with syntax highlighting
-  - [feh](config/feh) - image viewer
-  - [htop](config/htop) - process monitor
-  - [satty](config/satty) - screenshot annotation
-  - [vivid](config/vivid) - LS_COLORS generator
-  - [zathura](config/zathura) - document viewer
+- [`config/`](config)
+  - Shell
+    - [`nushell/`](config/nushell) - structured data shell
+    - [`starship.toml`](config/starship.toml) - shell prompt
+    - [`atuin/`](config/atuin) - shell history sync and search
+    - [`carapace/`](config/carapace) - shell completions
+    - [`zsh/`](config/zsh) - fallback shell
+  - Editor
+    - [`nvim/`](config/nvim) - neovim
+  - Terminal
+    - [`ghostty/`](config/ghostty) - terminal emulator
+  - Desktop
+    - [`niri/`](config/niri) - wayland compositor
+    - [`mako/`](config/mako) - notification daemon
+    - [`waybar/`](config/waybar) - status bar
+    - [`wlr-which-key/`](config/wlr-which-key) - keybinding hints
+    - [`rofi/`](config/rofi) - application launcher
+  - Dev Tools
+    - [`git/`](config/git) - global git configuration
+    - [`opencode/`](config/opencode) - AI coding assistant
+  - Utilities
+    - [`bat/`](config/bat) - cat with syntax highlighting
+    - [`feh/`](config/feh) - image viewer
+    - [`htop/`](config/htop) - process monitor
+    - [`satty/`](config/satty) - screenshot annotation
+    - [`vivid/`](config/vivid) - LS_COLORS generator
+    - [`zathura/`](config/zathura) - document viewer
 
 ### Nix Structure
 
