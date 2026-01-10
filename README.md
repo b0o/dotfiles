@@ -4,23 +4,32 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
 
 ![Screenshot](https://github.com/user-attachments/assets/a7873a70-4b90-4e92-a11c-f262d9653f29)
 
+## Overview
+
+- Compositor: [Niri](https://github.com/YaLTeR/niri)
+- Shell: [Nushell](https://www.nushell.sh/)
+- Editor: [Neovim](https://neovim.io/)
+- Multiplexer: [Zellij](https://zellij.dev/)
+- Colorscheme: [Lavi](https://github.com/b0o/lavi.nvim)
+- Font: [Pragmasevka Nerd Font](https://github.com/shytikov/pragmasevka)
+- Stats:
+  - 19,000+ lines of code across 175 files
+  - 10,000+ lines of Neovim config (Lua)
+  - 4,000+ lines of Nushell config
+  - In development since 2015, 1,250+ commits since 2018
+
 ## Components
 
-- [`config/`](config) - Application configurations (symlinked via Stow)
 - [`nix/`](nix) - [NixOS](https://nixos.org/) and [Home Manager](https://github.com/nix-community/home-manager) configurations
 - [`flake.nix`](flake.nix) - Nix flake entry point
 - [`justfile`](justfile) - Task runner commands
-
-### Application Configs
-
-- Colorscheme
-  - [lavi](https://github.com/b0o/lavi.nvim) - my custom colorscheme
-- [`config/`](config)
+- [`config/`](config) - Application configurations
   - Shell
     - [`nushell/`](config/nushell) - structured data shell
     - [`starship.toml`](config/starship.toml) - shell prompt
     - [`atuin/`](config/atuin) - shell history sync and search
     - [`carapace/`](config/carapace) - shell completions
+    - [`zellij/`](config/zellij) - multiplexer
     - [`zsh/`](config/zsh) - fallback shell
   - Editor
     - [`nvim/`](config/nvim) - Neovim configuration
