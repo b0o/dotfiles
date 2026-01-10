@@ -66,7 +66,7 @@ home-manager switch --flake .#<config>
 
 **Configs**:
 
-- `arch-maddy` - Arch Linux user environment
+- [`arch-maddy`](nix/home/arch-maddy.nix) - Arch Linux user environment
 
 ### [NixOS](https://nixos.org/)
 
@@ -76,7 +76,7 @@ nixos-rebuild switch --flake .#<host>
 
 **Hosts**:
 
-- `boonix` - desktop workstation with ZFS
+- [`boonix`](nix/hosts/boonix) - desktop workstation with ZFS
 
 ### [flakey-profile](https://github.com/lf-/flakey-profile)
 
@@ -90,8 +90,8 @@ nix run .#<profile>.switch
 
 **Profiles**:
 
-- `dev` - full development environment
-- `minimal` - base packages only
+- [`dev`](nix/profiles/dev.nix) - full development environment
+- [`minimal`](nix/profiles/minimal.nix) - base packages only
 
 ### Standalone
 
