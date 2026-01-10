@@ -234,18 +234,33 @@ map('n', '<leader>ym', function()
   vim.notify('Copied ' .. relative_path .. ' as markdown code block', vim.log.levels.INFO)
 end, 'Yank file as markdown code block')
 
-map('n', '<leader>yp', function()
+map('n', '<leader>ypa', function()
   local file = vim.fn.expand '%:p'
   require('user.fn').osc52_smart_copy('+', { file })
   vim.notify('Copied ' .. file, vim.log.levels.INFO)
-end, 'Yank file path')
+end, 'Yank file path (absolute)')
 
-map('n', '<leader>yr', function()
+map('n', '<leader>ypp', function()
   local file = vim.fn.expand '%:.'
   require('user.fn').osc52_smart_copy('+', { file })
   vim.notify('Copied ' .. file, vim.log.levels.INFO)
-end, 'Yank relative file path')
+end, 'Yank file path (relative)')
 
+map('n', '<leader>ypA', function()
+  local line = vim.fn.line '.'
+  local file = vim.fn.expand '%'
+  require('user.fn').osc52_smart_copy('+', { file .. ':' .. line })
+  vim.notify('Copied ' .. file .. ':' .. line, vim.log.levels.INFO)
+end, 'Yank file path with line number (absolute)')
+
+map('n', { '<leader>ypP', '<leader>yP' }, function()
+  local line = vim.fn.line '.'
+  local file = vim.fn.expand '%:.'
+  require('user.fn').osc52_smart_copy('+', { file .. ':' .. line })
+  vim.notify('Copied ' .. file .. ':' .. line, vim.log.levels.INFO)
+end, 'Yank file path with line number (relative)')
+
+-- TODO: use opencode
 map('n', '<localleader>aa', function()
   require('user.util.aider').add_buf()
   require('user.util.aider').copy_cmd()
@@ -257,13 +272,6 @@ map('n', { '<localleader>aA', '<localleader>at' }, function()
 end, 'Aider: /add all files in tab')
 
 map('n', '<localleader>ac', function() require('user.util.aider').clear_cmd() end, 'Aider: Clear cmd')
-
-map('n', '<leader>yP', function()
-  local line = vim.fn.line '.'
-  local file = vim.fn.expand '%'
-  require('user.fn').osc52_smart_copy('+', { file .. ':' .. line })
-  vim.notify('Copied ' .. file .. ':' .. line, vim.log.levels.INFO)
-end, 'Yank file path with line number')
 
 map('n', '<leader>y:', function()
   local cmd = vim.fn.getreg '@:'
