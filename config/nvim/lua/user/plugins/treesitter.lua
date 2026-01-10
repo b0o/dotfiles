@@ -15,7 +15,7 @@ return {
         'css',
         { 'cython', install = false, filetypes = { 'pyx', 'pxd' } },
         'dockerfile',
-        'dap_repl',
+        -- 'dap_repl', -- TODO
         'diff',
         'gitcommit',
         'git_rebase',
@@ -27,7 +27,7 @@ return {
         'javascript',
         'jsdoc',
         'json',
-        'jsonc',
+        -- 'jsonc', -- TODO
         'just',
         'kdl',
         'lua',
