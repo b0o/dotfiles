@@ -11,5 +11,5 @@ with pkgs; [
   # wl-clipboard-rs # wl-clipboard replacement (wl-copy/wl-paste), written in Rust
 
   # UI
-  pkgs.ttf-pragmasevka # Pragmata Pro doppelgänger made of Iosevka SS08
+  ttf-pragmasevka # Pragmata Pro doppelgänger made of Iosevka SS08
 ]
