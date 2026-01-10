@@ -31,7 +31,7 @@ Maddison's configuration files, managed with [Nix](https://nixos.org/)
     - [`zsh/`](config/zsh) - fallback shell
   - Editor
     - [`nvim/`](config/nvim) - Neovim configuration
-      - Fully custom, written from scratch
+      - Fully custom config written from scratch
       - 100+ plugins managed with lazy.nvim
       - LSP with 30+ language servers
       - 500+ custom keymaps
