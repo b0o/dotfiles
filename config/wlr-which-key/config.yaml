@@ -419,10 +419,6 @@ menu:
             alias: "Mod4+F"
             desc: "Figma"
             cmd: niri-tools scratchpad toggle figma
-          - key: "m"
-            alias: "Mod4+M"
-            desc: "Web"
-            cmd: niri-tools scratchpad toggle web-m
           - key: "n"
             alias: "Mod4+N"
             desc: "Security Cams"
