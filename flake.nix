@@ -42,6 +42,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Home Manager
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Misc
     opencode = {
       url = "github:b0o/opencode/b0o";
@@ -61,6 +67,7 @@
     self,
     nixpkgs,
     flakey-profile,
+    home-manager,
     ...
   } @ inputs: let
     inherit (nixpkgs) lib;
@@ -109,6 +116,14 @@
         modules = [
           ./nix/hosts/boonix
         ];
+      };
+    };
+
+    homeConfigurations = {
+      arch-maddy = home-manager.lib.homeManagerConfiguration {
+        pkgs = legacyPackages."x86_64-linux";
+        extraSpecialArgs = {inherit inputs;};
+        modules = [./nix/home/arch-maddy.nix];
       };
     };
   };
