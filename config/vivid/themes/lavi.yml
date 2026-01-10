@@ -1,4 +1,5 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/lavi-project/vivid/main/themes/schema.json
+# TODO: generate with lush + shipwright
 
 colors:
   # Lavi colorscheme
