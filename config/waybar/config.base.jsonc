@@ -115,6 +115,15 @@
       "critical": 95,
     },
     "on-click": "xdg-open https://claude.ai/settings/usage",
+    "menu": "on-click-right",
+    "menu-file": "~/.config/waybar/claude-usage-menu.xml",
+    "menu-actions": {
+      "prefer-cc": "~/.config/waybar/bin/claude-usage.py --set-prefer-cc",
+      "prefer-oc": "~/.config/waybar/bin/claude-usage.py --set-prefer-oc",
+      "prefer-auto": "~/.config/waybar/bin/claude-usage.py --set-prefer-auto",
+      "refresh": "~/.config/waybar/bin/claude-usage.py --refresh",
+      "open-usage": "xdg-open https://claude.ai/settings/usage",
+    },
   },
   "bluetooth": {
     "tooltip": true,

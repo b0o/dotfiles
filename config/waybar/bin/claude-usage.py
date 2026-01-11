@@ -18,6 +18,8 @@ from typing import Dict, Optional
 
 import humanize  # pyright: ignore
 
+import signal
+
 CHECK_INTERVAL = 60.0
 OUTPUT_INTERVAL = 1.0
 BAR_WIDTH = 44
@@ -25,6 +27,7 @@ HISTORY_FILE = os.path.expanduser("~/.local/share/claude-usage.json")
 CLAUDE_CREDS_PATH = os.path.expanduser("~/.claude/.credentials.json")
 OPENCODE_CREDS_PATH = os.path.expanduser("~/.local/share/opencode/auth.json")
 OAUTH_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token"
+OAUTH_PROFILE_URL = "https://api.anthropic.com/api/oauth/profile"
 OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 TOKEN_REFRESH_MARGIN = 300  # Refresh if token expires within 5 minutes
 
@@ -174,56 +177,98 @@ def refresh_opencode_token() -> Optional[str]:
     return None
 
 
-def get_valid_token() -> Optional[str]:
+def get_valid_token(
+    prefer: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str], bool]:
     """Get a valid OAuth token from Claude CLI or OpenCode credentials.
 
     Will automatically refresh expired tokens if a refresh token is available.
+
+    Args:
+        prefer: "cc" for Claude Code, "oc" for OpenCode, None for auto (tries cc first)
+
+    Returns:
+        Tuple of (token, source, is_fallback) where source is "cc" or "oc",
+        is_fallback is True if we had to use the non-preferred source,
+        or (None, None, False) if no valid token.
     """
     now = time.time()
 
-    # Try Claude CLI credentials first
-    if os.path.exists(CLAUDE_CREDS_PATH):
-        try:
-            with open(CLAUDE_CREDS_PATH) as f:
-                data = json.load(f)
-            oauth = data.get("claudeAiOauth", {})
-            token = oauth.get("accessToken")
-            expires_at = oauth.get("expiresAt")
-            if token and expires_at:
-                # expiresAt is a unix timestamp in milliseconds
-                expires_at_sec = expires_at / 1000
-                if expires_at_sec > now + TOKEN_REFRESH_MARGIN:
-                    return token
-                # Token expired or about to expire, try to refresh
-                if oauth.get("refreshToken"):
-                    new_token = refresh_claude_token()
-                    if new_token:
-                        return new_token
-        except (json.JSONDecodeError, KeyError, ValueError):
-            pass
+    def try_claude_code() -> Optional[str]:
+        if os.path.exists(CLAUDE_CREDS_PATH):
+            try:
+                with open(CLAUDE_CREDS_PATH) as f:
+                    data = json.load(f)
+                oauth = data.get("claudeAiOauth", {})
+                token = oauth.get("accessToken")
+                expires_at = oauth.get("expiresAt")
+                if token and expires_at:
+                    expires_at_sec = expires_at / 1000
+                    if expires_at_sec > now + TOKEN_REFRESH_MARGIN:
+                        return token
+                    if oauth.get("refreshToken"):
+                        new_token = refresh_claude_token()
+                        if new_token:
+                            return new_token
+            except (json.JSONDecodeError, KeyError, ValueError):
+                pass
+        return None
 
-    # Try OpenCode credentials
-    if os.path.exists(OPENCODE_CREDS_PATH):
-        try:
-            with open(OPENCODE_CREDS_PATH) as f:
-                data = json.load(f)
-            anthropic = data.get("anthropic", {})
-            token = anthropic.get("access")
-            expires_at = anthropic.get("expires")
-            if token and expires_at:
-                # expires is a unix timestamp in milliseconds
-                expires_at_sec = expires_at / 1000
-                if expires_at_sec > now + TOKEN_REFRESH_MARGIN:
-                    return token
-                # Token expired or about to expire, try to refresh
-                if anthropic.get("refresh"):
-                    new_token = refresh_opencode_token()
-                    if new_token:
-                        return new_token
-        except (json.JSONDecodeError, KeyError, ValueError):
-            pass
+    def try_opencode() -> Optional[str]:
+        if os.path.exists(OPENCODE_CREDS_PATH):
+            try:
+                with open(OPENCODE_CREDS_PATH) as f:
+                    data = json.load(f)
+                anthropic = data.get("anthropic", {})
+                token = anthropic.get("access")
+                expires_at = anthropic.get("expires")
+                if token and expires_at:
+                    expires_at_sec = expires_at / 1000
+                    if expires_at_sec > now + TOKEN_REFRESH_MARGIN:
+                        return token
+                    if anthropic.get("refresh"):
+                        new_token = refresh_opencode_token()
+                        if new_token:
+                            return new_token
+            except (json.JSONDecodeError, KeyError, ValueError):
+                pass
+        return None
 
-    return None
+    # Determine order based on preference
+    if prefer == "oc":
+        sources = [("oc", try_opencode), ("cc", try_claude_code)]
+    elif prefer == "cc":
+        sources = [("cc", try_claude_code), ("oc", try_opencode)]
+    else:
+        # Default: try Claude Code first
+        sources = [("cc", try_claude_code), ("oc", try_opencode)]
+
+    for i, (source, try_fn) in enumerate(sources):
+        token = try_fn()
+        if token:
+            # is_fallback is True if we have a preference and this isn't the first choice
+            is_fallback = prefer is not None and i > 0
+            return token, source, is_fallback
+
+    return None, None, False
+
+
+def fetch_profile(token: str) -> Optional[Dict]:
+    """Fetch user profile including plan/tier info."""
+    req = urllib.request.Request(
+        OAUTH_PROFILE_URL,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        method="GET",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            return json.load(response)
+    except (urllib.error.URLError, json.JSONDecodeError, TimeoutError):
+        return None
 
 
 def query_usage_headers(token: str) -> Optional[Dict[str, str]]:
@@ -290,49 +335,72 @@ def parse_usage_data(headers: Dict[str, str]) -> Optional[Dict]:
         return None
 
 
-def fetch_usage_data() -> tuple[Optional[Dict], bool]:
-    """Fetch and parse usage data from the API. Returns (data, has_token)."""
-    token = get_valid_token()
+def fetch_usage_data(
+    previous_token: Optional[str] = None,
+    prefer_source: Optional[str] = None,
+) -> tuple[Optional[Dict], Optional[Dict], Optional[str], Optional[str], bool, bool]:
+    """Fetch and parse usage data from the API.
+
+    Returns (data, profile, token, source, is_fallback, has_token).
+    Profile is only fetched if token changed from previous_token.
+    Source is "cc" (Claude Code) or "oc" (OpenCode).
+    is_fallback is True if using non-preferred source due to preferred being unavailable.
+    """
+    token, source, is_fallback = get_valid_token(prefer_source)
     if not token:
-        return None, False
+        return None, None, None, None, False, False
 
     headers = query_usage_headers(token)
     if not headers:
-        return None, True
+        return None, None, token, source, is_fallback, True
 
-    return parse_usage_data(headers), True
+    usage_data = parse_usage_data(headers)
+
+    # Only fetch profile if token changed (new login or refresh)
+    profile = None
+    if token != previous_token:
+        profile = fetch_profile(token)
+
+    return usage_data, profile, token, source, is_fallback, True
+
+
+def empty_account_data() -> Dict:
+    """Return empty account data structure."""
+    return {
+        "current": {
+            "session_5h": None,
+            "window_7d": None,
+        },
+        "history": {
+            "sessions_5h": [],
+            "windows_7d": [],
+        },
+    }
 
 
 def load_history() -> Dict:
-    """Load usage history from disk."""
+    """Load usage history and config from disk."""
+    empty = {
+        "version": 2,
+        "config": {
+            "prefer_source": None,  # "cc" or "oc" or None for auto
+        },
+        "accounts": {},
+        "active_account": None,
+    }
+
     if not os.path.exists(HISTORY_FILE):
-        return {
-            "version": 1,
-            "current": {
-                "session_5h": None,
-                "window_7d": None,
-            },
-            "history": {
-                "sessions_5h": [],
-                "windows_7d": [],
-            },
-        }
+        return empty
 
     try:
         with open(HISTORY_FILE) as f:
-            return json.load(f)
+            data = json.load(f)
+        # Ensure config section exists
+        if "config" not in data:
+            data["config"] = empty["config"]
+        return data
     except (json.JSONDecodeError, IOError):
-        return {
-            "version": 1,
-            "current": {
-                "session_5h": None,
-                "window_7d": None,
-            },
-            "history": {
-                "sessions_5h": [],
-                "windows_7d": [],
-            },
-        }
+        return empty
 
 
 def save_history(history: Dict) -> None:
@@ -347,48 +415,135 @@ def save_history(history: Dict) -> None:
         print(f"Failed to save history: {e}", file=sys.stderr)
 
 
-def update_history(usage_data: Dict) -> None:
+def save_pid() -> None:
+    """Save current PID to history file."""
+    history = load_history()
+    history["pid"] = os.getpid()
+    save_history(history)
+
+
+def clear_pid() -> None:
+    """Clear PID from history file on exit."""
+    history = load_history()
+    if history.get("pid") == os.getpid():
+        history["pid"] = None
+        save_history(history)
+
+
+def signal_running_instance() -> bool:
+    """Signal the running instance to refresh. Returns True if signal sent."""
+    history = load_history()
+    pid = history.get("pid")
+    if pid:
+        try:
+            os.kill(pid, signal.SIGUSR1)
+            return True
+        except (ProcessLookupError, PermissionError):
+            # Process doesn't exist or we can't signal it
+            pass
+    return False
+
+
+def set_config(key: str, value) -> None:
+    """Set a config value and signal running instance."""
+    history = load_history()
+    if "config" not in history:
+        history["config"] = {}
+    history["config"][key] = value
+    save_history(history)
+    signal_running_instance()
+
+
+def update_history(usage_data: Dict, profile: Optional[Dict] = None) -> None:
     """Update usage history with new data."""
     now = int(time.time())
     history = load_history()
 
+    # Get account UUID from profile (required for storing history)
+    account_uuid = None
+    if profile:
+        account_uuid = profile.get("account", {}).get("uuid")
+
+    # If no profile provided, use active account from history
+    if not account_uuid:
+        account_uuid = history.get("active_account")
+
+    # Can't store history without knowing which account
+    if not account_uuid:
+        return
+
+    # Ensure account exists in history
+    if account_uuid not in history["accounts"]:
+        history["accounts"][account_uuid] = empty_account_data()
+
+    account = history["accounts"][account_uuid]
+
+    # Update account profile info if we have it
+    if profile:
+        org = profile.get("organization", {})
+        account["email"] = profile.get("account", {}).get("email")
+        account["organization_name"] = org.get("name")
+        account["organization_type"] = org.get("organization_type")
+        account["rate_limit_tier"] = org.get("rate_limit_tier")
+        account["last_updated"] = now
+
+    # Update active account
+    history["active_account"] = account_uuid
+
+    # Extract plan info for session records
+    plan_info = None
+    if account.get("organization_type"):
+        plan_info = {
+            "organization_type": account["organization_type"],
+            "rate_limit_tier": account.get("rate_limit_tier"),
+        }
+
     # Check if current 5h session should be archived
-    current_5h = history["current"]["session_5h"]
+    current_5h = account["current"]["session_5h"]
     if current_5h and current_5h["reset_at"] != usage_data["5h_reset"]:
         # The reset_at changed, meaning the old session ended
-        # Archive the old session
-        history["history"]["sessions_5h"].append(
-            {
+        # Archive the old session with plan info (skip invalid entries with reset_at=0)
+        if current_5h["reset_at"] > 0:
+            archived = {
                 "reset_at": current_5h["reset_at"],
                 "utilization": current_5h["utilization"],
                 "recorded_at": current_5h["last_updated"],
             }
-        )
+            if current_5h.get("plan"):
+                archived["plan"] = current_5h["plan"]
+            account["history"]["sessions_5h"].append(archived)
 
     # Check if current 7d window should be archived
-    current_7d = history["current"]["window_7d"]
+    current_7d = account["current"]["window_7d"]
     if current_7d and current_7d["reset_at"] != usage_data["7d_reset"]:
         # The reset_at changed, meaning the old window ended
-        # Archive the old window
-        history["history"]["windows_7d"].append(
-            {
+        # Archive the old window with plan info (skip invalid entries with reset_at=0)
+        if current_7d["reset_at"] > 0:
+            archived = {
                 "reset_at": current_7d["reset_at"],
                 "utilization": current_7d["utilization"],
                 "recorded_at": current_7d["last_updated"],
             }
-        )
+            if current_7d.get("plan"):
+                archived["plan"] = current_7d["plan"]
+            account["history"]["windows_7d"].append(archived)
 
-    # Update current sessions
-    history["current"]["session_5h"] = {
+    # Update current sessions with plan info
+    account["current"]["session_5h"] = {
         "reset_at": usage_data["5h_reset"],
         "utilization": usage_data["5h_utilization"],
         "last_updated": now,
     }
-    history["current"]["window_7d"] = {
+    if plan_info:
+        account["current"]["session_5h"]["plan"] = plan_info
+
+    account["current"]["window_7d"] = {
         "reset_at": usage_data["7d_reset"],
         "utilization": usage_data["7d_utilization"],
         "last_updated": now,
     }
+    if plan_info:
+        account["current"]["window_7d"]["plan"] = plan_info
 
     save_history(history)
 
@@ -476,7 +631,44 @@ def format_relative_time(dt: datetime) -> str:
         return f"{seconds // 3600} hours ago"
 
 
-def format_tooltip(data: Dict, last_check_time: Optional[datetime] = None) -> str:
+def format_plan_name(profile: Optional[Dict]) -> str:
+    """Format the plan name from profile data."""
+    if not profile:
+        return "Claude"
+    org_type = profile.get("organization", {}).get("organization_type", "")
+    tier = profile.get("organization", {}).get("rate_limit_tier", "")
+
+    # Map organization_type to friendly name
+    plan_names = {
+        "claude_max": "Max",
+        "claude_pro": "Pro",
+        "claude_enterprise": "Enterprise",
+        "claude_team": "Team",
+    }
+    plan = plan_names.get(
+        org_type, org_type.replace("claude_", "").title() if org_type else ""
+    )
+
+    # Extract multiplier from tier (e.g., "default_claude_max_5x" -> "5x")
+    multiplier = ""
+    if tier:
+        import re
+
+        match = re.search(r"(\d+x)$", tier)
+        if match:
+            multiplier = f" {match.group(1)}"
+
+    return f"Claude {plan}{multiplier}" if plan else "Claude"
+
+
+def format_tooltip(
+    data: Dict,
+    last_check_time: Optional[datetime] = None,
+    profile: Optional[Dict] = None,
+    cred_source: Optional[str] = None,
+    cred_is_fallback: bool = False,
+    prefer_source: Optional[str] = None,
+) -> str:
     """Format the tooltip with usage information."""
     util_5h = data["5h_utilization"] * 100
     util_7d = data["7d_utilization"] * 100
@@ -521,12 +713,38 @@ def format_tooltip(data: Dict, last_check_time: Optional[datetime] = None) -> st
         lines.append("")
         lines.append(f"Overall status: {data['status']}")
 
+    # Footer with credential source, user info and last check time
+    footer_parts = []
+    if cred_source:
+        # Format source based on mode:
+        # - auto mode (no preference): just "cc" or "oc"
+        # - prefer mode, using preferred: "[cc]" or "[oc]"
+        # - prefer mode, using fallback: "cc (fallback)" or "oc (fallback)"
+        if prefer_source is None:
+            # Auto mode
+            footer_parts.append(cred_source)
+        elif cred_is_fallback:
+            # Prefer mode but using fallback
+            footer_parts.append(f"{cred_source} (fallback)")
+        else:
+            # Prefer mode, using preferred source
+            footer_parts.append(f"[{cred_source}]")
+    if profile:
+        email = profile.get("account", {}).get("email")
+        if email:
+            footer_parts.append(email)
     if last_check_time:
-        lines.append("")
-        lines.append(f"Last checked {format_relative_time(last_check_time)}")
+        footer_parts.append(f"checked {format_relative_time(last_check_time)}")
+    footer = " · ".join(footer_parts) if footer_parts else None
 
-    title = "Claude Max Usage"
-    centered_title = title.center(max(len(line) for line in lines))
+    title = f"{format_plan_name(profile)} Usage"
+    max_width = max(len(line) for line in lines)
+    centered_title = title.center(max_width)
+
+    # Add centered footer
+    if footer:
+        lines.append("")
+        lines.append(footer.center(max_width))
 
     return centered_title + "\n" + "\n".join(lines)
 
@@ -640,6 +858,10 @@ def format_waybar_output(
     last_check_time: Optional[datetime] = None,
     show_time_remaining: bool = False,
     has_token: bool = True,
+    profile: Optional[Dict] = None,
+    cred_source: Optional[str] = None,
+    cred_is_fallback: bool = False,
+    prefer_source: Optional[str] = None,
 ) -> Optional[Dict]:
     """Format output for Waybar."""
     if not has_token:
@@ -684,7 +906,9 @@ def format_waybar_output(
         css_class = "critical"
 
     # Format tooltip
-    tooltip = format_tooltip(data, last_check_time)
+    tooltip = format_tooltip(
+        data, last_check_time, profile, cred_source, cred_is_fallback, prefer_source
+    )
 
     # Format text - alternate between percentage and time remaining
     if data["representative_claim"] == "five_hour":
@@ -706,22 +930,42 @@ def format_waybar_output(
     }
 
 
-def monitor():
+def monitor(prefer_source_override: Optional[str] = None):
     """Main monitoring loop."""
     last_check_time: Optional[datetime] = None
     last_output_json: Optional[str] = None
     usage_data: Optional[Dict] = None
+    profile_data: Optional[Dict] = None
+    current_token: Optional[str] = None
+    cred_source: Optional[str] = None
+    cred_is_fallback: bool = False
     has_token: bool = True
     check_thread: Optional[threading.Thread] = None
-    check_result: list = [(None, True)]
+    check_result: list = [(None, None, None, None, False, True)]
     check_lock = threading.Lock()
     expired_5h_triggered: bool = False
     expired_7d_triggered: bool = False
     last_check_start: float = 0.0
+    signal_received: list = [False]  # Use list for mutability in signal handler
 
-    def run_check_async(result_container: list, lock: threading.Lock):
+    def get_prefer_source() -> Optional[str]:
+        """Get prefer_source from override or config."""
+        if prefer_source_override:
+            return prefer_source_override
+        history = load_history()
+        return history.get("config", {}).get("prefer_source")
+
+    def handle_signal(signum, frame):
+        """Handle SIGUSR1 to trigger refresh."""
+        signal_received[0] = True
+
+    signal.signal(signal.SIGUSR1, handle_signal)
+
+    def run_check_async(
+        result_container: list, lock: threading.Lock, prev_token: Optional[str]
+    ):
         try:
-            result = fetch_usage_data()
+            result = fetch_usage_data(prev_token, get_prefer_source())
             with lock:
                 result_container[0] = result
         except Exception as e:
@@ -731,11 +975,17 @@ def monitor():
         nonlocal check_thread, last_check_start
         check_thread = threading.Thread(
             target=run_check_async,
-            args=(check_result, check_lock),
+            args=(check_result, check_lock, current_token),
             daemon=True,
         )
         check_thread.start()
         last_check_start = time.time()
+
+    # Save PID and register cleanup
+    save_pid()
+    import atexit
+
+    atexit.register(clear_pid)
 
     # Start initial check immediately
     start_check()
@@ -744,19 +994,33 @@ def monitor():
         while True:
             current_time = time.time()
 
+            # Check if signal received (triggers immediate refresh)
+            if signal_received[0]:
+                signal_received[0] = False
+                if check_thread is None or not check_thread.is_alive():
+                    start_check()
+
             # Check if background thread completed
             if check_thread is not None and not check_thread.is_alive():
                 with check_lock:
                     if check_result[0] is not None:
-                        data, token_valid = check_result[0]
+                        data, profile, token, source, is_fallback, token_valid = (
+                            check_result[0]
+                        )
                         has_token = token_valid
                         if data is not None:
                             usage_data = data
+                            current_token = token
+                            cred_source = source
+                            cred_is_fallback = is_fallback
+                            # Only update profile if we got new one (token changed)
+                            if profile is not None:
+                                profile_data = profile
                             # Reset expiry triggers when we get new data
                             expired_5h_triggered = False
                             expired_7d_triggered = False
-                            # Update history
-                            update_history(data)
+                            # Update history with profile info (use cached if not refreshed)
+                            update_history(data, profile if profile else profile_data)
                         last_check_time = datetime.now()
                         check_result[0] = None
                 check_thread = None
@@ -790,8 +1054,16 @@ def monitor():
             show_time_remaining = cycle_position >= 15
 
             # Format and output
+            prefer_source = get_prefer_source()
             output = format_waybar_output(
-                usage_data, last_check_time, show_time_remaining, has_token
+                usage_data,
+                last_check_time,
+                show_time_remaining,
+                has_token,
+                profile_data,
+                cred_source,
+                cred_is_fallback,
+                prefer_source,
             )
             if output:
                 output_json = json.dumps(output)
@@ -802,11 +1074,81 @@ def monitor():
             time.sleep(OUTPUT_INTERVAL)
 
     except KeyboardInterrupt:
+        clear_pid()
         sys.exit(0)
 
 
 def main():
-    monitor()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Claude usage monitor for Waybar")
+
+    # Runtime preference override (for the monitor)
+    runtime_group = parser.add_mutually_exclusive_group()
+    runtime_group.add_argument(
+        "--prefer-cc",
+        action="store_true",
+        help="Prefer Claude Code credentials (falls back to OpenCode)",
+    )
+    runtime_group.add_argument(
+        "--prefer-oc",
+        action="store_true",
+        help="Prefer OpenCode credentials (falls back to Claude Code)",
+    )
+
+    # One-shot commands to configure and signal running instance
+    action_group = parser.add_mutually_exclusive_group()
+    action_group.add_argument(
+        "--set-prefer-cc",
+        action="store_true",
+        help="Set preference to Claude Code and signal refresh",
+    )
+    action_group.add_argument(
+        "--set-prefer-oc",
+        action="store_true",
+        help="Set preference to OpenCode and signal refresh",
+    )
+    action_group.add_argument(
+        "--set-prefer-auto",
+        action="store_true",
+        help="Set preference to auto (try Claude Code first) and signal refresh",
+    )
+    action_group.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Signal running instance to refresh",
+    )
+
+    args = parser.parse_args()
+
+    # Handle one-shot config commands
+    if args.set_prefer_cc:
+        set_config("prefer_source", "cc")
+        print("Set preference to Claude Code")
+        return
+    elif args.set_prefer_oc:
+        set_config("prefer_source", "oc")
+        print("Set preference to OpenCode")
+        return
+    elif args.set_prefer_auto:
+        set_config("prefer_source", None)
+        print("Set preference to auto")
+        return
+    elif args.refresh:
+        if signal_running_instance():
+            print("Signaled running instance to refresh")
+        else:
+            print("No running instance found")
+        return
+
+    # Start monitor with optional runtime override
+    prefer_source = None
+    if args.prefer_cc:
+        prefer_source = "cc"
+    elif args.prefer_oc:
+        prefer_source = "oc"
+
+    monitor(prefer_source)
 
 
 if __name__ == "__main__":
