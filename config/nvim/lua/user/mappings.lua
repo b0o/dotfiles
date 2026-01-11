@@ -411,6 +411,30 @@ map('i', '<M-a>', '<C-o>_', 'Move to start of line')
 map('i', { xk '<C-S-k>', xk "<C-'>" }, '<C-k>', 'Insert digraph')
 map('n', 'gxa', 'ga', 'Show char code in decimal, hexadecimal and octal')
 
+map('n', 'gxG', function()
+  local col = vim.fn.col '.'
+  local line = vim.api.nvim_get_current_line()
+  -- Find username/reponame pattern that contains the cursor position
+  local pattern = '[%w_%-%.]+/[%w_%-%.]+'
+  local start_pos = 1
+  while true do
+    local match_start, match_end = line:find(pattern, start_pos)
+    if not match_start then
+      break
+    end
+    -- Check if cursor is within or adjacent to this match
+    if col >= match_start and col <= match_end then
+      local repo = line:sub(match_start, match_end)
+      local url = 'https://github.com/' .. repo
+      vim.ui.open(url)
+      vim.notify('Opening ' .. url, vim.log.levels.INFO)
+      return
+    end
+    start_pos = match_start + 1
+  end
+  vim.notify('No GitHub repo found under cursor', vim.log.levels.WARN)
+end, 'Open GitHub repo under cursor')
+
 map('i', xk '<C-`>', '<C-o>~<Left>', 'Toggle case')
 
 -- emacs-style motion & editing in command mode
