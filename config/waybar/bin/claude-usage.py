@@ -22,6 +22,11 @@ CHECK_INTERVAL = 60.0
 OUTPUT_INTERVAL = 1.0
 BAR_WIDTH = 44
 HISTORY_FILE = os.path.expanduser("~/.local/share/claude-usage.json")
+CLAUDE_CREDS_PATH = os.path.expanduser("~/.claude/.credentials.json")
+OPENCODE_CREDS_PATH = os.path.expanduser("~/.local/share/opencode/auth.json")
+OAUTH_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token"
+OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+TOKEN_REFRESH_MARGIN = 300  # Refresh if token expires within 5 minutes
 
 progress_chars = {
     "empty_left": "",
@@ -55,39 +60,166 @@ hourglass_frames = [
 ]
 
 
+def refresh_claude_token() -> Optional[str]:
+    """Refresh Claude CLI OAuth token using refresh token. Returns new access token."""
+    if not os.path.exists(CLAUDE_CREDS_PATH):
+        return None
+
+    try:
+        with open(CLAUDE_CREDS_PATH) as f:
+            data = json.load(f)
+
+        oauth = data.get("claudeAiOauth", {})
+        refresh_token = oauth.get("refreshToken")
+        if not refresh_token:
+            return None
+
+        # Make refresh request
+        payload = json.dumps(
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": OAUTH_CLIENT_ID,
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            OAUTH_TOKEN_URL,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.load(response)
+
+        # Update credentials file with new tokens
+        new_access_token = result.get("access_token")
+        new_refresh_token = result.get("refresh_token")
+        expires_in = result.get("expires_in", 28800)
+
+        if new_access_token:
+            oauth["accessToken"] = new_access_token
+            # expiresAt is in milliseconds
+            oauth["expiresAt"] = int((time.time() + expires_in) * 1000)
+            if new_refresh_token:
+                oauth["refreshToken"] = new_refresh_token
+            data["claudeAiOauth"] = oauth
+
+            with open(CLAUDE_CREDS_PATH, "w") as f:
+                json.dump(data, f)
+
+            return new_access_token
+
+    except (json.JSONDecodeError, urllib.error.URLError, IOError, KeyError) as e:
+        print(f"Token refresh failed: {e}", file=sys.stderr)
+
+    return None
+
+
+def refresh_opencode_token() -> Optional[str]:
+    """Refresh OpenCode OAuth token using refresh token. Returns new access token."""
+    if not os.path.exists(OPENCODE_CREDS_PATH):
+        return None
+
+    try:
+        with open(OPENCODE_CREDS_PATH) as f:
+            data = json.load(f)
+
+        anthropic = data.get("anthropic", {})
+        refresh_token = anthropic.get("refresh")
+        if not refresh_token:
+            return None
+
+        # Make refresh request
+        payload = json.dumps(
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": refresh_token,
+                "client_id": OAUTH_CLIENT_ID,
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(
+            OAUTH_TOKEN_URL,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.load(response)
+
+        # Update credentials file with new tokens
+        new_access_token = result.get("access_token")
+        new_refresh_token = result.get("refresh_token")
+        expires_in = result.get("expires_in", 28800)
+
+        if new_access_token:
+            anthropic["access"] = new_access_token
+            # expires is in milliseconds
+            anthropic["expires"] = int((time.time() + expires_in) * 1000)
+            if new_refresh_token:
+                anthropic["refresh"] = new_refresh_token
+            data["anthropic"] = anthropic
+
+            with open(OPENCODE_CREDS_PATH, "w") as f:
+                json.dump(data, f, indent=4)
+
+            return new_access_token
+
+    except (json.JSONDecodeError, urllib.error.URLError, IOError, KeyError) as e:
+        print(f"OpenCode token refresh failed: {e}", file=sys.stderr)
+
+    return None
+
+
 def get_valid_token() -> Optional[str]:
-    """Get a valid OAuth token from Claude CLI or OpenCode credentials."""
+    """Get a valid OAuth token from Claude CLI or OpenCode credentials.
+
+    Will automatically refresh expired tokens if a refresh token is available.
+    """
     now = time.time()
 
     # Try Claude CLI credentials first
-    claude_creds_path = os.path.expanduser("~/.claude/.credentials.json")
-    if os.path.exists(claude_creds_path):
+    if os.path.exists(CLAUDE_CREDS_PATH):
         try:
-            with open(claude_creds_path) as f:
+            with open(CLAUDE_CREDS_PATH) as f:
                 data = json.load(f)
             oauth = data.get("claudeAiOauth", {})
             token = oauth.get("accessToken")
             expires_at = oauth.get("expiresAt")
             if token and expires_at:
                 # expiresAt is a unix timestamp in milliseconds
-                if expires_at / 1000 > now:
+                expires_at_sec = expires_at / 1000
+                if expires_at_sec > now + TOKEN_REFRESH_MARGIN:
                     return token
+                # Token expired or about to expire, try to refresh
+                if oauth.get("refreshToken"):
+                    new_token = refresh_claude_token()
+                    if new_token:
+                        return new_token
         except (json.JSONDecodeError, KeyError, ValueError):
             pass
 
     # Try OpenCode credentials
-    opencode_creds_path = os.path.expanduser("~/.local/share/opencode/auth.json")
-    if os.path.exists(opencode_creds_path):
+    if os.path.exists(OPENCODE_CREDS_PATH):
         try:
-            with open(opencode_creds_path) as f:
+            with open(OPENCODE_CREDS_PATH) as f:
                 data = json.load(f)
             anthropic = data.get("anthropic", {})
             token = anthropic.get("access")
             expires_at = anthropic.get("expires")
             if token and expires_at:
                 # expires is a unix timestamp in milliseconds
-                if expires_at / 1000 > now:
+                expires_at_sec = expires_at / 1000
+                if expires_at_sec > now + TOKEN_REFRESH_MARGIN:
                     return token
+                # Token expired or about to expire, try to refresh
+                if anthropic.get("refresh"):
+                    new_token = refresh_opencode_token()
+                    if new_token:
+                        return new_token
         except (json.JSONDecodeError, KeyError, ValueError):
             pass
 
