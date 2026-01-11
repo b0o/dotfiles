@@ -185,7 +185,8 @@ def get_valid_token(
     Will automatically refresh expired tokens if a refresh token is available.
 
     Args:
-        prefer: "cc" for Claude Code, "oc" for OpenCode, None for auto (tries cc first)
+        prefer: "cc" for Claude Code, "oc" for OpenCode, None for auto
+                (auto mode tries the most recently modified credential file first)
 
     Returns:
         Tuple of (token, source, is_fallback) where source is "cc" or "oc",
@@ -193,6 +194,33 @@ def get_valid_token(
         or (None, None, False) if no valid token.
     """
     now = time.time()
+
+    def check_token_valid(
+        path: str, token_key: str, expires_key: str, data_key: Optional[str] = None
+    ) -> bool:
+        """Check if a credential file has a valid (non-expired) token."""
+        if not os.path.exists(path):
+            return False
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            if data_key:
+                data = data.get(data_key, {})
+            token = data.get(token_key)
+            expires_at = data.get(expires_key)
+            if token and expires_at:
+                expires_at_sec = expires_at / 1000
+                return expires_at_sec > now + TOKEN_REFRESH_MARGIN
+        except (json.JSONDecodeError, KeyError, ValueError, IOError):
+            pass
+        return False
+
+    def get_mtime(path: str) -> float:
+        """Get file modification time, or 0 if file doesn't exist."""
+        try:
+            return os.path.getmtime(path)
+        except OSError:
+            return 0
 
     def try_claude_code() -> Optional[str]:
         if os.path.exists(CLAUDE_CREDS_PATH):
@@ -240,8 +268,25 @@ def get_valid_token(
     elif prefer == "cc":
         sources = [("cc", try_claude_code), ("oc", try_opencode)]
     else:
-        # Default: try Claude Code first
-        sources = [("cc", try_claude_code), ("oc", try_opencode)]
+        # Auto mode: if both have valid tokens, prefer the more recently modified file
+        cc_valid = check_token_valid(
+            CLAUDE_CREDS_PATH, "accessToken", "expiresAt", "claudeAiOauth"
+        )
+        oc_valid = check_token_valid(
+            OPENCODE_CREDS_PATH, "access", "expires", "anthropic"
+        )
+
+        if cc_valid and oc_valid:
+            # Both valid, use the one with more recent mtime
+            cc_mtime = get_mtime(CLAUDE_CREDS_PATH)
+            oc_mtime = get_mtime(OPENCODE_CREDS_PATH)
+            if oc_mtime > cc_mtime:
+                sources = [("oc", try_opencode), ("cc", try_claude_code)]
+            else:
+                sources = [("cc", try_claude_code), ("oc", try_opencode)]
+        else:
+            # Default order if not both valid
+            sources = [("cc", try_claude_code), ("oc", try_opencode)]
 
     for i, (source, try_fn) in enumerate(sources):
         token = try_fn()
