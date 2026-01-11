@@ -40,13 +40,6 @@ add-path ([
   $"($home)/.cargo/bin"
 ])
 
-# See ./autoload/plugins.nu
-$env.NU_PLUGINS = [
-  # { name: example, cmd?: nu_plugin_example }
-  # { name: example, path?: /path/to/plugin }
-  { name: skim, cmd: nu_plugin_skim }
-]
-
 $env.config.use_kitty_protocol = true
 $env.config.show_banner = false
 $env.config.completions = {
@@ -103,10 +96,7 @@ hooks use {
         and ($hm_session_vars | path exists)
       )
     }
-    hash: {
-      # Invalidate the cached hook if the session vars file changes
-      open --raw $hm_session_vars | hash md5
-    }
+    hash_files: $hm_session_vars
     cmd: {
       "load-env " ++ (
         env -u __HM_SESS_VARS_SOURCED bash-env-json $hm_session_vars
@@ -119,7 +109,7 @@ hooks use {
   }
   comark: {
     enabled: true
-    hash: { comark generate-autoload-hash }
+    hash_fn: { comark generate-autoload-hash }
     cmd: { comark generate-autoload }
   }
   # TODO: use atuin daemon
@@ -177,6 +167,8 @@ hooks use {
   }
   skim: {
     enabled: true
+    plugin: true
+    plugin_cmd: nu_plugin_skim
     depends: nu_plugin_skim
     env: {
       SKIM_DEFAULT_OPTIONS: ([
