@@ -21,6 +21,7 @@ import humanize  # pyright: ignore
 CHECK_INTERVAL = 60.0
 OUTPUT_INTERVAL = 1.0
 BAR_WIDTH = 44
+HISTORY_FILE = os.path.expanduser("~/.local/share/claude-usage.json")
 
 progress_chars = {
     "empty_left": "",
@@ -168,6 +169,96 @@ def fetch_usage_data() -> tuple[Optional[Dict], bool]:
         return None, True
 
     return parse_usage_data(headers), True
+
+
+def load_history() -> Dict:
+    """Load usage history from disk."""
+    if not os.path.exists(HISTORY_FILE):
+        return {
+            "version": 1,
+            "current": {
+                "session_5h": None,
+                "window_7d": None,
+            },
+            "history": {
+                "sessions_5h": [],
+                "windows_7d": [],
+            },
+        }
+
+    try:
+        with open(HISTORY_FILE) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {
+            "version": 1,
+            "current": {
+                "session_5h": None,
+                "window_7d": None,
+            },
+            "history": {
+                "sessions_5h": [],
+                "windows_7d": [],
+            },
+        }
+
+
+def save_history(history: Dict) -> None:
+    """Save usage history to disk."""
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+
+    try:
+        with open(HISTORY_FILE, "w") as f:
+            json.dump(history, f, indent=2)
+    except IOError as e:
+        print(f"Failed to save history: {e}", file=sys.stderr)
+
+
+def update_history(usage_data: Dict) -> None:
+    """Update usage history with new data."""
+    now = int(time.time())
+    history = load_history()
+
+    # Check if current 5h session should be archived
+    current_5h = history["current"]["session_5h"]
+    if current_5h and current_5h["reset_at"] != usage_data["5h_reset"]:
+        # The reset_at changed, meaning the old session ended
+        # Archive the old session
+        history["history"]["sessions_5h"].append(
+            {
+                "reset_at": current_5h["reset_at"],
+                "utilization": current_5h["utilization"],
+                "recorded_at": current_5h["last_updated"],
+            }
+        )
+
+    # Check if current 7d window should be archived
+    current_7d = history["current"]["window_7d"]
+    if current_7d and current_7d["reset_at"] != usage_data["7d_reset"]:
+        # The reset_at changed, meaning the old window ended
+        # Archive the old window
+        history["history"]["windows_7d"].append(
+            {
+                "reset_at": current_7d["reset_at"],
+                "utilization": current_7d["utilization"],
+                "recorded_at": current_7d["last_updated"],
+            }
+        )
+
+    # Update current sessions
+    history["current"]["session_5h"] = {
+        "reset_at": usage_data["5h_reset"],
+        "utilization": usage_data["5h_utilization"],
+        "last_updated": now,
+    }
+    history["current"]["window_7d"] = {
+        "reset_at": usage_data["7d_reset"],
+        "utilization": usage_data["7d_utilization"],
+        "last_updated": now,
+    }
+
+    save_history(history)
 
 
 def format_reset_time(reset_timestamp: int) -> str:
@@ -532,6 +623,8 @@ def monitor():
                             # Reset expiry triggers when we get new data
                             expired_5h_triggered = False
                             expired_7d_triggered = False
+                            # Update history
+                            update_history(data)
                         last_check_time = datetime.now()
                         check_result[0] = None
                 check_thread = None
