@@ -135,17 +135,17 @@ def parse_usage_data(headers: Dict[str, str]) -> Optional[Dict]:
         return None
 
 
-def fetch_usage_data() -> Optional[Dict]:
-    """Fetch and parse usage data from the API."""
+def fetch_usage_data() -> tuple[Optional[Dict], bool]:
+    """Fetch and parse usage data from the API. Returns (data, has_token)."""
     token = get_valid_token()
     if not token:
-        return None
+        return None, False
 
     headers = query_usage_headers(token)
     if not headers:
-        return None
+        return None, True
 
-    return parse_usage_data(headers)
+    return parse_usage_data(headers), True
 
 
 def format_reset_time(reset_timestamp: int) -> str:
@@ -303,8 +303,17 @@ def format_waybar_output(
     data: Optional[Dict],
     last_check_time: Optional[datetime] = None,
     show_time_remaining: bool = False,
+    has_token: bool = True,
 ) -> Optional[Dict]:
     """Format output for Waybar."""
+    if not has_token:
+        return {
+            "text": "󰛄",
+            "tooltip": "No active token",
+            "percentage": 0,
+            "class": "inactive",
+        }
+
     if not data:
         return None
 
@@ -366,8 +375,9 @@ def monitor():
     last_check_time: Optional[datetime] = None
     last_output_json: Optional[str] = None
     usage_data: Optional[Dict] = None
+    has_token: bool = True
     check_thread: Optional[threading.Thread] = None
-    check_result: list = [None]
+    check_result: list = [(None, True)]
     check_lock = threading.Lock()
 
     def run_check_async(result_container: list, lock: threading.Lock):
@@ -395,7 +405,10 @@ def monitor():
             if check_thread is not None and not check_thread.is_alive():
                 with check_lock:
                     if check_result[0] is not None:
-                        usage_data = check_result[0]
+                        data, token_valid = check_result[0]
+                        has_token = token_valid
+                        if data is not None:
+                            usage_data = data
                         last_check_time = datetime.now()
                         check_result[0] = None
                 check_thread = None
@@ -418,7 +431,7 @@ def monitor():
 
             # Format and output
             output = format_waybar_output(
-                usage_data, last_check_time, show_time_remaining
+                usage_data, last_check_time, show_time_remaining, has_token
             )
             if output:
                 output_json = json.dumps(output)
