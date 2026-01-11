@@ -2,6 +2,27 @@
 <interface>
   <object class="GtkMenu" id="menu">
     <child>
+      <object class="GtkMenuItem" id="credentials-menu">
+        <property name="label">Credentials</property>
+        <property name="submenu">credentials-submenu</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="refresh">
+        <property name="label">Refresh</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkSeparatorMenuItem" id="delimiter1" />
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="open-usage">
+        <property name="label">Open Usage Page</property>
+      </object>
+    </child>
+  </object>
+  <object class="GtkMenu" id="credentials-submenu">
+    <child>
       <object class="GtkMenuItem" id="prefer-cc">
         <property name="label">Prefer Claude Code</property>
       </object>
@@ -14,22 +35,6 @@
     <child>
       <object class="GtkMenuItem" id="prefer-auto">
         <property name="label">Auto</property>
-      </object>
-    </child>
-    <child>
-      <object class="GtkSeparatorMenuItem" id="delimiter1" />
-    </child>
-    <child>
-      <object class="GtkMenuItem" id="refresh">
-        <property name="label">Refresh</property>
-      </object>
-    </child>
-    <child>
-      <object class="GtkSeparatorMenuItem" id="delimiter2" />
-    </child>
-    <child>
-      <object class="GtkMenuItem" id="open-usage">
-        <property name="label">Open Usage Page</property>
       </object>
     </child>
   </object>
