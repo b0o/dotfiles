@@ -77,10 +77,14 @@ very_lazy(function()
 
     bufmap('n', '<Tab>', function()
       local entry, ref_id = get_selected()
-      if not entry or not entry:is_directory() then
+      if not entry then
         return
       end
-      toggle_dir(entry, ref_id)
+      if entry:is_directory() then
+        toggle_dir(entry, ref_id)
+      elseif entry.type == 'file' then
+        require('overlook.peek').file(entry.path)
+      end
     end, 'Fyler: Toggle expanded')
   end)
 end)

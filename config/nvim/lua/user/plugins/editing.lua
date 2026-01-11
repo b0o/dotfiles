@@ -207,7 +207,29 @@ return {
   },
   {
     'WilliamHsieh/overlook.nvim',
-    opts = {},
+    opts = {
+      ui = {
+        min_width = 100,
+        z_index_base = 100,
+      },
+      adapters = {
+        file = {
+          get = function(path)
+            local buf = vim.fn.bufnr(path, true)
+            if buf == -1 then
+              vim.notify('Overlook: Failed to get buf for file ' .. path, vim.log.levels.ERROR)
+              return
+            end
+            ---@type OverlookPopupOptions
+            return {
+              target_bufnr = buf,
+              col = 1,
+              lnum = 1,
+            }
+          end,
+        },
+      },
+    },
     keys = {
       {
         '<leader>pp',
