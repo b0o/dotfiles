@@ -492,6 +492,9 @@ def monitor():
     check_thread: Optional[threading.Thread] = None
     check_result: list = [(None, True)]
     check_lock = threading.Lock()
+    expired_5h_triggered: bool = False
+    expired_7d_triggered: bool = False
+    last_check_start: float = 0.0
 
     def run_check_async(result_container: list, lock: threading.Lock):
         try:
@@ -501,14 +504,18 @@ def monitor():
         except Exception as e:
             print(f"Background check error: {e}", file=sys.stderr)
 
+    def start_check():
+        nonlocal check_thread, last_check_start
+        check_thread = threading.Thread(
+            target=run_check_async,
+            args=(check_result, check_lock),
+            daemon=True,
+        )
+        check_thread.start()
+        last_check_start = time.time()
+
     # Start initial check immediately
-    check_thread = threading.Thread(
-        target=run_check_async,
-        args=(check_result, check_lock),
-        daemon=True,
-    )
-    check_thread.start()
-    last_check_start = time.time()
+    start_check()
 
     try:
         while True:
@@ -522,21 +529,36 @@ def monitor():
                         has_token = token_valid
                         if data is not None:
                             usage_data = data
+                            # Reset expiry triggers when we get new data
+                            expired_5h_triggered = False
+                            expired_7d_triggered = False
                         last_check_time = datetime.now()
                         check_result[0] = None
                 check_thread = None
 
-            # Start new check if interval elapsed
-            if current_time - last_check_start >= CHECK_INTERVAL and (
+            # Check if either timer has expired and trigger a check
+            should_check = False
+            if usage_data:
+                if (
+                    usage_data["5h_reset"] > 0
+                    and current_time >= usage_data["5h_reset"]
+                ):
+                    if not expired_5h_triggered:
+                        expired_5h_triggered = True
+                        should_check = True
+                if (
+                    usage_data["7d_reset"] > 0
+                    and current_time >= usage_data["7d_reset"]
+                ):
+                    if not expired_7d_triggered:
+                        expired_7d_triggered = True
+                        should_check = True
+
+            # Start new check if interval elapsed or timer expired
+            if (should_check or current_time - last_check_start >= CHECK_INTERVAL) and (
                 check_thread is None or not check_thread.is_alive()
             ):
-                check_thread = threading.Thread(
-                    target=run_check_async,
-                    args=(check_result, check_lock),
-                    daemon=True,
-                )
-                check_thread.start()
-                last_check_start = current_time
+                start_check()
 
             # Determine display mode: 15s percentage, 5s time remaining
             cycle_position = int(current_time) % 20
