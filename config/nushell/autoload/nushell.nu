@@ -96,3 +96,23 @@ def save-xtra [
 ] {
   save-command --desc=$desc --xtras --export=$export --append=$append $name $submod
 }
+
+# Convert bash-style command to nushell syntax
+# Handles line continuations (\) and wraps multi-line commands in parens
+# Primary use-case: pasting curl commands from browser devtools
+def sh2nu []: string -> string {
+  let result = (
+    $in
+    | str replace -ra '\\\r?\n' "\n"  # Remove backslash continuations
+    | str trim
+  )
+  if ($result | str contains "\n") {
+    $"\(($result)\)"                  # Wrap in parens for multi-line
+  } else {
+    $result
+  }
+}
+
+def xsh2nu [] {
+  xco | sh2nu | xc
+}
