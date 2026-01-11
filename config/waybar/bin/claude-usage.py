@@ -20,7 +20,7 @@ import humanize  # pyright: ignore
 
 CHECK_INTERVAL = 60.0
 OUTPUT_INTERVAL = 1.0
-BAR_WIDTH = 30
+BAR_WIDTH = 44
 
 progress_chars = {
     "empty_left": "",
@@ -30,6 +30,28 @@ progress_chars = {
     "full_mid": "",
     "full_right": "",
 }
+
+hourglass_frames = [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+]
 
 
 def get_valid_token() -> Optional[str]:
@@ -154,10 +176,11 @@ def format_reset_time(reset_timestamp: int) -> str:
         return "unknown"
     reset_dt = datetime.fromtimestamp(reset_timestamp, tz=timezone.utc).astimezone()
     now = datetime.now(timezone.utc).astimezone()
-    delta = reset_dt - now
+    # delta = reset_dt - now
 
     # Get relative time using humanize
-    relative = humanize.naturaldelta(delta)
+    # relative = humanize.naturaldelta(delta)
+    relative = format_reset_short(reset_timestamp)
 
     # Format the absolute time part
     if reset_dt.date() == now.date():
@@ -167,7 +190,7 @@ def format_reset_time(reset_timestamp: int) -> str:
     else:
         absolute = reset_dt.strftime("%A %H:%M")
 
-    return f"in {relative} ({absolute})"
+    return f"{relative} ({absolute})"
 
 
 def format_reset_short(reset_timestamp: int) -> str:
@@ -234,36 +257,55 @@ def format_tooltip(data: Dict, last_check_time: Optional[datetime] = None) -> st
     """Format the tooltip with usage information."""
     util_5h = data["5h_utilization"] * 100
     util_7d = data["7d_utilization"] * 100
-    reset_5h = format_reset_time(data["5h_reset"])
-    reset_7d = format_reset_time(data["7d_reset"])
     bar_5h = get_progress_bar(int(util_5h), width=BAR_WIDTH)
     bar_7d = get_progress_bar(int(util_7d), width=BAR_WIDTH)
 
-    tooltip = "Claude API Usage\n"
+    time_elapsed_5h = get_time_elapsed_percentage(data["5h_reset"], 5.0)
+    time_elapsed_7d = get_time_elapsed_percentage(data["7d_reset"], 7 * 24.0)
+    time_bar_5h = get_time_bar(int(time_elapsed_5h), width=BAR_WIDTH)
+    time_bar_7d = get_time_bar(int(time_elapsed_7d), width=BAR_WIDTH)
+    hourglass_5h = get_hourglass_icon(time_elapsed_5h)
+    hourglass_7d = get_hourglass_icon(time_elapsed_7d)
 
-    if last_check_time:
-        tooltip += f"Last check: {format_relative_time(last_check_time)}\n"
+    end_time_5h = format_end_time(data["5h_reset"])
+    end_time_7d = format_end_time(data["7d_reset"])
+    remaining_5h = format_reset_short(data["5h_reset"])
+    remaining_7d = format_reset_short(data["7d_reset"])
 
     active_claim = data["representative_claim"]
+    zap = ""
 
-    tooltip += "\n"
-    tooltip += f"5-hour window{' (active)' if active_claim == 'five_hour' else ''}\n"
-    tooltip += f"{bar_5h} {util_5h:.1f}%\n"
+    lines = []
+    lines.append("")
+    lines.append(
+        f"5-hour session{' (active)' if active_claim == 'five_hour' else ''} {end_time_5h} ({remaining_5h})"
+    )
+    lines.append(f"{zap}  {bar_5h} {util_5h:4.1f}%")
+    lines.append(f"{hourglass_5h}  {time_bar_5h} {time_elapsed_5h:4.1f}%")
     if data["5h_status"] != "allowed":
-        tooltip += f"Status: {data['5h_status']}\n"
-    tooltip += f"Resets {reset_5h}\n"
-    tooltip += "\n"
+        lines.append(f"  Status: {data['5h_status']}")
+    lines.append("")
 
-    tooltip += f"7-day window{' (active)' if active_claim == 'seven_day' else ''}\n"
-    tooltip += f"{bar_7d} {util_7d:.1f}%\n"
+    lines.append(
+        f"7-day window{' (active)' if active_claim == 'seven_day' else ''} {end_time_7d} ({remaining_7d})"
+    )
+    lines.append(f"{zap}  {bar_7d} {util_7d:4.1f}%")
+    lines.append(f"{hourglass_7d}  {time_bar_7d} {time_elapsed_7d:4.1f}%")
     if data["7d_status"] != "allowed":
-        tooltip += f"Status: {data['7d_status']}\n"
-    tooltip += f"Resets {reset_7d}\n"
-    if data["status"] != "allowed":
-        tooltip += "\n"
-        tooltip += f"Overall status: {data['status']}\n"
+        lines.append(f"  Status: {data['7d_status']}")
 
-    return tooltip
+    if data["status"] != "allowed":
+        lines.append("")
+        lines.append(f"Overall status: {data['status']}")
+
+    if last_check_time:
+        lines.append("")
+        lines.append(f"Last checked {format_relative_time(last_check_time)}")
+
+    title = "Claude Max Usage"
+    centered_title = title.center(max(len(line) for line in lines))
+
+    return centered_title + "\n" + "\n".join(lines)
 
 
 def get_progress_bar(percentage: int, width: int) -> str:
@@ -315,6 +357,59 @@ def get_progress_bar(percentage: int, width: int) -> str:
         )
 
     return bar
+
+
+def get_time_bar(percentage: int, width: int) -> str:
+    """Convert percentage to simple Unicode progress bar using ▰▱ characters."""
+    filled_segments = min(width, percentage * width // 100)
+    empty_segments = width - filled_segments
+    return "▰" * filled_segments + "▱" * empty_segments
+
+
+def get_hourglass_icon(elapsed_percentage: float) -> str:
+    """Get the appropriate hourglass icon based on elapsed percentage."""
+    num_frames = len(hourglass_frames)
+    frame_index = int(elapsed_percentage * num_frames / 100)
+    # Clamp to valid range
+    frame_index = max(0, min(num_frames - 1, frame_index))
+    return hourglass_frames[frame_index]
+
+
+def get_time_elapsed_percentage(reset_timestamp: int, window_hours: float) -> float:
+    """Calculate percentage of time elapsed in a window.
+
+    Returns percentage from 0-100 where 100 means the window just reset
+    and 0 means it's about to reset.
+    """
+    if reset_timestamp <= 0:
+        return 0.0
+
+    now = time.time()
+    window_seconds = window_hours * 3600
+    time_remaining = reset_timestamp - now
+
+    if time_remaining <= 0:
+        return 100.0  # Window has reset
+
+    time_elapsed = window_seconds - time_remaining
+    percentage = (time_elapsed / window_seconds) * 100
+    return max(0.0, min(100.0, percentage))
+
+
+def format_end_time(reset_timestamp: int) -> str:
+    """Format reset timestamp to 'ends ...' phrase like 'ends at 14:00' or 'ends on Monday at 14:00'."""
+    if reset_timestamp == 0:
+        return "ends at unknown"
+    reset_dt = datetime.fromtimestamp(reset_timestamp, tz=timezone.utc).astimezone()
+    now = datetime.now(timezone.utc).astimezone()
+
+    time_str = reset_dt.strftime("%H:%M")
+    if reset_dt.date() == now.date():
+        return f"ends at {time_str}"
+    elif (reset_dt.date() - now.date()).days == 1:
+        return f"ends tomorrow at {time_str}"
+    else:
+        return f"ends on {reset_dt.strftime('%A')} at {time_str}"
 
 
 def format_waybar_output(
