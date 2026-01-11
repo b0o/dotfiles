@@ -62,6 +62,12 @@ hourglass_frames = [
     "",
 ]
 
+icons = {
+    "bullet": "·",
+    "claude": "󰛄",
+    "zap": "",
+}
+
 
 def refresh_claude_token() -> Optional[str]:
     """Refresh Claude CLI OAuth token using refresh token. Returns new access token."""
@@ -429,6 +435,7 @@ def load_history() -> Dict:
         "version": 2,
         "config": {
             "prefer_source": None,  # "cc" or "oc" or None for auto
+            "display_mode": "normal",  # "compact", "normal", or "expanded"
         },
         "accounts": {},
         "active_account": None,
@@ -765,32 +772,30 @@ def format_tooltip(
     remaining_7d = format_reset_short(data["7d_reset"])
 
     active_claim = data["representative_claim"]
-    zap = ""
-    bullet = "·"
 
     # Build 5h header: "5-hour session · ends {end_time} ({short}) · active"
     header_5h_parts = ["5-hour session", f"{end_time_5h} ({remaining_5h})"]
     if active_claim == "five_hour":
         header_5h_parts.append("active")
-    header_5h = f" {bullet} ".join(header_5h_parts)
+    header_5h = f" {icons['bullet']} ".join(header_5h_parts)
 
     # Build 7d header: "7-day window · ends {end_time} ({short}) · active"
     header_7d_parts = ["7-day window", f"{end_time_7d} ({remaining_7d})"]
     if active_claim == "seven_day":
         header_7d_parts.append("active")
-    header_7d = f" {bullet} ".join(header_7d_parts)
+    header_7d = f" {icons['bullet']} ".join(header_7d_parts)
 
     lines = []
     lines.append("")
     lines.append(header_5h)
-    lines.append(f"{zap}  {bar_5h} {util_5h:4.1f}%")
+    lines.append(f"{icons['zap']}  {bar_5h} {util_5h:4.1f}%")
     lines.append(f"{hourglass_5h}  {time_bar_5h} {time_elapsed_5h:4.1f}%")
     if data["5h_status"] != "allowed":
         lines.append(f"  Status: {data['5h_status']}")
     lines.append("")
 
     lines.append(header_7d)
-    lines.append(f"{zap}  {bar_7d} {util_7d:4.1f}%")
+    lines.append(f"{icons['zap']}  {bar_7d} {util_7d:4.1f}%")
     lines.append(f"{hourglass_7d}  {time_bar_7d} {time_elapsed_7d:4.1f}%")
     if data["7d_status"] != "allowed":
         lines.append(f"  Status: {data['7d_status']}")
@@ -825,9 +830,11 @@ def format_tooltip(
 
     plan_name = format_plan_name(profile)
     if plan_name:
-        title = f"Claude {bullet} Usage Monitor {bullet} {plan_name} Plan"
+        title = (
+            f"Claude {icons['bullet']} Usage Monitor {icons['bullet']} {plan_name} Plan"
+        )
     else:
-        title = f"Claude {bullet} Usage Monitor"
+        title = f"Claude {icons['bullet']} Usage Monitor"
     max_width = max(len(line) for line in lines)
     centered_title = title.center(max_width)
 
@@ -943,17 +950,34 @@ def format_end_time(reset_timestamp: int) -> str:
         return f"ends on {reset_dt.strftime('%A')} at {time_str}"
 
 
+def get_compact_usage_bar(percentage: int, width: int = 10) -> str:
+    """Get a compact usage progress bar (styled like tooltip usage bar)."""
+    return get_progress_bar(percentage, width)
+
+
+def get_compact_time_bar(percentage: int, width: int = 10) -> str:
+    """Get a compact time progress bar (styled like tooltip time bar)."""
+    return get_time_bar(percentage, width)
+
+
 def format_waybar_output(
     data: Optional[Dict],
     last_check_time: Optional[datetime] = None,
-    show_time_remaining: bool = False,
+    show_alternate: bool = False,
     has_token: bool = True,
     profile: Optional[Dict] = None,
     cred_source: Optional[str] = None,
     cred_is_fallback: bool = False,
     prefer_source: Optional[str] = None,
+    display_mode: str = "normal",
 ) -> Optional[Dict]:
-    """Format output for Waybar."""
+    """Format output for Waybar.
+
+    Display modes:
+    - compact: alternates between "{icon} {pct}%" and "{icon} {time}"
+    - normal: "{icon} {pct}% ({time})"
+    - expanded: "{icon} {bar} {pct}%" alternating bar between usage and time elapsed
+    """
     if not has_token:
         return {
             "text": "󰛄",
@@ -967,12 +991,18 @@ def format_waybar_output(
 
     # Use the representative claim to determine which utilization to show
     # "five_hour" means the 5h limit is the active constraint
-    if data["representative_claim"] == "five_hour":
+    is_5h_active = data["representative_claim"] == "five_hour"
+    if is_5h_active:
         primary_util = data["5h_utilization"]
+        reset_time = data["5h_reset"]
+        time_elapsed_pct = get_time_elapsed_percentage(reset_time, 5.0)
     else:
         primary_util = data["7d_utilization"]
+        reset_time = data["7d_reset"]
+        time_elapsed_pct = get_time_elapsed_percentage(reset_time, 7 * 24.0)
 
     percentage = int(primary_util * 100)
+    reset_short = format_reset_short(reset_time)
 
     # Determine CSS class based on status and usage percentage
     # Check if any status is not allowed - that's critical
@@ -982,7 +1012,7 @@ def format_waybar_output(
         or data["7d_status"] != "allowed"
     ):
         css_class = "critical"
-    elif data["representative_claim"] != "five_hour":
+    elif not is_5h_active:
         css_class = "inactive"
     elif percentage == 0:
         css_class = "inactive"
@@ -1000,17 +1030,24 @@ def format_waybar_output(
         data, last_check_time, profile, cred_source, cred_is_fallback, prefer_source
     )
 
-    # Format text - alternate between percentage and time remaining
-    if data["representative_claim"] == "five_hour":
-        reset_short = format_reset_short(data["5h_reset"])
+    # Format text based on display mode
+    if display_mode == "compact":
+        if show_alternate and is_5h_active:
+            text = f"{icons['claude']} {reset_short}"
+        else:
+            text = f"{icons['claude']} {percentage}%"
+    elif display_mode == "normal":
+        text = f"{icons['claude']} {percentage}% ({reset_short})"
+    elif display_mode == "expanded":
+        if show_alternate and is_5h_active:
+            hourglass = get_hourglass_icon(time_elapsed_pct)
+            bar = get_compact_time_bar(int(time_elapsed_pct))
+            text = f"{icons['claude']} {bar}  {hourglass} {int(time_elapsed_pct):2d}%"
+        else:
+            bar = get_compact_usage_bar(percentage)
+            text = f"{icons['claude']} {bar}  {icons['zap']} {percentage:2d}%"
     else:
-        reset_short = format_reset_short(data["7d_reset"])
-
-    # Only alternate if there's an active 5h session
-    if show_time_remaining and data["representative_claim"] == "five_hour":
-        text = f"󰛄 {reset_short}"
-    else:
-        text = f"󰛄 {percentage}%"
+        text = f"{icons['claude']} {percentage}%"
 
     return {
         "text": text,
@@ -1053,11 +1090,16 @@ def monitor(prefer_source_override: Optional[str] = None):
         history = load_history()
         return history.get("config", {}).get("prefer_source")
 
-    def handle_refresh_signal(signum, frame):
+    def get_display_mode() -> str:
+        """Get display_mode from config."""
+        history = load_history()
+        return history.get("config", {}).get("display_mode", "normal")
+
+    def handle_refresh_signal(_signum, _frame):
         """Handle SIGUSR1 to trigger refresh."""
         signal_received[0] = True
 
-    def handle_exit_signal(signum, frame):
+    def handle_exit_signal(_signum, _frame):
         """Handle SIGTERM/SIGINT to clean up and exit."""
         clear_pid()
         sys.exit(0)
@@ -1154,21 +1196,23 @@ def monitor(prefer_source_override: Optional[str] = None):
             ):
                 start_check()
 
-            # Determine display mode: 15s percentage, 5s time remaining
-            cycle_position = int(current_time) % 20
-            show_time_remaining = cycle_position >= 15
+            # Determine alternation cycle: 15s primary, 15s alternate
+            cycle_position = int(current_time) % 30
+            show_alternate = cycle_position >= 15
 
             # Format and output
             prefer_source = get_prefer_source()
+            display_mode = get_display_mode()
             output = format_waybar_output(
                 usage_data,
                 last_check_time,
-                show_time_remaining,
+                show_alternate,
                 has_token,
                 profile_data,
                 cred_source,
                 cred_is_fallback,
                 prefer_source,
+                display_mode,
             )
             if output:
                 output_json = json.dumps(output)
@@ -1223,6 +1267,31 @@ def main():
         action="store_true",
         help="Signal running instance to refresh",
     )
+    action_group.add_argument(
+        "--set-mode-compact",
+        action="store_true",
+        help="Set display mode to compact",
+    )
+    action_group.add_argument(
+        "--set-mode-normal",
+        action="store_true",
+        help="Set display mode to normal",
+    )
+    action_group.add_argument(
+        "--set-mode-expanded",
+        action="store_true",
+        help="Set display mode to expanded",
+    )
+    action_group.add_argument(
+        "--cycle-mode-up",
+        action="store_true",
+        help="Cycle display mode: compact -> normal -> expanded -> compact",
+    )
+    action_group.add_argument(
+        "--cycle-mode-down",
+        action="store_true",
+        help="Cycle display mode: compact <- normal <- expanded <- compact",
+    )
 
     args = parser.parse_args()
 
@@ -1244,6 +1313,34 @@ def main():
             print("Signaled running instance to refresh")
         else:
             print("No running instance found")
+        return
+    elif args.set_mode_compact:
+        set_config("display_mode", "compact")
+        print("Set display mode to compact")
+        return
+    elif args.set_mode_normal:
+        set_config("display_mode", "normal")
+        print("Set display mode to normal")
+        return
+    elif args.set_mode_expanded:
+        set_config("display_mode", "expanded")
+        print("Set display mode to expanded")
+        return
+    elif args.cycle_mode_up:
+        history = load_history()
+        current = history.get("config", {}).get("display_mode", "normal")
+        modes = ["compact", "normal", "expanded"]
+        next_mode = modes[(modes.index(current) + 1) % len(modes)]
+        set_config("display_mode", next_mode)
+        print(f"Display mode: {next_mode}")
+        return
+    elif args.cycle_mode_down:
+        history = load_history()
+        current = history.get("config", {}).get("display_mode", "normal")
+        modes = ["compact", "normal", "expanded"]
+        next_mode = modes[(modes.index(current) - 1) % len(modes)]
+        set_config("display_mode", next_mode)
+        print(f"Display mode: {next_mode}")
         return
 
     # Start monitor with optional runtime override

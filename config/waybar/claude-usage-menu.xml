@@ -2,6 +2,12 @@
 <interface>
   <object class="GtkMenu" id="menu">
     <child>
+      <object class="GtkMenuItem" id="display-menu">
+        <property name="label">Display</property>
+        <property name="submenu">display-submenu</property>
+      </object>
+    </child>
+    <child>
       <object class="GtkMenuItem" id="credentials-menu">
         <property name="label">Credentials</property>
         <property name="submenu">credentials-submenu</property>
@@ -17,7 +23,24 @@
     </child>
     <child>
       <object class="GtkMenuItem" id="open-usage">
-        <property name="label">Open Usage Page</property>
+        <property name="label">Open Usage Webpage</property>
+      </object>
+    </child>
+  </object>
+  <object class="GtkMenu" id="display-submenu">
+    <child>
+      <object class="GtkMenuItem" id="mode-compact">
+        <property name="label">Compact</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="mode-normal">
+        <property name="label">Normal</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="mode-expanded">
+        <property name="label">Expanded</property>
       </object>
     </child>
   </object>
