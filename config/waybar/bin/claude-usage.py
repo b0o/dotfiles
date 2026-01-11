@@ -184,11 +184,29 @@ def format_reset_short(reset_timestamp: int) -> str:
 
     result = humanize.naturaldelta(delta)
 
-    # Shorten "X hours" -> "Xh", "X minutes" -> "Xm", etc.
+    # Handle "a moment" for very small deltas
+    if result == "a moment":
+        return "0s"
+
+    # Handle "a/an" forms like "an hour" -> "1h", "a minute" -> "1m"
+    result = re.sub(r"\ba\s+second\b", "1s", result)
+    result = re.sub(r"\ba\s+minute\b", "1m", result)
+    result = re.sub(r"\ban\s+hour\b", "1h", result)
+    result = re.sub(r"\ba\s+day\b", "1d", result)
+    result = re.sub(r"\ba\s+month\b", "1mo", result)
+    result = re.sub(r"\ba\s+year\b", "1y", result)
+
+    # Shorten "X units" -> "Xu" forms
     result = re.sub(r"(\d+)\s*seconds?", r"\1s", result)
     result = re.sub(r"(\d+)\s*minutes?", r"\1m", result)
     result = re.sub(r"(\d+)\s*hours?", r"\1h", result)
     result = re.sub(r"(\d+)\s*days?", r"\1d", result)
+    result = re.sub(r"(\d+)\s*months?", r"\1mo", result)
+    result = re.sub(r"(\d+)\s*years?", r"\1y", result)
+
+    # Clean up compound forms like "1y, 2mo" -> just use the largest unit
+    # For a short display, we only want the primary unit
+    result = re.sub(r"^(\d+[a-z]+),?\s+.*", r"\1", result)
 
     return result
 
