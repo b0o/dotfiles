@@ -1,3 +1,7 @@
+# nushell
+
+alias startup = banner --short # Show nushell startup time
+
 # shell
 
 alias core-cd = cd
