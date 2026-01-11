@@ -707,12 +707,15 @@ def format_relative_time(dt: datetime) -> str:
         return f"{seconds // 3600} hours ago"
 
 
-def format_plan_name(profile: Optional[Dict]) -> str:
-    """Format the plan name from profile data."""
+def format_plan_name(profile: Optional[Dict]) -> Optional[str]:
+    """Format the plan name from profile data (without 'Claude' prefix)."""
     if not profile:
-        return "Claude"
+        return None
     org_type = profile.get("organization", {}).get("organization_type", "")
     tier = profile.get("organization", {}).get("rate_limit_tier", "")
+
+    if not org_type:
+        return None
 
     # Map organization_type to friendly name
     plan_names = {
@@ -728,13 +731,11 @@ def format_plan_name(profile: Optional[Dict]) -> str:
     # Extract multiplier from tier (e.g., "default_claude_max_5x" -> "5x")
     multiplier = ""
     if tier:
-        import re
-
         match = re.search(r"(\d+x)$", tier)
         if match:
             multiplier = f" {match.group(1)}"
 
-    return f"Claude {plan}{multiplier}" if plan else "Claude"
+    return f"{plan}{multiplier}" if plan else "Free"
 
 
 def format_tooltip(
@@ -765,21 +766,30 @@ def format_tooltip(
 
     active_claim = data["representative_claim"]
     zap = ""
+    bullet = "·"
+
+    # Build 5h header: "5-hour session · ends {end_time} ({short}) · active"
+    header_5h_parts = ["5-hour session", f"{end_time_5h} ({remaining_5h})"]
+    if active_claim == "five_hour":
+        header_5h_parts.append("active")
+    header_5h = f" {bullet} ".join(header_5h_parts)
+
+    # Build 7d header: "7-day window · ends {end_time} ({short}) · active"
+    header_7d_parts = ["7-day window", f"{end_time_7d} ({remaining_7d})"]
+    if active_claim == "seven_day":
+        header_7d_parts.append("active")
+    header_7d = f" {bullet} ".join(header_7d_parts)
 
     lines = []
     lines.append("")
-    lines.append(
-        f"5-hour session{' (active)' if active_claim == 'five_hour' else ''} {end_time_5h} ({remaining_5h})"
-    )
+    lines.append(header_5h)
     lines.append(f"{zap}  {bar_5h} {util_5h:4.1f}%")
     lines.append(f"{hourglass_5h}  {time_bar_5h} {time_elapsed_5h:4.1f}%")
     if data["5h_status"] != "allowed":
         lines.append(f"  Status: {data['5h_status']}")
     lines.append("")
 
-    lines.append(
-        f"7-day window{' (active)' if active_claim == 'seven_day' else ''} {end_time_7d} ({remaining_7d})"
-    )
+    lines.append(header_7d)
     lines.append(f"{zap}  {bar_7d} {util_7d:4.1f}%")
     lines.append(f"{hourglass_7d}  {time_bar_7d} {time_elapsed_7d:4.1f}%")
     if data["7d_status"] != "allowed":
@@ -813,7 +823,11 @@ def format_tooltip(
         footer_parts.append(f"checked {format_relative_time(last_check_time)}")
     footer = " · ".join(footer_parts) if footer_parts else None
 
-    title = f"{format_plan_name(profile)} Usage"
+    plan_name = format_plan_name(profile)
+    if plan_name:
+        title = f"Claude {bullet} Usage Monitor {bullet} {plan_name} Plan"
+    else:
+        title = f"Claude {bullet} Usage Monitor"
     max_width = max(len(line) for line in lines)
     centered_title = title.center(max_width)
 
