@@ -13,7 +13,7 @@
     </child>
     <child>
       <object class="GtkMenuItem" id="prefer-auto">
-        <property name="label">Auto (Claude Code first)</property>
+        <property name="label">Auto</property>
       </object>
     </child>
     <child>
