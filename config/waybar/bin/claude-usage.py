@@ -469,10 +469,41 @@ def save_pid() -> None:
 
 def clear_pid() -> None:
     """Clear PID from history file on exit."""
+    try:
+        history = load_history()
+        if history.get("pid") == os.getpid():
+            history["pid"] = None
+            save_history(history)
+    except Exception:
+        # Best effort cleanup, don't fail on exit
+        pass
+
+
+def is_pid_running(pid: int) -> bool:
+    """Check if a process with the given PID is running."""
+    try:
+        os.kill(pid, 0)  # Signal 0 doesn't kill, just checks
+        return True
+    except (ProcessLookupError, PermissionError):
+        return False
+
+
+def check_existing_instance() -> Optional[int]:
+    """Check if another instance is already running.
+
+    Returns the PID of the running instance, or None if no instance is running.
+    Cleans up stale PID if the process is no longer running.
+    """
     history = load_history()
-    if history.get("pid") == os.getpid():
-        history["pid"] = None
-        save_history(history)
+    pid = history.get("pid")
+    if pid and pid != os.getpid():
+        if is_pid_running(pid):
+            return pid
+        else:
+            # Stale PID, clean it up
+            history["pid"] = None
+            save_history(history)
+    return None
 
 
 def signal_running_instance() -> bool:
@@ -977,6 +1008,14 @@ def format_waybar_output(
 
 def monitor(prefer_source_override: Optional[str] = None):
     """Main monitoring loop."""
+    # Check if another instance is already running
+    existing_pid = check_existing_instance()
+    if existing_pid:
+        print(
+            f"Another instance is already running (PID {existing_pid})", file=sys.stderr
+        )
+        sys.exit(1)
+
     last_check_time: Optional[datetime] = None
     last_output_json: Optional[str] = None
     usage_data: Optional[Dict] = None
@@ -1000,11 +1039,18 @@ def monitor(prefer_source_override: Optional[str] = None):
         history = load_history()
         return history.get("config", {}).get("prefer_source")
 
-    def handle_signal(signum, frame):
+    def handle_refresh_signal(signum, frame):
         """Handle SIGUSR1 to trigger refresh."""
         signal_received[0] = True
 
-    signal.signal(signal.SIGUSR1, handle_signal)
+    def handle_exit_signal(signum, frame):
+        """Handle SIGTERM/SIGINT to clean up and exit."""
+        clear_pid()
+        sys.exit(0)
+
+    signal.signal(signal.SIGUSR1, handle_refresh_signal)
+    signal.signal(signal.SIGTERM, handle_exit_signal)
+    signal.signal(signal.SIGINT, handle_exit_signal)
 
     def run_check_async(
         result_container: list, lock: threading.Lock, prev_token: Optional[str]
