@@ -432,7 +432,7 @@ CHANGE DETECTION:
   first; the actual file hash is only computed if the stat changed.
 
 EXAMPLES:
-  # Basic hook with external command
+Basic hook with external command:
   hooks use {
     starship: {
       depends: starship
@@ -440,7 +440,7 @@ EXAMPLES:
     }
   }
 
-  # Hook with file-based change detection
+Hook with file-based change detection:
   hooks use {
     my-hook: {
       hash_files: ~/.config/myapp/config.toml
@@ -448,7 +448,7 @@ EXAMPLES:
     }
   }
 
-  # Plugin hook
+Plugin hook:
   hooks use {
     skim: {
       plugin: true
