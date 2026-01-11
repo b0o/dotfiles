@@ -202,8 +202,8 @@ M.jumplist_jump_buf = function(dir)
   if jumppos == #jumplist then
     dist = dist - 1
   end
-  local keys = vim.api.nvim_replace_termcodes(('%d<C-%s>')
-    :format(math.abs(dist), dir > 0 and 'i' or 'o'), true, false, true)
+  local keys =
+    vim.api.nvim_replace_termcodes(('%d<C-%s>'):format(math.abs(dist), dir > 0 and 'i' or 'o'), true, false, true)
   vim.api.nvim_feedkeys(keys, 'n', false)
 end
 
@@ -318,13 +318,11 @@ M.is_normal_win = function(winid)
   if vim.bo[bufid].buftype ~= '' then
     return false
   end
-  if
-      vim.tbl_contains({
-        'NvimTree',
-        'Trouble',
-        'aerial',
-      }, vim.bo[bufid].filetype)
-  then
+  if vim.tbl_contains({
+    'NvimTree',
+    'Trouble',
+    'aerial',
+  }, vim.bo[bufid].filetype) then
     return false
   end
   return true
@@ -537,7 +535,7 @@ end
 M.osc52_smart_copy = function(reg, lines, force)
   lines = vim.iter({ lines, '' }):flatten(math.huge):totable()
   if reg and reg ~= '' then
-    vim.fn.setreg(reg, vim.iter(lines):join('\n'))
+    vim.fn.setreg(reg, vim.iter(lines):join '\n')
   end
   -- Only send the OSC 52 if connected via SSH
   if not force and vim.env.SSH_CONNECTION == nil then
