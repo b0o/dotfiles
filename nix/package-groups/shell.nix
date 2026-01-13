@@ -46,6 +46,7 @@ with pkgs; [
   skim # fuzzy finder written in Rust
   fd # simple, fast alternative to 'find'
   ripgrep # faster grep alternative
+  witr # "why is this running?"
 
   # Git tools
   hub # GitHub CLI wrapper for git
