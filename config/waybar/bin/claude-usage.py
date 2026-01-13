@@ -21,7 +21,7 @@ import humanize  # pyright: ignore
 import signal
 
 CHECK_INTERVAL = 60.0
-OUTPUT_INTERVAL = 15.0
+OUTPUT_INTERVAL = 5.0
 BAR_WIDTH = 44
 HISTORY_FILE = os.path.expanduser("~/.local/share/claude-usage.json")
 CLAUDE_CREDS_PATH = os.path.expanduser("~/.claude/.credentials.json")
