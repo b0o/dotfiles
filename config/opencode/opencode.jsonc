@@ -70,6 +70,20 @@
       "extensions": [".nix"],
     },
   },
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true,
+    },
+  },
+  "server": {
+    "hostname": "localhost",
+  },
+  "compaction": {
+    "auto": false,
+    "prune": true,
+  },
   "plugin": [
     // Update using `bunx opencode-openai-codex-auth@latest` from this directory
     "opencode-openai-codex-auth",
