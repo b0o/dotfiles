@@ -8,6 +8,12 @@ very_lazy(function()
   local map = maputil.map
   local ft = maputil.ft
 
+  -- Custom smart breadth-first recursive search
+  -- TODO: Make a Fyler PR adding this once I've tested it thoroughly
+  require('user.util.fyler.search').setup {
+    max_depth = 5,
+  }
+
   map('n', xk '<C-S-\\>', function()
     local finder = require('fyler.views.finder').instance()
     if finder and finder.win and finder.win:is_visible() then
