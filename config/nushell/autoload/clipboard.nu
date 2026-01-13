@@ -81,7 +81,7 @@ export def xcf [
   }
 
   if $text {
-    open $file_path | xc
+    open --raw $file_path | xc
   } else {
     if 'WAYLAND_DISPLAY' in $env {
       let uri = $"file://($file_path)"
@@ -89,10 +89,10 @@ export def xcf [
     } else if 'DISPLAY' in $env {
       # X11: xclip doesn't handle this well, fall back to text
       print -e "xcf: file reference copy not supported on X11, copying as text"
-      open $file_path | xc
+      open --raw $file_path | xc
     } else {
       print -e "xcf: file reference copy requires graphical session, copying as text via OSC 52"
-      open $file_path | xc
+      open --raw $file_path | xc
     }
   }
 }
