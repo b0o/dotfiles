@@ -136,3 +136,36 @@ def --wrapped hm [...args] {
   let home_flake = _hm_init
   ^home-manager --flake $".#($home_flake)" ...$args
 }
+
+export module ns {
+  export def complete-indexes [context: string, position: int] {
+    use nushell/completion.nu *
+    complete-comma-separated-options $context $position [
+      "nixos"
+      "nixpkgs"
+      "home-manager"
+      "darwin"
+      "nur"
+    ]
+  }
+
+  # Search nix packages
+  export def main [
+    # Search query
+    query?: string
+    --indexes (-i): string@complete-indexes # Search index
+  ] {
+    let ns_opts = [
+      ...(if ($indexes | is-not-empty) { $indexes | each { ["--indexes" $in] } | flatten })
+    ]
+    let fzf_opts = [
+      --scheme history
+      --preview $"nix-search-tv preview ($ns_opts | str join ' ') {}"
+      ...(if ($query | is-not-empty) { ["--query" $query] })
+    ]
+
+    nix-search-tv print ...$ns_opts | fzf ...$fzf_opts
+  }
+}
+
+use ns

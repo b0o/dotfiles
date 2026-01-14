@@ -34,5 +34,9 @@ in {
 
   dconf.enable = true;
   targets.genericLinux.enable = true;
-  programs.home-manager.enable = true;
+
+  programs = {
+    home-manager.enable = true;
+    nix-search-tv.enable = true;
+  };
 }
