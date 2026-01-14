@@ -114,6 +114,7 @@ def --env _hm_init [] {
     return
   }
   cd $dotfiles_dir
+  # TODO: Don't hardcode this
   let home_flake = "arch-maddy"
   $home_flake
 }
