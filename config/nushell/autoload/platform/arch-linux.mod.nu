@@ -1,9 +1,6 @@
 def complete-pacman-installed-package [spans: list<string>] {
-  if ($spans | last | str starts-with "-") {
-    return []
-  }
-  let spans = $spans | where {|s| not ($s | str starts-with "-")}
-  ^carapace pacman nushell pacman -Q ...$spans | from json
+  use nushell/completion.nu carapace-complete
+  carapace-complete --no-args $spans pacman '-Q'
 }
 
 # Like pacman -Ql but only show executable files

@@ -39,3 +39,19 @@ export def complete-comma-separated-options [
 
   $candidates | each { $selected ++ [$in] | str join "," }
 }
+
+export def carapace-complete [
+  --skip: int = 1 # Number of spans to skip
+  --no-args # Skip spans starting with "-"
+  spans: list<string>, # Spans under completion
+  cmd: string, # Base command for completion
+  ...args: string # Additional arguments to append to the base command before generating completions
+] {
+  if $no_args and ($spans | last | str starts-with "-") {
+    return []
+  }
+  let spans = if $no_args {
+    $spans | where { not ($in | str starts-with "-")}
+  } else { $spans }
+  ^carapace $cmd nushell $cmd ...$args ...($spans | skip $skip) | from json
+}

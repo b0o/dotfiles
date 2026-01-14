@@ -103,7 +103,8 @@ def --wrapped fp [cmd, ...args] {
 }
 
 def _complete-hm [spans: list<string>] {
-  ^carapace home-manager nushell home-manager ...($spans | skip 1) | from json
+  use nushell/completion.nu carapace-complete
+  carapace-complete $spans home-manager
 }
 
 def --env _hm_init [] {
@@ -119,7 +120,8 @@ def --env _hm_init [] {
 
 def _complete-hm-update [spans: list<string>] {
   _hm_init
-  ^carapace nix nushell nix flake update ...($spans | skip 1) | from json
+  use nushell/completion.nu carapace-complete
+  carapace-complete $spans nix flake update
 }
 
 # Update the $DOTFILES_HOME/flake.lock
