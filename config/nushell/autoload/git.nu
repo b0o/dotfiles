@@ -3,7 +3,6 @@ alias git = hub # important: set this before the `use` line so that we always us
 export use git *
 
 # see ~/.config/git/alias.config for git alias definitions
-alias g = git
 alias gl = git ls
 alias gla = git la
 alias gll = git ll
