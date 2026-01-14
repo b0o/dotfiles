@@ -10,7 +10,7 @@ export def pqlx [
   ...pkgs: string
 ] {
   def is-in-path [file: string] {
-    for p in $env.PATH {
+    for p in ($env.PATH | split row ":") {
       if ($file | str starts-with $p) {
         return true
       }
