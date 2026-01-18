@@ -7,7 +7,8 @@ import sys
 from typing import Any
 
 from ..common import CONFIG_FILE, SOCKET_PATH
-from .config import load_scratchpad_configs, notify_config_error
+from .config import load_config
+from .notify import notify_error, notify_info, set_notify_level
 from .scratchpad import ScratchpadManager
 from .state import DaemonState, OutputInfo, WindowInfo, WorkspaceInfo
 from .urgency import UrgencyHandler
@@ -357,19 +358,26 @@ class DaemonServer:
                 if CONFIG_FILE.exists():
                     mtime = CONFIG_FILE.stat().st_mtime
                     if mtime > self.state.config_mtime:
-                        self._reload_config()
+                        self._reload_config(is_reload=True)
             except OSError:
                 pass
 
-    def _reload_config(self) -> None:
+    def _reload_config(self, *, is_reload: bool = False) -> None:
         """Reload configuration from file. Keeps previous config on failure."""
         try:
-            configs = load_scratchpad_configs()
-            # Only update state if loading succeeded
-            self.state.scratchpad_configs = configs
+            config = load_config()
+            # Update notify level first so it applies to subsequent notifications
+            set_notify_level(config.settings.notify_level)
+            # Update scratchpad configs
+            self.state.scratchpad_configs = config.scratchpads
             if CONFIG_FILE.exists():
                 self.state.config_mtime = CONFIG_FILE.stat().st_mtime
-            print(f"Loaded {len(configs)} scratchpad configs")
+            print(f"Loaded {len(config.scratchpads)} scratchpad configs")
+            if is_reload:
+                notify_info(
+                    "Scratchpad config reloaded",
+                    f"Loaded {len(config.scratchpads)} scratchpads",
+                )
 
         except Exception as e:
             # Keep previous config, just update mtime to avoid retry loop
@@ -377,7 +385,7 @@ class DaemonServer:
                 self.state.config_mtime = CONFIG_FILE.stat().st_mtime
             error_msg = f"Failed to load config: {e}"
             print(error_msg, file=sys.stderr)
-            notify_config_error(error_msg)
+            notify_error("Config error", error_msg)
 
 
 async def run_daemon() -> int:

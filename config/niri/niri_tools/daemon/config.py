@@ -1,7 +1,6 @@
 """Configuration loading and hot-reload for scratchpads."""
 
 import re
-import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -10,6 +9,14 @@ from typing import Any
 import yaml
 
 from ..common import CONFIG_DIR
+from .notify import NotifyLevel
+
+
+@dataclass
+class DaemonSettings:
+    """Global daemon settings."""
+
+    notify_level: NotifyLevel = NotifyLevel.ALL
 
 
 @dataclass
@@ -39,7 +46,9 @@ def parse_size(size_str: str) -> tuple[str, str]:
     """Parse size string like '80%x60%' into (width, height)."""
     parts = size_str.split("x")
     if len(parts) != 2:
-        print(f"Invalid size format: {size_str}. Using default 80%x60%", file=sys.stderr)
+        print(
+            f"Invalid size format: {size_str}. Using default 80%x60%", file=sys.stderr
+        )
         return "80%", "60%"
     return parts[0].strip(), parts[1].strip()
 
@@ -55,16 +64,50 @@ def parse_position(position_str: str) -> tuple[str, str] | None:
     return parts[0].strip(), parts[1].strip()
 
 
-def load_scratchpad_configs(config_file: Path | None = None) -> dict[str, ScratchpadConfig]:
-    """Load scratchpad configurations from YAML file."""
+@dataclass
+class LoadedConfig:
+    """Result of loading configuration."""
+
+    settings: DaemonSettings
+    scratchpads: dict[str, ScratchpadConfig]
+
+
+def load_config(config_file: Path | None = None) -> LoadedConfig:
+    """Load daemon configuration from YAML file."""
     if config_file is None:
         config_file = CONFIG_DIR / "scratchpads.yaml"
 
     raw_config = _load_config_recursive(config_file, set())
-    scratchpads = raw_config.get("scratchpads", {})
 
+    # Parse daemon settings
+    settings = _parse_daemon_settings(raw_config.get("settings", {}))
+
+    # Parse scratchpads
+    scratchpads = _parse_scratchpads(raw_config.get("scratchpads", {}))
+
+    return LoadedConfig(settings=settings, scratchpads=scratchpads)
+
+
+def _parse_daemon_settings(settings_cfg: dict[str, Any]) -> DaemonSettings:
+    """Parse daemon settings from config."""
+    notify_level = NotifyLevel.ALL
+    if notify_str := settings_cfg.get("notify"):
+        try:
+            notify_level = NotifyLevel(notify_str.lower())
+        except ValueError:
+            valid = ", ".join(level.value for level in NotifyLevel)
+            print(
+                f"Invalid notify level: {notify_str}. Valid: {valid}", file=sys.stderr
+            )
+    return DaemonSettings(notify_level=notify_level)
+
+
+def _parse_scratchpads(
+    scratchpads_cfg: dict[str, Any],
+) -> dict[str, ScratchpadConfig]:
+    """Parse scratchpad configurations."""
     result: dict[str, ScratchpadConfig] = {}
-    for name, cfg in scratchpads.items():
+    for name, cfg in scratchpads_cfg.items():
         width, height = None, None
         if size_str := cfg.get("size"):
             width, height = parse_size(size_str)
@@ -113,7 +156,7 @@ def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, A
         if not config:
             return {}
 
-        result: dict[str, Any] = {"scratchpads": {}}
+        result: dict[str, Any] = {"settings": {}, "scratchpads": {}}
 
         includes = config.get("include", [])
         if includes:
@@ -122,9 +165,14 @@ def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, A
             for include_path_str in includes:
                 include_path = config_path.parent / include_path_str
                 included = _load_config_recursive(include_path, visited)
+                if "settings" in included:
+                    result["settings"].update(included["settings"])
                 if "scratchpads" in included:
                     result["scratchpads"].update(included["scratchpads"])
 
+        # Main file settings override included settings
+        if "settings" in config:
+            result["settings"].update(config["settings"])
         if "scratchpads" in config:
             result["scratchpads"].update(config["scratchpads"])
 
@@ -136,14 +184,3 @@ def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, A
     except OSError as e:
         print(f"Failed to read config from {config_path}: {e}", file=sys.stderr)
         return {}
-
-
-def notify_config_error(error: str) -> None:
-    """Send critical notification about config error."""
-    try:
-        subprocess.run(
-            ["notify-send", "-u", "critical", "niri-tools config error", error],
-            check=False,
-        )
-    except Exception:
-        pass

@@ -1,11 +1,11 @@
 """Scratchpad management logic for the daemon."""
 
 import asyncio
-import subprocess
 import sys
 
 from ..common import SCRATCHPAD_WORKSPACE
 from .config import ScratchpadConfig
+from .notify import notify_error
 from .state import DaemonState, WindowInfo
 
 
@@ -450,13 +450,7 @@ class ScratchpadManager:
     async def _notify_error(self, message: str) -> None:
         """Show an error notification."""
         print(f"Error: {message}", file=sys.stderr)
-        try:
-            subprocess.run(
-                ["notify-send", "-u", "critical", "Scratchpad Error", message],
-                check=False,
-            )
-        except Exception:
-            pass
+        notify_error("Scratchpad Error", message)
 
     async def _spawn_scratchpad(self, name: str, config: ScratchpadConfig) -> None:
         """Spawn a new scratchpad window via niri.

@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/user/dotfiles/scratchpads.schema.json",
+  "title": "Scratchpads Configuration",
+  "description": "Configuration for niri-tools scratchpad daemon",
+  "type": "object",
+  "properties": {
+    "include": {
+      "description": "List of additional config files to include (paths relative to this file)",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      ]
+    },
+    "settings": {
+      "description": "Global daemon settings",
+      "type": "object",
+      "properties": {
+        "notify": {
+          "description": "Notification level",
+          "type": "string",
+          "enum": ["none", "error", "all"],
+          "default": "all"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scratchpads": {
+      "description": "Scratchpad window definitions",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/scratchpad"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "scratchpad": {
+      "type": "object",
+      "description": "A scratchpad window configuration",
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "description": "Wayland app_id to match. Prefix with '/' for regex (e.g., '/firefox.*')"
+        },
+        "title": {
+          "type": "string",
+          "description": "Window title to match. Prefix with '/' for regex (e.g., '/^Terminal$')"
+        },
+        "command": {
+          "description": "Command to spawn the scratchpad window",
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1
+            }
+          ]
+        },
+        "size": {
+          "type": "string",
+          "description": "Window size as 'WIDTHxHEIGHT'. Values can be percentages (e.g., '80%x60%') or pixels (e.g., '1920x1080')",
+          "pattern": "^[0-9]+%?x[0-9]+%?$",
+          "examples": ["80%x60%", "1920x1080", "50%x800"]
+        },
+        "position": {
+          "type": "object",
+          "description": "Window position per output. Keys are output names (e.g., 'DP-1', 'HDMI-A-1'). Values are 'X,Y' coordinates or 'center'. Percentages (0-100%) map to valid on-screen positions where 0%=edge, 50%=centered, 100%=opposite edge.",
+          "additionalProperties": {
+            "type": "string",
+            "description": "Position as 'X,Y' (percentages or pixels) or 'center'",
+            "examples": ["50%,50%", "center", "100,200", "10%,5%"]
+          }
+        }
+      },
+      "anyOf": [
+        { "required": ["app_id"] },
+        { "required": ["title"] }
+      ],
+      "additionalProperties": false
+    }
+  }
+}
