@@ -116,7 +116,7 @@ class DaemonState:
 
     # Config
     scratchpad_configs: dict[str, ScratchpadConfig] = field(default_factory=dict)
-    config_mtimes: dict[Path, float] = field(default_factory=dict)
+    config_files: set[Path] = field(default_factory=set)
     watch_config: bool = True
 
     def load_initial_state(self) -> None:

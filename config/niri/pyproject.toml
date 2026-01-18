@@ -23,7 +23,10 @@ classifiers = [
   "Topic :: Utilities",
 ]
 
-dependencies = ["pyyaml>=6.0.2"]
+dependencies = [
+  "pyyaml>=6.0.2",
+  "watchfiles>=1.1.1",
+]
 
 [project.urls]
 Homepage = "https://github.com/YaLTeR/niri"
@@ -41,11 +44,11 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = [
-  "E",  # pycodestyle errors
-  "W",  # pycodestyle warnings
-  "F",  # Pyflakes
-  "I",  # isort
-  "B",  # flake8-bugbear
+  "E", # pycodestyle errors
+  "W", # pycodestyle warnings
+  "F", # Pyflakes
+  "I", # isort
+  "B", # flake8-bugbear
   "C4", # flake8-comprehensions
   "UP", # pyupgrade
 ]

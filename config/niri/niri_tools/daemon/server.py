@@ -4,7 +4,10 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any
+
+from watchfiles import awatch
 
 from ..common import SOCKET_PATH
 from .config import load_config
@@ -350,23 +353,47 @@ class DaemonServer:
             print(f"Failed to reload workspaces: {e}", file=sys.stderr)
 
     async def _config_watch_loop(self) -> None:
-        """Watch for config file changes (main file and all includes)."""
+        """Watch for config file changes using inotify (via watchfiles)."""
         while self.running:
-            await asyncio.sleep(1.0)
-
             if not self.state.watch_config:
+                await asyncio.sleep(1.0)
+                continue
+
+            watched_files = {f for f in self.state.config_files if f.exists()}
+            if not watched_files:
+                await asyncio.sleep(1.0)
                 continue
 
             try:
-                # Check if any tracked config file has changed
-                for config_path, old_mtime in self.state.config_mtimes.items():
-                    if config_path.exists():
-                        mtime = config_path.stat().st_mtime
-                        if mtime > old_mtime:
-                            self._reload_config(is_reload=True)
-                            break
-            except OSError:
-                pass
+                async for _changes in awatch(
+                    *watched_files,
+                    watch_filter=self._config_watch_filter,
+                    debounce=500,
+                    recursive=False,
+                ):
+                    if not self.running:
+                        break
+
+                    # Reload config on any change
+                    old_files = self.state.config_files.copy()
+                    self._reload_config(is_reload=True)
+                    new_files = self.state.config_files
+
+                    # If watched files changed, restart the watcher
+                    if old_files != new_files:
+                        break
+
+                    # If watching was disabled, exit
+                    if not self.state.watch_config:
+                        break
+
+            except Exception as e:
+                print(f"Config watch error: {e}", file=sys.stderr)
+                await asyncio.sleep(1.0)
+
+    def _config_watch_filter(self, change: Any, path: str) -> bool:
+        """Filter for config file watcher - only watch our specific files."""
+        return Path(path) in self.state.config_files
 
     def _reload_config(self, *, is_reload: bool = False) -> None:
         """Reload configuration from file. Keeps previous config on failure."""
@@ -378,12 +405,8 @@ class DaemonServer:
             self.state.scratchpad_configs = config.scratchpads
             # Update watch setting
             self.state.watch_config = config.settings.watch_config
-            # Update tracked config files and their mtimes
-            self.state.config_mtimes = {
-                path: path.stat().st_mtime
-                for path in config.config_files
-                if path.exists()
-            }
+            # Update tracked config files
+            self.state.config_files = set(config.config_files)
             print(f"Loaded {len(config.scratchpads)} scratchpad configs")
             if is_reload:
                 notify_info(
@@ -392,10 +415,6 @@ class DaemonServer:
                 )
 
         except Exception as e:
-            # Keep previous config, just update mtimes to avoid retry loop
-            for path in list(self.state.config_mtimes.keys()):
-                if path.exists():
-                    self.state.config_mtimes[path] = path.stat().st_mtime
             error_msg = f"Failed to load config: {e}"
             print(error_msg, file=sys.stderr)
             notify_error("Config error", error_msg)
