@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from watchfiles import awatch
+from watchfiles import Change, awatch
 
-from ..common import SOCKET_PATH
+from ..common import CONFIG_FILE, SOCKET_PATH
 from .config import load_config
 from .notify import notify_error, notify_info, set_notify_level
 from .scratchpad import ScratchpadManager
@@ -353,20 +353,26 @@ class DaemonServer:
             print(f"Failed to reload workspaces: {e}", file=sys.stderr)
 
     async def _config_watch_loop(self) -> None:
-        """Watch for config file changes using inotify (via watchfiles)."""
+        """Watch for config file changes using inotify (via watchfiles).
+
+        Watches parent directories rather than files directly to handle
+        editors like nvim that use atomic saves (write temp + rename).
+        """
         while self.running:
             if not self.state.watch_config:
                 await asyncio.sleep(1.0)
                 continue
 
-            watched_files = {f for f in self.state.config_files if f.exists()}
-            if not watched_files:
+            if not self.state.config_files:
                 await asyncio.sleep(1.0)
                 continue
 
+            # Watch parent directories of config files
+            watch_dirs = {f.parent for f in self.state.config_files}
+
             try:
-                async for _changes in awatch(
-                    *watched_files,
+                async for changes in awatch(
+                    *watch_dirs,
                     watch_filter=self._config_watch_filter,
                     debounce=500,
                     recursive=False,
@@ -374,18 +380,15 @@ class DaemonServer:
                     if not self.running:
                         break
 
-                    # Reload config on any change
-                    old_files = self.state.config_files.copy()
-                    self._reload_config(is_reload=True)
-                    new_files = self.state.config_files
-
-                    # If watched files changed, restart the watcher
-                    if old_files != new_files:
-                        break
-
-                    # If watching was disabled, exit
-                    if not self.state.watch_config:
-                        break
+                    # Only reload if a watched file was added/modified (not just deleted)
+                    dominated_files = {
+                        Path(path)
+                        for change, path in changes
+                        if change != Change.deleted
+                        and Path(path) in self.state.config_files
+                    }
+                    if dominated_files:
+                        self._reload_config(is_reload=True)
 
             except Exception as e:
                 print(f"Config watch error: {e}", file=sys.stderr)
@@ -399,25 +402,27 @@ class DaemonServer:
         """Reload configuration from file. Keeps previous config on failure."""
         try:
             config = load_config()
-            # Update notify level first so it applies to subsequent notifications
-            set_notify_level(config.settings.notify_level)
-            # Update scratchpad configs
-            self.state.scratchpad_configs = config.scratchpads
-            # Update watch setting
-            self.state.watch_config = config.settings.watch_config
-            # Update tracked config files
-            self.state.config_files = set(config.config_files)
-            print(f"Loaded {len(config.scratchpads)} scratchpad configs")
-            if is_reload:
-                notify_info(
-                    "Scratchpad config reloaded",
-                    f"Loaded {len(config.scratchpads)} scratchpads",
-                )
-
         except Exception as e:
+            self.state.config_files.add(CONFIG_FILE.resolve())
             error_msg = f"Failed to load config: {e}"
             print(error_msg, file=sys.stderr)
             notify_error("Config error", error_msg)
+            return
+
+        # Update notify level first so it applies to subsequent notifications
+        set_notify_level(config.settings.notify_level)
+        self.state.scratchpad_configs = config.scratchpads
+        self.state.watch_config = config.settings.watch_config
+        # Update tracked config files (always include main config file)
+        self.state.config_files = set(config.config_files)
+        self.state.config_files.add(CONFIG_FILE.resolve())
+
+        print(f"Loaded {len(config.scratchpads)} scratchpad configs")
+        if is_reload:
+            notify_info(
+                "Scratchpad config reloaded",
+                f"Loaded {len(config.scratchpads)} scratchpads",
+            )
 
 
 async def run_daemon() -> int:
