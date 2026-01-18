@@ -32,9 +32,13 @@ class WindowInfo:
     workspace_id: int | None
     is_focused: bool
     is_floating: bool
+    width: int
+    height: int
 
     @classmethod
     def from_niri(cls, data: dict[str, Any]) -> "WindowInfo":
+        layout = data.get("layout", {})
+        window_size = layout.get("window_size", [0, 0])
         return cls(
             id=data["id"],
             app_id=data.get("app_id", ""),
@@ -42,6 +46,8 @@ class WindowInfo:
             workspace_id=data.get("workspace_id"),
             is_focused=data.get("is_focused", False),
             is_floating=data.get("is_floating", False),
+            width=int(window_size[0]) if window_size else 0,
+            height=int(window_size[1]) if window_size else 0,
         )
 
 
@@ -279,7 +285,9 @@ class DaemonState:
                 )
 
             # Load window mappings (convert string keys back to int)
-            for window_id_str, name in state_data.get("window_to_scratchpad", {}).items():
+            for window_id_str, name in state_data.get(
+                "window_to_scratchpad", {}
+            ).items():
                 self.window_to_scratchpad[int(window_id_str)] = name
 
             print(f"Restored {len(self.scratchpads)} scratchpad states from disk")
@@ -296,15 +304,14 @@ class DaemonState:
         Should be called after loading state and receiving WindowsChanged event.
         """
         # Find orphaned window IDs
-        orphaned = [
-            wid for wid in self.window_to_scratchpad
-            if wid not in window_ids
-        ]
+        orphaned = [wid for wid in self.window_to_scratchpad if wid not in window_ids]
 
         for window_id in orphaned:
             name = self.window_to_scratchpad.pop(window_id, None)
             if name and name in self.scratchpads:
-                print(f"Scratchpad '{name}' window {window_id} no longer exists, clearing")
+                print(
+                    f"Scratchpad '{name}' window {window_id} no longer exists, clearing"
+                )
                 self.scratchpads[name].window_id = None
                 self.scratchpads[name].visible = False
 

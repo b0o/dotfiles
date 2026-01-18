@@ -9,21 +9,36 @@ from .config import ScratchpadConfig
 from .state import DaemonState, WindowInfo
 
 
-def convert_coordinates_to_pixels(
+def convert_position_to_pixels(
     coords: tuple[str, str],
     output_width: int,
     output_height: int,
+    window_width: int,
+    window_height: int,
 ) -> tuple[int, int]:
-    """Convert percentage or pixel coordinates to absolute pixels."""
+    """Convert position coordinates to absolute pixels.
+
+    Percentages represent where the window sits in its valid position range:
+    - 0% = window at left/top edge of screen
+    - 100% = window at right/bottom edge of screen
+    - 50% = window centered
+
+    This ensures any percentage 0-100% results in the window fully on-screen.
+    Pixel values are used directly as the top-left corner position.
+    """
     x_str, y_str = coords
 
     if x_str.endswith("%"):
-        x = int(output_width * float(x_str[:-1]) / 100)
+        # Valid x range is [0, output_width - window_width]
+        max_x = max(0, output_width - window_width)
+        x = int(max_x * float(x_str[:-1]) / 100)
     else:
         x = int(x_str)
 
     if y_str.endswith("%"):
-        y = int(output_height * float(y_str[:-1]) / 100)
+        # Valid y range is [0, output_height - window_height]
+        max_y = max(0, output_height - window_height)
+        y = int(max_y * float(y_str[:-1]) / 100)
     else:
         y = int(y_str)
 
@@ -549,7 +564,11 @@ class ScratchpadManager:
         await self._position_window(window_id, config)
 
     async def _position_window(self, window_id: int, config: ScratchpadConfig) -> None:
-        """Position a window based on config."""
+        """Position a window based on config.
+
+        Positions are relative to the center of the window, not the top-left corner.
+        This means "50%,50%" will truly center the window on the screen.
+        """
         if not config.position_map:
             return
 
@@ -566,8 +585,16 @@ class ScratchpadManager:
             else:
                 output = self.state.outputs.get(output_name or "")
                 if output:
-                    x, y = convert_coordinates_to_pixels(
-                        coords, output.width, output.height
+                    # Calculate expected window size from config
+                    window_width, window_height = self._get_expected_window_size(
+                        config, output.width, output.height
+                    )
+                    x, y = convert_position_to_pixels(
+                        coords,
+                        output.width,
+                        output.height,
+                        window_width,
+                        window_height,
                     )
                     await self._run_niri_action(
                         "move-floating-window",
@@ -578,6 +605,30 @@ class ScratchpadManager:
                         "--y",
                         str(y),
                     )
+
+    def _get_expected_window_size(
+        self, config: ScratchpadConfig, output_width: int, output_height: int
+    ) -> tuple[int, int]:
+        """Calculate expected window size from config.
+
+        Falls back to current window size from state if config doesn't specify.
+        """
+        width = 0
+        height = 0
+
+        if config.width:
+            if config.width.endswith("%"):
+                width = int(output_width * float(config.width[:-1]) / 100)
+            else:
+                width = int(config.width)
+
+        if config.height:
+            if config.height.endswith("%"):
+                height = int(output_height * float(config.height[:-1]) / 100)
+            else:
+                height = int(config.height)
+
+        return width, height
 
     async def _move_to_scratchpad_workspace(self, window_id: int) -> None:
         """Move a window to the hidden scratchpad workspace."""
