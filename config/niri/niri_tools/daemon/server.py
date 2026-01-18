@@ -6,7 +6,7 @@ import os
 import sys
 from typing import Any
 
-from ..common import CONFIG_FILE, SOCKET_PATH
+from ..common import SOCKET_PATH
 from .config import load_config
 from .notify import notify_error, notify_info, set_notify_level
 from .scratchpad import ScratchpadManager
@@ -350,15 +350,21 @@ class DaemonServer:
             print(f"Failed to reload workspaces: {e}", file=sys.stderr)
 
     async def _config_watch_loop(self) -> None:
-        """Watch for config file changes."""
+        """Watch for config file changes (main file and all includes)."""
         while self.running:
             await asyncio.sleep(1.0)
 
+            if not self.state.watch_config:
+                continue
+
             try:
-                if CONFIG_FILE.exists():
-                    mtime = CONFIG_FILE.stat().st_mtime
-                    if mtime > self.state.config_mtime:
-                        self._reload_config(is_reload=True)
+                # Check if any tracked config file has changed
+                for config_path, old_mtime in self.state.config_mtimes.items():
+                    if config_path.exists():
+                        mtime = config_path.stat().st_mtime
+                        if mtime > old_mtime:
+                            self._reload_config(is_reload=True)
+                            break
             except OSError:
                 pass
 
@@ -370,8 +376,14 @@ class DaemonServer:
             set_notify_level(config.settings.notify_level)
             # Update scratchpad configs
             self.state.scratchpad_configs = config.scratchpads
-            if CONFIG_FILE.exists():
-                self.state.config_mtime = CONFIG_FILE.stat().st_mtime
+            # Update watch setting
+            self.state.watch_config = config.settings.watch_config
+            # Update tracked config files and their mtimes
+            self.state.config_mtimes = {
+                path: path.stat().st_mtime
+                for path in config.config_files
+                if path.exists()
+            }
             print(f"Loaded {len(config.scratchpads)} scratchpad configs")
             if is_reload:
                 notify_info(
@@ -380,9 +392,10 @@ class DaemonServer:
                 )
 
         except Exception as e:
-            # Keep previous config, just update mtime to avoid retry loop
-            if CONFIG_FILE.exists():
-                self.state.config_mtime = CONFIG_FILE.stat().st_mtime
+            # Keep previous config, just update mtimes to avoid retry loop
+            for path in list(self.state.config_mtimes.keys()):
+                if path.exists():
+                    self.state.config_mtimes[path] = path.stat().st_mtime
             error_msg = f"Failed to load config: {e}"
             print(error_msg, file=sys.stderr)
             notify_error("Config error", error_msg)

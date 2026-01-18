@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from ..common import STATE_FILE
@@ -115,7 +116,8 @@ class DaemonState:
 
     # Config
     scratchpad_configs: dict[str, ScratchpadConfig] = field(default_factory=dict)
-    config_mtime: float = 0.0
+    config_mtimes: dict[Path, float] = field(default_factory=dict)
+    watch_config: bool = True
 
     def load_initial_state(self) -> None:
         """Load initial state from niri commands."""

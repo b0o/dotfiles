@@ -17,6 +17,7 @@ class DaemonSettings:
     """Global daemon settings."""
 
     notify_level: NotifyLevel = NotifyLevel.ALL
+    watch_config: bool = True
 
 
 @dataclass
@@ -70,6 +71,7 @@ class LoadedConfig:
 
     settings: DaemonSettings
     scratchpads: dict[str, ScratchpadConfig]
+    config_files: list[Path]
 
 
 def load_config(config_file: Path | None = None) -> LoadedConfig:
@@ -77,7 +79,8 @@ def load_config(config_file: Path | None = None) -> LoadedConfig:
     if config_file is None:
         config_file = CONFIG_DIR / "scratchpads.yaml"
 
-    raw_config = _load_config_recursive(config_file, set())
+    loaded_files: list[Path] = []
+    raw_config = _load_config_recursive(config_file, set(), loaded_files)
 
     # Parse daemon settings
     settings = _parse_daemon_settings(raw_config.get("settings", {}))
@@ -85,7 +88,9 @@ def load_config(config_file: Path | None = None) -> LoadedConfig:
     # Parse scratchpads
     scratchpads = _parse_scratchpads(raw_config.get("scratchpads", {}))
 
-    return LoadedConfig(settings=settings, scratchpads=scratchpads)
+    return LoadedConfig(
+        settings=settings, scratchpads=scratchpads, config_files=loaded_files
+    )
 
 
 def _parse_daemon_settings(settings_cfg: dict[str, Any]) -> DaemonSettings:
@@ -99,7 +104,12 @@ def _parse_daemon_settings(settings_cfg: dict[str, Any]) -> DaemonSettings:
             print(
                 f"Invalid notify level: {notify_str}. Valid: {valid}", file=sys.stderr
             )
-    return DaemonSettings(notify_level=notify_level)
+
+    watch_config = True
+    if "watch" in settings_cfg:
+        watch_config = bool(settings_cfg["watch"])
+
+    return DaemonSettings(notify_level=notify_level, watch_config=watch_config)
 
 
 def _parse_scratchpads(
@@ -134,7 +144,9 @@ def _parse_scratchpads(
     return result
 
 
-def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, Any]:
+def _load_config_recursive(
+    config_path: Path, visited: set[Path], loaded_files: list[Path]
+) -> dict[str, Any]:
     """Recursively load config with include support."""
     try:
         config_path = config_path.resolve()
@@ -148,6 +160,7 @@ def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, A
         return {}
 
     visited.add(config_path)
+    loaded_files.append(config_path)
 
     try:
         with open(config_path) as f:
@@ -164,7 +177,7 @@ def _load_config_recursive(config_path: Path, visited: set[Path]) -> dict[str, A
                 includes = [includes]
             for include_path_str in includes:
                 include_path = config_path.parent / include_path_str
-                included = _load_config_recursive(include_path, visited)
+                included = _load_config_recursive(include_path, visited, loaded_files)
                 if "settings" in included:
                     result["settings"].update(included["settings"])
                 if "scratchpads" in included:

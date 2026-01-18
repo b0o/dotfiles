@@ -24,6 +24,11 @@
           "type": "string",
           "enum": ["none", "error", "all"],
           "default": "all"
+        },
+        "watch": {
+          "description": "Watch config files for changes and auto-reload",
+          "type": "boolean",
+          "default": true
         }
       },
       "additionalProperties": false
