@@ -1,54 +1,63 @@
+# yaml-language-server: $schema=scratchpads.schema.json
 include:
-  - scratchpads.private.yaml
+  - ./scratchpads.private.yaml
+
+settings:
+  notify: all
+  watch: true
 
 scratchpads:
   term:
     app_id: com.mitchellh.ghostty
-    command: ghostty
+    command:
+      - ghostty
+      - +new-window
     size: 60%x60%
     position:
-      DP-2: 34%,20%
-      DP-1: 6%,20%
+      DP-1: 10%,35%
+      DP-2: 50%,35%
 
   term-n:
     app_id: com.mitchellh.ghostty
     command:
-      ["ghostty", "--theme=TokyoNight Storm", "-e", "zsh", "-ic", "obsidnvim"]
+      - ghostty
+      - --theme=TokyoNight Storm
+      - -e
+      - nu
+      - -c
+      - |
+        env COLORSCHEME=tokyonight ~/.config/zellij/bin/layout new-tab cmd --name personal --cwd ([(xdg-user-dir DOCUMENTS) personal.obsidian] | path join) nvim index.md
     size: 50%x80%
     position:
-      DP-2: 41%,10%
-      DP-1: 9%,10%
+      DP-1: 10%,35%
+      DP-2: 50%,35%
 
   web-m:
     app_id: /(?i)google-chrome
     command:
-      [
-        "xdg-launch",
-        "-A",
-        "new-window",
-        "google-chrome",
-        "https://mail.google.com/mail/u/0/#inbox",
-        "https://mail.google.com/mail/u/1/#inbox",
-      ]
+      - xdg-launch
+      - -A
+      - new-window
+      - google-chrome
+      - https://mail.google.com/mail/u/0/#inbox
+      - https://mail.google.com/mail/u/1/#inbox
     size: 60%x60%
     position:
-      DP-2: 37%,20%
-      DP-1: 3%,20%
+      DP-1: 10%,35%
+      DP-2: 50%,35%
 
   web-i:
     app_id: chrome-bgdbmehlmdmddlgneophbcddadgknlpm-alt
     command:
-      [
-        "xdg-launch",
-        "-A",
-        "app-window",
-        "google-chrome",
-        "bgdbmehlmdmddlgneophbcddadgknlpm",
-      ]
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - bgdbmehlmdmddlgneophbcddadgknlpm
     size: 40%x75%
     position:
-      DP-2: 50%,13%
-      DP-1: 10%,13%
+      DP-1: 10%,30%
+      DP-2: 50%,30%
 
   music-tidal:
     app_id: chrome-ilbcbhpbmggihnbldpmmbppiclfnifck-alt
@@ -60,8 +69,8 @@ scratchpads:
       - ilbcbhpbmggihnbldpmmbppiclfnifck
     size: 38%x55%
     position:
-      DP-2: 50%,22%
-      DP-1: 10%,22%
+      DP-1: 10%,45%
+      DP-2: 50%,45%
 
   music-apple:
     app_id: chrome-jkeipnhncidnkjhpeoiehafoaabagaha-alt
@@ -73,8 +82,8 @@ scratchpads:
       - jkeipnhncidnkjhpeoiehafoaabagaha
     size: 38%x55%
     position:
-      DP-2: 50%,22%
-      DP-1: 10%,22%
+      DP-1: 10%,45%
+      DP-2: 50%,45%
 
   music-soundcloud:
     app_id: chrome-eikjhbkpemdappjfcmdeeeamdpkgabmk-alt
@@ -86,8 +95,8 @@ scratchpads:
       - eikjhbkpemdappjfcmdeeeamdpkgabmk
     size: 38%x55%
     position:
-      DP-2: 50%,22%
-      DP-1: 10%,22%
+      DP-1: 10%,45%
+      DP-2: 50%,45%
 
   music-youtube:
     app_id: chrome-cinhimbnkkaeohfgghhklpknlkffjgod-alt
@@ -99,160 +108,165 @@ scratchpads:
       - cinhimbnkkaeohfgghhklpknlkffjgod
     size: 38%x55%
     position:
-      DP-2: 50%,22%
-      DP-1: 10%,22%
+      DP-1: 10%,45%
+      DP-2: 50%,45%
 
   volume:
     app_id: org.pulseaudio.pavucontrol
-    command: ["pavucontrol"]
+    command: pavucontrol
     size: 40%x55%
     position:
-      DP-2: 50%,22%
-      DP-1: 10%,22%
+      DP-1: 10%,45%
+      DP-2: 50%,45%
 
   calendar:
     app_id: org.gnome.Calendar
-    command: ["xdg-launch", "org.gnome.Calendar"]
+    command:
+      - xdg-launch
+      - org.gnome.Calendar
     size: 55%x65%
     position:
-      DP-2: 36%,17%
-      DP-1: 10%,17%
+      DP-1: 10%,40%
+      DP-2: 50%,40%
 
   web-b:
     app_id: chrome-dcllmfmjlkpljanfegjgohmlnfipachj-alt
     command:
-      [
-        "xdg-launch",
-        "-A",
-        "app-window",
-        "google-chrome",
-        "dcllmfmjlkpljanfegjgohmlnfipachj",
-      ]
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - dcllmfmjlkpljanfegjgohmlnfipachj
     size: 30%x65%
     position:
-      DP-2: 50%,13%
-      DP-1: 10%,13%
+      DP-1: 10%,35%
+      DP-2: 50%,35%
 
   web-d:
     app_id: chrome-ahiigpfcghkbjfcibpojancebdfjmoop-alt
     command:
-      [
-        "xdg-launch",
-        "-A",
-        "app-window",
-        "google-chrome",
-        "ahiigpfcghkbjfcibpojancebdfjmoop",
-      ]
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - ahiigpfcghkbjfcibpojancebdfjmoop
     size: 40%x65%
     position:
-      DP-2: 50%,13%
-      DP-1: 10%,13%
+      DP-1: 10%,40%
+      DP-2: 50%,40%
 
   web-k:
     app_id: chrome-eaghjkinfdiclgpfbfdpbfkdpbjoceob-alt
     command:
-      [
-        "xdg-launch",
-        "-A",
-        "app-window",
-        "google-chrome",
-        "eaghjkinfdiclgpfbfdpbfkdpbjoceob",
-      ]
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - eaghjkinfdiclgpfbfdpbfkdpbjoceob
     size: 40%x65%
     position:
-      DP-2: 50%,13%
-      DP-1: 10%,13%
+      DP-1: 10%,40%
+      DP-2: 50%,40%
 
   web-claude:
     app_id: chrome-fmpnliohjhemenmnlpbfagaolkdacoja-alt
     command:
-      [
-        "xdg-launch",
-        "-A",
-        "app-window",
-        "google-chrome",
-        "fmpnliohjhemenmnlpbfagaolkdacoja",
-      ]
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - fmpnliohjhemenmnlpbfagaolkdacoja
     size: 40%x90%
     position:
-      DP-2: 50%,5%
-      DP-1: 10%,5%
+      DP-1: 10%,15%
+      DP-2: 50%,15%
 
-  web-discord:
-    app_id: chrome-magkoliahgffibhgfkmoealggombgknl-alt
+  claude:
+    app_id: Claude
     command:
-      [
-        "xdg-launch",
-        "-A",
-        "app-window",
-        "google-chrome",
-        "magkoliahgffibhgfkmoealggombgknl",
-      ]
-    size: 50%x90%
+      - xdg-launch
+      - claude-desktop
+    size: 40%x90%
     position:
-      DP-2: 42%,5%
-      DP-1: 8%,5%
-
-  web-matrix:
-    app_id: chrome-bcngdmpegpihnheapppgoniglphkpfhm-alt
-    command:
-      [
-        "xdg-launch",
-        "-A",
-        "app-window",
-        "google-chrome",
-        "bcngdmpegpihnheapppgoniglphkpfhm",
-      ]
-    size: 50%x90%
-    position:
-      DP-2: 42%,5%
-      DP-1: 8%,5%
+      DP-1: 10%,15%
+      DP-2: 50%,15%
 
   term-cc:
     app_id: com.mitchellh.ghostty
     command:
-      ["ghostty", "--theme=Monokai Pro", "-e", "zsh", "-ic", "commander-claude"]
+      - ghostty
+      - --theme=Matrix
+      - -e
+      - nu
+      - -c
+      - command-center
     size: 40%x90%
     position:
-      DP-2: 50%,5%
-      DP-1: 10%,5%
+      DP-1: 10%,15%
+      DP-2: 50%,15%
 
-  claude:
-    app_id: Claude
-    command: ["xdg-launch", "claude-desktop"]
-    size: 40%x90%
+  web-discord:
+    app_id: chrome-magkoliahgffibhgfkmoealggombgknl-alt
+    command:
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - magkoliahgffibhgfkmoealggombgknl
+    size: 50%x90%
     position:
-      DP-2: 50%,5%
-      DP-1: 10%,5%
+      DP-1: 10%,15%
+      DP-2: 50%,15%
+
+  web-matrix:
+    app_id: chrome-bcngdmpegpihnheapppgoniglphkpfhm-alt
+    command:
+      - xdg-launch
+      - -A
+      - app-window
+      - google-chrome
+      - bcngdmpegpihnheapppgoniglphkpfhm
+    size: 50%x90%
+    position:
+      DP-1: 10%,15%
+      DP-2: 50%,15%
 
   discord:
     title: "/^[a-zA-Z0-9]* - Discord$"
-    command: ["gtk-launch", "discord"]
+    command:
+      - gtk-launch
+      - discord
     size: 50%x90%
     position:
-      DP-2: 42%,5%
-      DP-1: 8%,5%
+      DP-1: 10%,15%
+      DP-2: 50%,15%
 
   figma:
     app_id: figma-linux
-    command: ["gtk-launch", "figma-linux"]
+    command:
+      - gtk-launch
+      - figma-linux
     size: 61%x90%
     position:
-      DP-2: 36%,5%
-      DP-1: 2%,5%
+      DP-1: 10%,15%
+      DP-2: 50%,15%
 
   parsec:
     app_id: parsecd
-    command: ["xdg-launch", "parsecd"]
+    command:
+      - xdg-launch
+      - parsecd
     size: 2560x1440
     position:
-      DP-2: 32%,15%
       DP-1: 1%,15%
+      DP-2: 50%,15%
 
   books:
     title: "/^calibre — "
-    command: ["xdg-launch", "calibre-gui"]
+    command:
+      - xdg-launch
+      - calibre-gui
     size: 50%x60%
     position:
-      DP-2: 40%,20%
-      DP-1: 10%,20%
+      DP-1: 10%,45%
+      DP-2: 50%,45%
