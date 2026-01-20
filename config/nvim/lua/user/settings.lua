@@ -82,7 +82,7 @@ vim.o.showmatch = true
 vim.o.scrolloff = 5
 vim.o.smoothscroll = true -- scroll by screen line rather than by text line when wrap is set
 
--- vim.o.winborder = 'rounded'
+vim.o.winborder = 'rounded'
 
 vim.opt.list = true
 vim.opt.listchars = {
@@ -128,6 +128,8 @@ vim.diagnostic.config {
   underline = true,
   update_in_insert = false,
 }
+
+vim.g.health = { style = 'float' }
 
 ---- Providers
 vim.g.loaded_perl_provider = 0
