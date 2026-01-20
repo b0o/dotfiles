@@ -6,13 +6,12 @@
 
 # Get the comark directory path
 def comark-dir [] {
-  let home = $nu.home-dir? | default $nu.home-path
   $env
   | get -o COMARK_DIR
   | default (
     $env
     | get -o XDG_CONFIG_HOME
-    | default ($home | path join ".config")
+    | default ($env.HOME | path join ".config")
     | path join "comark"
   )
 }
@@ -133,6 +132,98 @@ export def p, [alias: string] {
   comark-init
   validate-alias $alias
   resolve-bookmark $alias
+}
+
+# Find bookmarks that contain the given path, sorted by closest match (longest target first)
+# With --direct, only direct ancestors are returned.
+# By default, if the path is in a git worktree, bookmarks under the git root are also included,
+# with sort order:
+#   1. Direct ancestors within the git repo (longest first)
+#   2. Siblings in the git repo (by relative distance, shorter is higher)
+#   3. Direct ancestors outside the git repo (longest first)
+export def find, [
+  path: string
+  --direct (-d) # Disable smart search functionality, only return direct ancestors
+] {
+  let expanded_path = $path | path expand
+  let bookmarks = l,
+
+  # Find direct ancestor bookmarks (path starts with bookmark target)
+  let ancestors = (
+    $bookmarks
+    | each {|row|
+      let target_normalized = $row.target | str trim --right --char '/'
+      if ($expanded_path | str starts-with $target_normalized) {
+        $row
+      }
+    }
+    | compact
+  )
+
+  if $direct {
+    return ($ancestors | sort-by { ($in.target | str length) } --reverse)
+  }
+
+  use git/worktree.nu gw-parse
+
+  # gw-parse needs a directory, so use dirname if path is a file
+  let git_path = if ($expanded_path | path type) == "file" {
+    $expanded_path | path dirname
+  } else {
+    $expanded_path
+  }
+  let git_info = do --ignore-errors { gw-parse $git_path }
+  if ($git_info | is-empty) {
+    return ($ancestors | sort-by { ($in.target | str length) } --reverse)
+  }
+
+  let git_root = $git_info.git_root
+  let git_root_normalized = $git_root | str trim --right --char '/'
+
+  # Split ancestors into those inside vs outside the git repo
+  let ancestors_grouped = $ancestors | group-by {
+    $in.target | str trim --right --char '/' | str starts-with $git_root_normalized
+  }
+
+  let ancestors_in_repo = $ancestors_grouped | get -o "true" | default [] | sort-by { $in.target | str length } --reverse
+  let ancestors_outside_repo = $ancestors_grouped | get -o "false" | default [] | sort-by { $in.target | str length } --reverse
+
+  # Find sibling bookmarks (under git root but not ancestors of the path)
+  # Calculate relative distance: how many path components differ from the input path
+  let ancestor_targets = $ancestors | get target | each { $in | str trim --right --char '/' }
+
+  let siblings = (
+    $bookmarks
+    | each {|row|
+      let target_normalized = $row.target | str trim --right --char '/'
+      # Must be under git root but not already an ancestor
+      if ($target_normalized | str starts-with $git_root_normalized) and ($target_normalized not-in $ancestor_targets) {
+        # Calculate relative distance:
+        # Find common prefix length, then count differing components in both paths
+        let target_parts = $target_normalized | path split
+        let path_parts = $expanded_path | path split
+
+        # Find the length of common prefix
+        let min_len = [($target_parts | length) ($path_parts | length)] | math min
+        mut common_len = 0
+        for i in 0..<$min_len {
+          if ($target_parts | get $i) == ($path_parts | get $i) {
+            $common_len = $common_len + 1
+          } else {
+            break
+          }
+        }
+        let distance = (($target_parts | length) - $common_len) + (($path_parts | length) - $common_len)
+        $row | insert distance $distance
+      }
+    }
+    | compact
+    | sort-by distance
+  )
+
+  $ancestors_in_repo
+  | append ($siblings | reject distance)
+  | append $ancestors_outside_repo
 }
 
 # List all bookmarks
@@ -963,10 +1054,9 @@ export def fzf,path [] {
     let result = match $path_style.type {
       "tilde" => {
         # Convert to tilde-prefixed path
-        let home = $nu.home-dir? | default $nu.home-path | path expand
         let abs_result = ($raw_result | path expand)
-        if ($abs_result | str starts-with $home) {
-          $abs_result | str replace $home "~"
+        if ($abs_result | str starts-with $env.HOME) {
+          $abs_result | str replace $env.HOME "~"
         } else {
           $raw_result
         }
@@ -1032,9 +1122,12 @@ export def fzf,path [] {
 }
 
 export def "comark generate-autoload" [] {
-  (l, | each { |row|
-    $"# cd ($row.target)\nexport alias ,($row.name) = cd, ($row.name)"
-  }) | str join "\n"
+  [
+    "use comark *\n"
+    ...(l, | each { |row|
+      $"# cd ($row.target)\nexport alias ,($row.name) = cd, ($row.name)"
+    })
+  ] | str join "\n"
 }
 
 export def "comark generate-autoload-hash" [] {
