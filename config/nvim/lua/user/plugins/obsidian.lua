@@ -1,14 +1,27 @@
-local private = require 'user.util.private'
-local vault = private.obsidian_vault or {}
+local workspaces = {
+  vim.env.XDG_DOCUMENTS_DIR and {
+    name = 'personal',
+    path = vim.env.XDG_DOCUMENTS_DIR .. '/personal.obsidian',
+  },
+}
 
 ---@type LazySpec[]
 return {
   {
     'obsidian-nvim/obsidian.nvim',
-    event = vault.path and {
-      ('BufReadPre %s/**.md'):format(vault.path),
-      ('BufNewFile %s/**.md'):format(vault.path),
-    } or nil,
+    event = vim
+      .iter(workspaces)
+      :map(
+        function(workspace)
+          return {
+            ('BufReadPre %s/*.md'):format(workspace.path),
+            ('BufNewFile %s/*.md'):format(workspace.path),
+          }
+        end
+      )
+      :flatten()
+      :totable(),
+    dir = nil,
     cmd = 'Obsidian',
     config = function()
       local xk = require('user.keys').xk
@@ -29,7 +42,7 @@ return {
 
       require('obsidian').setup {
         ui = { enable = false }, -- use render-markdown.nvim instead
-        workspaces = { vault },
+        workspaces = workspaces,
         completion = {
           nvim_cmp = false,
           blink = true,
