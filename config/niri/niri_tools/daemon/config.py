@@ -72,6 +72,7 @@ class LoadedConfig:
     settings: DaemonSettings
     scratchpads: dict[str, ScratchpadConfig]
     config_files: list[Path]
+    warnings: list[str]
 
 
 def load_config(config_file: Path | None = None) -> LoadedConfig:
@@ -80,7 +81,8 @@ def load_config(config_file: Path | None = None) -> LoadedConfig:
         config_file = CONFIG_DIR / "scratchpads.yaml"
 
     loaded_files: list[Path] = []
-    raw_config = _load_config_recursive(config_file, set(), loaded_files)
+    warnings: list[str] = []
+    raw_config = _load_config_recursive(config_file, set(), loaded_files, warnings)
 
     # Parse daemon settings
     settings = _parse_daemon_settings(raw_config.get("settings", {}))
@@ -89,18 +91,25 @@ def load_config(config_file: Path | None = None) -> LoadedConfig:
     scratchpads = _parse_scratchpads(raw_config.get("scratchpads", {}))
 
     return LoadedConfig(
-        settings=settings, scratchpads=scratchpads, config_files=loaded_files
+        settings=settings,
+        scratchpads=scratchpads,
+        config_files=loaded_files,
+        warnings=warnings,
     )
+
+
+_NOTIFY_LEVEL_MAP = {level.name.lower(): level for level in NotifyLevel}
 
 
 def _parse_daemon_settings(settings_cfg: dict[str, Any]) -> DaemonSettings:
     """Parse daemon settings from config."""
     notify_level = NotifyLevel.ALL
     if notify_str := settings_cfg.get("notify"):
-        try:
-            notify_level = NotifyLevel(notify_str.lower())
-        except ValueError:
-            valid = ", ".join(level.value for level in NotifyLevel)
+        level = _NOTIFY_LEVEL_MAP.get(notify_str.lower())
+        if level is not None:
+            notify_level = level
+        else:
+            valid = ", ".join(_NOTIFY_LEVEL_MAP.keys())
             print(
                 f"Invalid notify level: {notify_str}. Valid: {valid}", file=sys.stderr
             )
@@ -145,7 +154,10 @@ def _parse_scratchpads(
 
 
 def _load_config_recursive(
-    config_path: Path, visited: set[Path], loaded_files: list[Path]
+    config_path: Path,
+    visited: set[Path],
+    loaded_files: list[Path],
+    warnings: list[str],
 ) -> dict[str, Any]:
     """Recursively load config with include support."""
     try:
@@ -176,8 +188,13 @@ def _load_config_recursive(
             if not isinstance(includes, list):
                 includes = [includes]
             for include_path_str in includes:
-                include_path = config_path.parent / include_path_str
-                included = _load_config_recursive(include_path, visited, loaded_files)
+                include_path = (config_path.parent / include_path_str).resolve()
+                if not include_path.exists():
+                    warnings.append(f"Include file not found: {include_path}")
+                    continue
+                included = _load_config_recursive(
+                    include_path, visited, loaded_files, warnings
+                )
                 if "settings" in included:
                     result["settings"].update(included["settings"])
                 if "scratchpads" in included:
@@ -195,5 +212,4 @@ def _load_config_recursive(
         # Re-raise YAML parse errors so caller can handle them
         raise ValueError(f"Failed to parse {config_path}: {e}") from e
     except OSError as e:
-        print(f"Failed to read config from {config_path}: {e}", file=sys.stderr)
-        return {}
+        raise ValueError(f"Failed to read {config_path}: {e}") from e

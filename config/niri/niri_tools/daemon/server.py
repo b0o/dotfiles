@@ -11,7 +11,7 @@ from watchfiles import Change, awatch
 
 from ..common import CONFIG_FILE, SOCKET_PATH
 from .config import load_config
-from .notify import notify_error, notify_info, set_notify_level
+from .notify import notify_error, notify_info, notify_warning, set_notify_level
 from .scratchpad import ScratchpadManager
 from .state import DaemonState, OutputInfo, WindowInfo, WorkspaceInfo
 from .urgency import UrgencyHandler
@@ -418,6 +418,12 @@ class DaemonServer:
         self.state.config_files.add(CONFIG_FILE.resolve())
 
         print(f"Loaded {len(config.scratchpads)} scratchpad configs")
+
+        # Show warnings for missing includes, etc.
+        for warning in config.warnings:
+            print(f"Warning: {warning}", file=sys.stderr)
+            notify_warning("Config warning", warning)
+
         if is_reload:
             notify_info(
                 "Scratchpad config reloaded",

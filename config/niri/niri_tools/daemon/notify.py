@@ -1,15 +1,16 @@
 """Centralized notification system for the daemon."""
 
 import subprocess
-from enum import Enum
+from enum import IntEnum
 
 
-class NotifyLevel(Enum):
-    """Notification level configuration."""
+class NotifyLevel(IntEnum):
+    """Notification level configuration (ordered by verbosity)."""
 
-    NONE = "none"  # No notifications
-    ERROR = "error"  # Only errors
-    ALL = "all"  # All notifications (errors + info)
+    NONE = 0  # No notifications
+    ERROR = 1  # Only errors
+    WARNING = 2  # Errors + warnings
+    ALL = 3  # All notifications (errors + warnings + info)
 
 
 # Global notification level, set by config
@@ -28,17 +29,24 @@ def get_notify_level() -> NotifyLevel:
 
 
 def notify_error(title: str, message: str) -> None:
-    """Send an error notification (shown if level is ERROR or ALL)."""
-    if _notify_level == NotifyLevel.NONE:
+    """Send an error notification (shown if level >= ERROR)."""
+    if _notify_level < NotifyLevel.ERROR:
         return
     _send_notification(title, message, urgency="critical")
 
 
+def notify_warning(title: str, message: str) -> None:
+    """Send a warning notification (shown if level >= WARNING)."""
+    if _notify_level < NotifyLevel.WARNING:
+        return
+    _send_notification(title, message, urgency="normal", timeout_ms=5000)
+
+
 def notify_info(title: str, message: str, timeout_ms: int = 2000) -> None:
     """Send an info notification (shown only if level is ALL)."""
-    if _notify_level != NotifyLevel.ALL:
+    if _notify_level < NotifyLevel.ALL:
         return
-    _send_notification(title, message, timeout_ms=timeout_ms)
+    _send_notification(title, message, urgency="low", timeout_ms=timeout_ms)
 
 
 def _send_notification(

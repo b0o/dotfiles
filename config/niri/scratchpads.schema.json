@@ -22,7 +22,7 @@
         "notify": {
           "description": "Notification level",
           "type": "string",
-          "enum": ["none", "error", "all"],
+          "enum": ["none", "error", "warning", "all"],
           "default": "all"
         },
         "watch": {
