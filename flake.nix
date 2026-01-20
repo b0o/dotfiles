@@ -44,18 +44,16 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Misc
-    opencode = {
-      url = "github:b0o/opencode/b0o";
+    # Rust (for zellij build)
+    fenix = {
+      url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    opentui-src = {
-      url = "github:b0o/opentui/b0o";
-      flake = false;
-    };
-    opentui-spinner-src = {
-      url = "github:msmps/opentui-spinner";
-      flake = false;
+
+    # Misc
+    opencode = {
+      url = "github:anomalyco/opencode/dev";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
