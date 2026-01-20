@@ -4,10 +4,6 @@
   ...
 }:
 with pkgs; [
-  # Terminal
-  # TODO
-  # ghostty
-
   # Shells
   bash # bourne-again shell
   fish # friendly interactive shell
