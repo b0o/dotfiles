@@ -11,7 +11,7 @@ with pkgs; [
   }))
 
   # Tree Sitter + Node for installing Treesitter Grammars
-  inputs.neovim-nightly-overlay.packages.${pkgs.system}.tree-sitter
+  inputs.neovim-nightly-overlay.packages.${pkgs.stdenv.hostPlatform.system}.tree-sitter
 
   ### Lanugage Servers / Tools
   # Nix
@@ -26,6 +26,7 @@ with pkgs; [
   svelte-language-server # svelte language server
   tailwindcss-language-server # tailwindcss language server
   typescript-go # tsgo - typescript language server (golang re-implementation)
+  yaml-language-server # yaml language server
 
   ## Formatters
   dprint # multi-language formatter
