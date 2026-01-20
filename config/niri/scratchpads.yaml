@@ -25,8 +25,13 @@ scratchpads:
       - -e
       - nu
       - -c
-      - |
-        env COLORSCHEME=tokyonight ~/.config/zellij/bin/layout new-tab cmd --name personal --cwd ([(xdg-user-dir DOCUMENTS) personal.obsidian] | path join) nvim index.md
+      - >
+        env COLORSCHEME=tokyonight
+        ~/.config/zellij/bin/layout new-tab cmd
+        --name personal
+        --borderless
+        --cwd ([(xdg-user-dir DOCUMENTS) personal.obsidian] | path join)
+        nvim index.md
     size: 50%x80%
     position:
       DP-1: 10%,35%
