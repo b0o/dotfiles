@@ -13,7 +13,6 @@ with pkgs; [
   fish # friendly interactive shell
   zsh # z-shell
   nushell # modern shell
-  bash-env-json # load bash environment variables as JSON, for importing into nushell
 
   # Nushell plugins
   nushellPlugins.skim
@@ -38,6 +37,7 @@ with pkgs; [
   carapace # multi-shell completion generator
   vivid # themeable LS_COLORS generator
   usage # completions for mise
+  bash-env-json # load bash environment variables as JSON, for importing into nushell
 
   # Modern CLI utilities
   bat # cat clone with syntax highlighting and Git integration
@@ -58,4 +58,7 @@ with pkgs; [
 
   # Services
   google-cloud-sdk # Google Cloud CLI
+
+  # Filetypes
+  jsonkdl # Convert JSON -> KDL
 ]
