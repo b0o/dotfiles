@@ -78,8 +78,6 @@ def plugin-path [hook: record] {
   }
 }
 
-
-
 # Check if plugin needs update, returns {needs_update: bool, hash: string|null, mtime: string|null}
 def plugin-check [name: string, hook: record, manifest_entry: record] {
   let path = plugin-path $hook
@@ -210,6 +208,15 @@ def hook-init [name: string, hook: record] {
     }
   }
 
+  let hook_env = $hook | get -o env | default {}
+  let hook_env = (
+    if ($hook_env | describe -d | get type) == 'closure' {
+      do $hook_env
+    } else {
+      $hook_env
+    }
+  )
+
   let generated = try {
     let type = $cmd | describe
     let res = if ($type =~ '^closure') {
@@ -251,10 +258,17 @@ def hook-init [name: string, hook: record] {
       "export-env { do --env " + (view source $on_load) + " }"
     }
 
+    let load_env = if ($hook_env | is-not-empty) {
+      "load-env " ++ ($hook_env | to nuon)
+    }
+
     let out = [
+      (if $hook.timeit? == true { $"hooks time start ($name)" })
+      $load_env
       $res.stdout
       $on_load
-    ] | where { is-not-empty } | str join "\n" | default ""
+      (if $hook.timeit? == true { $"hooks time stop ($name)" })
+    ] | compact --empty | str join "\n" | default ""
 
     if $module {
       # Save command output to module file
@@ -334,7 +348,6 @@ def hook-generate [
   let path = hook-path $name
   let manifest_entry = $manifest | get -o $name | default {}
   let current_hash = $manifest_entry | get -o hash | default ""
-  $hook | get -o env | default {} | load-env
 
   let is_plugin = $hook | get -o plugin | default false
   let hash_files = normalize-hash-files $hook
@@ -511,7 +524,7 @@ export def --wrapped main [...args] {
 #     enabled?: bool = true                  # Whether to enable the hook
 #     cmd?: string|list<string>|closure      # Command to run to initialize the hook, or a closure that returns a string/list of lines
 #     depends?: string|list<string>|closure  # Command that must be installed; if not found, hook is quietly disabled
-#     env?: record                           # Environment variables to set before running the command
+#     env?: record|closure                   # Environment variables to set before running the command or closure returning a record of env vars
 #     module?: bool = false                  # If true, save as a module
 #     lazy?: bool = false                    # If true, don't load the module immediately, use `hooks load <name>` to load the module
 #                                            # Mutually exclusive with `overlay`
@@ -533,8 +546,16 @@ export def --wrapped main [...args] {
 # }
 # All hooks are automatically regenerated daily
 # Plugins and hash_files use stat-first optimization (inode+size+mtime check before hashing)
-export def --env use [hooks: record] {
+export def --env use [
+  hooks: record
+  --timeit # Record hooks execution times, can be displayed with `hooks times`
+] {
   mkdir $hooks_dir
+
+  let hooks = $hooks | upsert __nu_hooks {
+    enabled: true
+    env: {{ _nu_hooks_loaded: true }}
+  }
 
   # TODO: Allow `use` to be called multiple times
   $env._nu_hooks = $hooks
@@ -570,6 +591,11 @@ export def --env use [hooks: record] {
   # Initialize or update hooks
   for name in ($hooks | columns) {
     let hook = $hooks | get $name
+    let hook = if ($timeit) {
+      $hook | upsert timeit true
+    } else {
+      $hook
+    }
     if not (hook-enabled $name $hook) {
       continue
     }
@@ -786,4 +812,55 @@ export def update-plugin [
   if ($updated | is-not-empty) {
     print -e $"hooks: Reload nushell to load updated plugins: ($updated | str join ', ')"
   }
+}
+
+def --env save-time [marker: string, name: string] {
+  let time = date now
+  let hook_time = $env._nu_hooks_time? | get -o $name | default {} | upsert $marker $time
+  $env._nu_hooks_time = ($env._nu_hooks_time? | default {}) | upsert $name $hook_time
+}
+
+export def --env "time start" [name: string] {
+  save-time start $name
+}
+
+export def --env "time stop" [name: string] {
+  save-time stop $name
+}
+
+export def "time list" [] {
+  if ('_nu_hooks_time' not-in $env) {
+    print -e "hooks time tracking is not enabled, pass --timeit to `hooks use` to enable"
+    return
+  }
+  let times = $env._nu_hooks_time
+    | default {}
+    | items { |name, times|
+      let duration = ($times.stop - $times.start)
+      {
+        name: $name
+        start: $times.start
+        stop: $times.stop
+        duration: $duration
+      }
+    }
+  let total = $times | get duration | math sum
+  { hooks: $times, total: $total }
+}
+
+export def "serialize block" [block: closure] {
+  view source $block | str trim -lc '{' | str trim -rc '}'
+}
+
+export def "serialize env-smart" [
+  env_record: record
+  --default (-d) # Default to loading $env
+] {
+  if ($env_record | is-empty) {
+    return
+  }
+  [
+    "use nushell/env.nu smart-load-env"
+    ($"smart-load-env --default=($default) " ++ ($env_record | to nuon))
+  ]
 }

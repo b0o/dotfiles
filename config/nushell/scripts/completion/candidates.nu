@@ -182,8 +182,7 @@ export def "flags internal" [command: string, --short, --long]: nothing -> table
 }
 
 export def paths [prefix: path] {
-  let home = $nu.home-dir? | default $nu.home-path
-  let prefix = ($prefix | str replace "~" $home)
+  let prefix = ($prefix | str replace "~" $env.HOME)
   let args = (
     if ($prefix | str ends-with "/") {
       { dir: $prefix, pattern: "." }

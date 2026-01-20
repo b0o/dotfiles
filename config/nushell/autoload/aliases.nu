@@ -1,6 +1,6 @@
 # nushell
 
-alias startup = banner --short # Show nushell startup time
+alias sup = banner --short # Show nushell startup time
 
 # shell
 
