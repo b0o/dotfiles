@@ -255,10 +255,11 @@ local conform = lazy_require 'conform'
 local user_conform = lazy_require 'user.plugins.conform.internal'
 
 very_lazy(function()
-  map('n', '<leader>lif', '<Cmd>LspInfo<Cr>', 'LSP: Show LSP information')
-  map('n', '<leader>lr', '<Cmd>LspRestart<Cr>', 'LSP: Restart LSP')
-  map('n', '<leader>ls', '<Cmd>LspStart<Cr>', 'LSP: Start LSP')
-  map('n', '<leader>lS', '<Cmd>LspStop<Cr>', 'LSP: Stop LSP')
+  map('n', '<leader>lif', '<Cmd>checkhealth vim.lsp<Cr>', 'LSP: Show LSP information')
+  map('n', '<leader>lr', '<Cmd>lsp restart<Cr>', 'LSP: Restart LSP')
+  map('n', '<leader>lS', '<Cmd>lsp stop<Cr>', 'LSP: Stop LSP')
+  map('n', '<leader>le', '<Cmd>lsp enable<Cr>', 'LSP: Enable LSP')
+  map('n', '<leader>ld', '<Cmd>lsp disable<Cr>', 'LSP: Disable LSP')
 end)
 
 local on_first_attach = function()
