@@ -60,6 +60,15 @@ on-notify=exec mpv --start=5% /usr/share/sounds/deepin/stereo/dialog-error.wav
 [app-name=Claude]
 on-notify=exec mpv --start=5% /usr/share/sounds/Oxygen-Sys-Question.ogg
 
+[app-name=whispertool summary~=Started]
+on-notify=exec mpv --start=5% /usr/share/sounds/Oxygen-Im-Message-Out.ogg
+
+[app-name=whispertool summary~=Complete]
+on-notify=exec mpv --start=5% /usr/share/sounds/Oxygen-Im-Message-In.ogg
+
+[app-name=whispertool summary~=Canceled]
+on-notify=exec mpv --start=5% /usr/share/sounds/Oxygen-Sys-List-End.ogg
+
 [app-name=audioctl]
 group-by=app-name
 
