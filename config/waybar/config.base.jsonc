@@ -116,7 +116,7 @@
     },
     "on-click": "~/.config/waybar/bin/claude-usage.py --cycle-mode-up",
     "menu": "on-click-right",
-    "menu-file": "~/.config/waybar/claude-usage-menu.xml",
+    "menu-file": "~/.config/waybar/menu/claude-usage.xml",
     "menu-actions": {
       "mode-compact": "~/.config/waybar/bin/claude-usage.py --set-mode-compact",
       "mode-normal": "~/.config/waybar/bin/claude-usage.py --set-mode-normal",
@@ -148,7 +148,7 @@
     "tooltip": true,
     "restart-interval": 1,
     "menu": "on-click-right",
-    "menu-file": "~/.config/waybar/mullvad-status-menu.xml",
+    "menu-file": "~/.config/waybar/menu/mullvad-status.xml",
     "menu-actions": {
       "approve-all": "~/.config/waybar/bin/mullvad-status.py --approve-all",
       "unapprove-all": "~/.config/waybar/bin/mullvad-status.py --unapprove-all",
