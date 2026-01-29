@@ -13,16 +13,14 @@ import threading
 import time
 import urllib.request
 import urllib.error
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional
-
-import humanize  # pyright: ignore
 
 import signal
 
 CHECK_INTERVAL = 60.0
 OUTPUT_INTERVAL = 5.0
-BAR_WIDTH = 44
+BAR_WIDTH = 46
 HISTORY_FILE = os.path.expanduser("~/.local/share/claude-usage.json")
 CLAUDE_CREDS_PATH = os.path.expanduser("~/.claude/.credentials.json")
 OPENCODE_CREDS_PATH = os.path.expanduser("~/.local/share/opencode/auth.json")
@@ -30,6 +28,9 @@ OAUTH_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token"
 OAUTH_PROFILE_URL = "https://api.anthropic.com/api/oauth/profile"
 OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 TOKEN_REFRESH_MARGIN = 300  # Refresh if token expires within 5 minutes
+
+COLOR_SUBDUED = "#c3bae6"  # header details, footer, percentages <=85%, icons
+COLOR_DIM = "#61557d"  # bar bg
 
 progress_chars = {
     "empty_left": "",
@@ -64,7 +65,6 @@ hourglass_frames = [
 
 icons = {
     "bullet": "·",
-    "claude": "󰛄",
     "zap": "",
 }
 
@@ -537,7 +537,36 @@ def set_config(key: str, value) -> None:
     signal_running_instance()
 
 
-def update_history(usage_data: Dict, profile: Optional[Dict] = None) -> None:
+def load_current_snapshots() -> tuple[list[tuple[float, float]], int]:
+    """Load snapshots for the current 5h session from history.
+
+    Returns:
+        Tuple of (snapshots list, reset_at timestamp).
+        Returns empty list and 0 if no current session or snapshots.
+    """
+    history = load_history()
+    active_account = history.get("active_account")
+    if not active_account:
+        return [], 0
+
+    account = history.get("accounts", {}).get(active_account, {})
+    current_5h = account.get("current", {}).get("session_5h")
+    if not current_5h:
+        return [], 0
+
+    reset_at = current_5h.get("reset_at", 0)
+    stored_snapshots = current_5h.get("snapshots", [])
+
+    # Convert from [timestamp, utilization] lists back to tuples
+    snapshots = [(float(s[0]), float(s[1])) for s in stored_snapshots]
+    return snapshots, reset_at
+
+
+def update_history(
+    usage_data: Dict,
+    profile: Optional[Dict] = None,
+    snapshots: Optional[list[tuple[float, float]]] = None,
+) -> None:
     """Update usage history with new data."""
     now = int(time.time())
     history = load_history()
@@ -594,6 +623,8 @@ def update_history(usage_data: Dict, profile: Optional[Dict] = None) -> None:
             }
             if current_5h.get("plan"):
                 archived["plan"] = current_5h["plan"]
+            if current_5h.get("snapshots"):
+                archived["snapshots"] = current_5h["snapshots"]
             account["history"]["sessions_5h"].append(archived)
 
     # Check if current 7d window should be archived
@@ -611,7 +642,7 @@ def update_history(usage_data: Dict, profile: Optional[Dict] = None) -> None:
                 archived["plan"] = current_7d["plan"]
             account["history"]["windows_7d"].append(archived)
 
-    # Update current sessions with plan info
+    # Update current sessions with plan info and snapshots
     account["current"]["session_5h"] = {
         "reset_at": usage_data["5h_reset"],
         "utilization": usage_data["5h_utilization"],
@@ -619,6 +650,9 @@ def update_history(usage_data: Dict, profile: Optional[Dict] = None) -> None:
     }
     if plan_info:
         account["current"]["session_5h"]["plan"] = plan_info
+    if snapshots:
+        # Store snapshots as list of [timestamp, utilization] for JSON
+        account["current"]["session_5h"]["snapshots"] = [[t, u] for t, u in snapshots]
 
     account["current"]["window_7d"] = {
         "reset_at": usage_data["7d_reset"],
@@ -656,6 +690,8 @@ def format_reset_time(reset_timestamp: int) -> str:
 
 def format_reset_short(reset_timestamp: int) -> str:
     """Format reset timestamp to short form like '3h' or '12m'."""
+    from waybar_utils import format_delta_short
+
     if reset_timestamp <= 0:
         return "0m"
 
@@ -666,33 +702,7 @@ def format_reset_short(reset_timestamp: int) -> str:
     if delta.total_seconds() <= 0:
         return "0m"
 
-    result = humanize.naturaldelta(delta)
-
-    # Handle "a moment" for very small deltas
-    if result == "a moment":
-        return "0s"
-
-    # Handle "a/an" forms like "an hour" -> "1h", "a minute" -> "1m"
-    result = re.sub(r"\ba\s+second\b", "1s", result)
-    result = re.sub(r"\ba\s+minute\b", "1m", result)
-    result = re.sub(r"\ban\s+hour\b", "1h", result)
-    result = re.sub(r"\ba\s+day\b", "1d", result)
-    result = re.sub(r"\ba\s+month\b", "1mo", result)
-    result = re.sub(r"\ba\s+year\b", "1y", result)
-
-    # Shorten "X units" -> "Xu" forms
-    result = re.sub(r"(\d+)\s*seconds?", r"\1s", result)
-    result = re.sub(r"(\d+)\s*minutes?", r"\1m", result)
-    result = re.sub(r"(\d+)\s*hours?", r"\1h", result)
-    result = re.sub(r"(\d+)\s*days?", r"\1d", result)
-    result = re.sub(r"(\d+)\s*months?", r"\1mo", result)
-    result = re.sub(r"(\d+)\s*years?", r"\1y", result)
-
-    # Clean up compound forms like "1y, 2mo" -> just use the largest unit
-    # For a short display, we only want the primary unit
-    result = re.sub(r"^(\d+[a-z]+),?\s+.*", r"\1", result)
-
-    return result
+    return format_delta_short(delta)
 
 
 def format_relative_time(dt: datetime) -> str:
@@ -752,17 +762,22 @@ def format_tooltip(
     cred_source: Optional[str] = None,
     cred_is_fallback: bool = False,
     prefer_source: Optional[str] = None,
+    usage_snapshots: Optional[list[tuple[float, float]]] = None,
 ) -> str:
     """Format the tooltip with usage information."""
     util_5h = data["5h_utilization"] * 100
     util_7d = data["7d_utilization"] * 100
     bar_5h = get_progress_bar(int(util_5h), width=BAR_WIDTH)
     bar_7d = get_progress_bar(int(util_7d), width=BAR_WIDTH)
+    bar_5h_colored = get_progress_bar_colored(int(util_5h), width=BAR_WIDTH)
+    bar_7d_colored = get_progress_bar_colored(int(util_7d), width=BAR_WIDTH)
 
     time_elapsed_5h = get_time_elapsed_percentage(data["5h_reset"], 5.0)
     time_elapsed_7d = get_time_elapsed_percentage(data["7d_reset"], 7 * 24.0)
     time_bar_5h = get_time_bar(int(time_elapsed_5h), width=BAR_WIDTH)
     time_bar_7d = get_time_bar(int(time_elapsed_7d), width=BAR_WIDTH)
+    time_bar_5h_colored = get_time_bar_colored(int(time_elapsed_5h), width=BAR_WIDTH)
+    time_bar_7d_colored = get_time_bar_colored(int(time_elapsed_7d), width=BAR_WIDTH)
     hourglass_5h = get_hourglass_icon(time_elapsed_5h)
     hourglass_7d = get_hourglass_icon(time_elapsed_7d)
 
@@ -771,54 +786,67 @@ def format_tooltip(
     remaining_5h = format_reset_short(data["5h_reset"])
     remaining_7d = format_reset_short(data["7d_reset"])
 
-    active_claim = data["representative_claim"]
+    header_5h = f'   <b>5-hour session</b> <span color="{COLOR_SUBDUED}">{icons["bullet"]} {end_time_5h} (in {remaining_5h})</span>'
+    header_7d = f'   <b>7-day window</b> <span color="{COLOR_SUBDUED}">{icons["bullet"]} {end_time_7d} (in {remaining_7d})</span>'
 
-    # Build 5h header: "5-hour session · ends {end_time} ({short}) · active"
-    header_5h_parts = ["5-hour session", f"{end_time_5h} ({remaining_5h})"]
-    if active_claim == "five_hour":
-        header_5h_parts.append("active")
-    header_5h = f" {icons['bullet']} ".join(header_5h_parts)
+    # Build plain-text lines for width calculation, then markup lines for display
+    # Build bar lines (plain text for width, markup for display)
+    # Color percentages: use gradient color only if >85%, otherwise subdued
+    usage_5h_pct_color = (
+        _gradient_color(util_5h / 100) if util_5h > 85 else COLOR_SUBDUED
+    )
+    usage_7d_pct_color = (
+        _gradient_color(util_7d / 100) if util_7d > 85 else COLOR_SUBDUED
+    )
+    time_5h_pct_color = (
+        _time_gradient_color(time_elapsed_5h / 100)
+        if time_elapsed_5h > 85
+        else COLOR_SUBDUED
+    )
+    time_7d_pct_color = (
+        _time_gradient_color(time_elapsed_7d / 100)
+        if time_elapsed_7d > 85
+        else COLOR_SUBDUED
+    )
 
-    # Build 7d header: "7-day window · ends {end_time} ({short}) · active"
-    header_7d_parts = ["7-day window", f"{end_time_7d} ({remaining_7d})"]
-    if active_claim == "seven_day":
-        header_7d_parts.append("active")
-    header_7d = f" {icons['bullet']} ".join(header_7d_parts)
+    bar_line_5h_plain = f"{icons['zap']}  {bar_5h} {util_5h:4.1f}%"
+    bar_line_5h_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{icons["zap"]}</span>  {bar_5h_colored} <span color="{usage_5h_pct_color}">{util_5h:4.1f}%</span>'
+    time_line_5h_plain = f"{hourglass_5h}  {time_bar_5h} {time_elapsed_5h:4.1f}%"
+    time_line_5h_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_5h}</span>  {time_bar_5h_colored} <span color="{time_5h_pct_color}">{time_elapsed_5h:4.1f}%</span>'
 
-    lines = []
-    lines.append("")
-    lines.append(header_5h)
-    lines.append(f"{icons['zap']}  {bar_5h} {util_5h:4.1f}%")
-    lines.append(f"{hourglass_5h}  {time_bar_5h} {time_elapsed_5h:4.1f}%")
-    if data["5h_status"] != "allowed":
-        lines.append(f"  Status: {data['5h_status']}")
-    lines.append("")
+    bar_line_7d_plain = f"{icons['zap']}  {bar_7d} {util_7d:4.1f}%"
+    bar_line_7d_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{icons["zap"]}</span>  {bar_7d_colored} <span color="{usage_7d_pct_color}">{util_7d:4.1f}%</span>'
+    time_line_7d_plain = f"{hourglass_7d}  {time_bar_7d} {time_elapsed_7d:4.1f}%"
+    time_line_7d_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_7d}</span>  {time_bar_7d_colored} <span color="{time_7d_pct_color}">{time_elapsed_7d:4.1f}%</span>'
 
-    lines.append(header_7d)
-    lines.append(f"{icons['zap']}  {bar_7d} {util_7d:4.1f}%")
-    lines.append(f"{hourglass_7d}  {time_bar_7d} {time_elapsed_7d:4.1f}%")
-    if data["7d_status"] != "allowed":
-        lines.append(f"  Status: {data['7d_status']}")
+    # Build header plain text for width calculation
+    header_5h_plain = (
+        f"   5-hour session {icons['bullet']} {end_time_5h} (in {remaining_5h})"
+    )
+    header_7d_plain = (
+        f"   7-day window {icons['bullet']} {end_time_7d} (in {remaining_7d})"
+    )
 
-    if data["status"] != "allowed":
-        lines.append("")
-        lines.append(f"Overall status: {data['status']}")
+    # Collect plain text lines for width calculation
+    plain_lines = [
+        "",
+        header_5h_plain,
+        bar_line_5h_plain,
+        time_line_5h_plain,
+        "",
+        header_7d_plain,
+        bar_line_7d_plain,
+        time_line_7d_plain,
+    ]
 
     # Footer with credential source, user info and last check time
     footer_parts = []
     if cred_source:
-        # Format source based on mode:
-        # - auto mode (no preference): just "cc" or "oc"
-        # - prefer mode, using preferred: "[cc]" or "[oc]"
-        # - prefer mode, using fallback: "cc (fallback)" or "oc (fallback)"
         if prefer_source is None:
-            # Auto mode
             footer_parts.append(cred_source)
         elif cred_is_fallback:
-            # Prefer mode but using fallback
             footer_parts.append(f"{cred_source} (fallback)")
         else:
-            # Prefer mode, using preferred source
             footer_parts.append(f"[{cred_source}]")
     if profile:
         email = profile.get("account", {}).get("email")
@@ -826,28 +854,122 @@ def format_tooltip(
             footer_parts.append(email)
     if last_check_time:
         footer_parts.append(f"checked {format_relative_time(last_check_time)}")
-    footer = " · ".join(footer_parts) if footer_parts else None
+    footer = f" {icons['bullet']} ".join(footer_parts) if footer_parts else None
 
     plan_name = format_plan_name(profile)
+    bullet = f'<span color="{COLOR_SUBDUED}">{icons["bullet"]}</span>'
     if plan_name:
-        title = (
+        title_plain = (
             f"Claude {icons['bullet']} Usage Monitor {icons['bullet']} {plan_name} Plan"
         )
+        title_markup = f"Claude {bullet} Usage Monitor {bullet} {plan_name} Plan"
     else:
-        title = f"Claude {icons['bullet']} Usage Monitor"
-    max_width = max(len(line) for line in lines)
-    centered_title = title.center(max_width)
+        title_plain = f"Claude {icons['bullet']} Usage Monitor"
+        title_markup = f"Claude {bullet} Usage Monitor"
 
-    # Add centered footer
+    max_width = max(len(line) for line in plain_lines)
+    # Center based on plain text width, then apply markup
+    pad = max(0, max_width - len(title_plain))
+    pad_left = pad // 2
+    pad_right = pad - pad_left
+    centered_title = " " * pad_left + title_markup + " " * pad_right
+
+    # Build final markup output
+    lines = []
+    lines.append(f"<b>{centered_title}</b>")
+    lines.append("")
+    lines.append(header_5h)
+    lines.append(bar_line_5h_markup)
+    # Add usage timeline chart (between usage bar and time bar)
+    buckets = calculate_usage_buckets(
+        usage_snapshots or [], data["5h_reset"], BAR_WIDTH
+    )
+    top_row, bottom_row = render_usage_timeline_chart_colored(buckets, BAR_WIDTH)
+    lines.append(f"   {top_row}")
+    lines.append(f"   {bottom_row}")
+    lines.append(time_line_5h_markup)
+    time_labels_5h = render_5h_time_labels(data["5h_reset"], BAR_WIDTH)
+    lines.append(f"   {time_labels_5h}")
+    if data["5h_status"] != "allowed":
+        lines.append(
+            f'  Status: <span color="#FF7D90"><b>{data["5h_status"]}</b></span>'
+        )
+    lines.append("")
+
+    lines.append(header_7d)
+    lines.append(bar_line_7d_markup)
+    # Add 7d usage timeline chart from session history (between usage bar and time bar)
+    history = load_history()
+    buckets_7d = calculate_7d_buckets_from_history(history, data["7d_reset"], BAR_WIDTH)
+    top_row_7d, bottom_row_7d = render_usage_timeline_chart_colored(
+        buckets_7d, BAR_WIDTH
+    )
+    lines.append(f"   {top_row_7d}")
+    lines.append(f"   {bottom_row_7d}")
+    lines.append(time_line_7d_markup)
+    day_labels = render_7d_day_labels(data["7d_reset"], BAR_WIDTH)
+    lines.append(f"   {day_labels}")
+    if data["7d_status"] != "allowed":
+        lines.append(
+            f'  Status: <span color="#FF7D90"><b>{data["7d_status"]}</b></span>'
+        )
+
+    if data["status"] != "allowed":
+        lines.append("")
+        lines.append(
+            f'Overall status: <span color="#FF7D90"><b>{data["status"]}</b></span>'
+        )
+
     if footer:
         lines.append("")
-        lines.append(footer.center(max_width))
+        lines.append(f'<span color="{COLOR_SUBDUED}">{footer.center(max_width)}</span>')
 
-    return centered_title + "\n" + "\n".join(lines)
+    return "\n".join(lines)
+
+
+def _interpolate_colors(colors: list[tuple[int, int, int]], position: float) -> str:
+    """Interpolate through a list of evenly-spaced color stops.
+
+    Duplicate a color to make it hold longer in the gradient.
+    """
+    position = max(0.0, min(1.0, position))
+    n = len(colors)
+    if n == 0:
+        return "#FFFFFF"
+    if n == 1:
+        return f"#{colors[0][0]:02X}{colors[0][1]:02X}{colors[0][2]:02X}"
+
+    scaled = position * (n - 1)
+    i = min(int(scaled), n - 2)
+    t = scaled - i
+    c0, c1 = colors[i], colors[i + 1]
+    r = int(c0[0] + (c1[0] - c0[0]) * t)
+    g = int(c0[1] + (c1[1] - c0[1]) * t)
+    b = int(c0[2] + (c1[2] - c0[2]) * t)
+    return f"#{r:02X}{g:02X}{b:02X}"
+
+
+def _gradient_color(position: float) -> str:
+    """Return a hex color for a position 0.0-1.0 along the usage gradient.
+
+    Colors are evenly distributed. Duplicate a color to hold it longer.
+    """
+    colors = [
+        (0xDB, 0xFF, 0xB3),  # #DBFFB3
+        (0xDB, 0xFF, 0xB3),
+        (0xDB, 0xFF, 0xB3),
+        (0xDB, 0xFF, 0xB3),
+        (0xC4, 0xAE, 0x7A),  # #C4AE7A
+        (0xC4, 0xAE, 0x7A),
+        (0xF7, 0x95, 0x68),  # #F79568
+        (0xF7, 0x95, 0x68),
+        (0xED, 0x6E, 0x86),  # #ED6E86
+    ]
+    return _interpolate_colors(colors, position)
 
 
 def get_progress_bar(percentage: int, width: int) -> str:
-    """Convert percentage to Unicode progress bar."""
+    """Convert percentage to Unicode progress bar (plain, no color)."""
     total_segments = width
     middle_segments = total_segments - 2
 
@@ -897,11 +1019,384 @@ def get_progress_bar(percentage: int, width: int) -> str:
     return bar
 
 
+def get_progress_bar_colored(percentage: int, width: int) -> str:
+    """Convert percentage to Unicode progress bar with Pango color gradient on filled segments."""
+    total_segments = width
+    filled_segments = min(total_segments, percentage * total_segments // 100)
+
+    parts = []
+    for i in range(total_segments):
+        is_filled = i < filled_segments
+        if i == 0:
+            char = (
+                progress_chars["full_left"]
+                if is_filled
+                else progress_chars["empty_left"]
+            )
+        elif i == total_segments - 1:
+            char = (
+                progress_chars["full_right"]
+                if is_filled
+                else progress_chars["empty_right"]
+            )
+        else:
+            char = (
+                progress_chars["full_mid"] if is_filled else progress_chars["empty_mid"]
+            )
+
+        if is_filled:
+            # Color based on this segment's position in the bar
+            pos = i / max(total_segments - 1, 1)
+            color = _gradient_color(pos)
+            parts.append(f'<span color="{color}" alpha="70%">{char}</span>')
+        else:
+            parts.append(f'<span color="{COLOR_DIM}">{char}</span>')
+
+    return "".join(parts)
+
+
+def _time_gradient_color(position: float) -> str:
+    """Return a hex color for a position 0.0-1.0 along the time gradient.
+
+    Colors are evenly distributed across the gradient. Duplicate a color
+    to make it hold longer.
+    """
+    colors = [
+        (0xA5, 0x93, 0xEA),  # #A593EA
+        (0xA5, 0x93, 0xEA),
+        (0xA5, 0x93, 0xEA),
+        (0xA5, 0x93, 0xEA),
+        (0xA5, 0x93, 0xEA),
+        (0xDA, 0xAC, 0xC5),  # #DAACC5
+        (0xDA, 0xAC, 0xC5),
+        (0xDA, 0xAC, 0xC5),
+        (0xF5, 0x94, 0x67),  # #F59467
+        (0xF5, 0x94, 0x67),
+        (0xEF, 0x6F, 0x88),  # #EF6F88
+    ]
+    return _interpolate_colors(colors, position)
+
+
 def get_time_bar(percentage: int, width: int) -> str:
-    """Convert percentage to simple Unicode progress bar using ▰▱ characters."""
-    filled_segments = min(width, percentage * width // 100)
+    """Convert percentage to simple Unicode progress bar using ▰▱ characters (plain)."""
+    filled_segments = min(width, round(percentage * width / 100))
     empty_segments = width - filled_segments
     return "▰" * filled_segments + "▱" * empty_segments
+
+
+def get_time_bar_colored(percentage: int, width: int) -> str:
+    """Convert percentage to Unicode time bar with Pango color gradient."""
+    filled_segments = min(width, round(percentage * width / 100))
+    parts = []
+    for i in range(width):
+        is_filled = i < filled_segments
+        char = "▰" if is_filled else "▱"
+        if is_filled:
+            pos = i / max(width - 1, 1)
+            color = _time_gradient_color(pos)
+            parts.append(f'<span color="{color}" alpha="70%">{char}</span>')
+        else:
+            parts.append(f'<span color="{COLOR_DIM}">{char}</span>')
+    return "".join(parts)
+
+
+def calculate_usage_buckets(
+    snapshots: list[tuple[float, float]], reset_time: int, width: int
+) -> list[float]:
+    """Calculate per-bucket usage deltas from snapshots.
+
+    Args:
+        snapshots: List of (timestamp, utilization) tuples, utilization is 0.0-1.0
+        reset_time: Unix timestamp when the 5h session resets
+        width: Number of buckets (chart width)
+
+    Returns:
+        List of bucket values, normalized so max bucket = 1.0
+    """
+    if not snapshots or width <= 0 or reset_time <= 0:
+        return [0.0] * width
+
+    session_start = reset_time - 5 * 3600
+    bucket_duration = 5 * 3600 / width
+    buckets = [0.0] * width
+
+    # Calculate deltas between consecutive snapshots and assign to buckets
+    for i in range(1, len(snapshots)):
+        t_prev, u_prev = snapshots[i - 1]
+        t_curr, u_curr = snapshots[i]
+        delta = u_curr - u_prev
+
+        # Skip negative deltas (shouldn't happen, but defensive)
+        if delta <= 0:
+            continue
+
+        # Assign delta to the bucket where t_curr falls
+        bucket_idx = int((t_curr - session_start) / bucket_duration)
+        bucket_idx = max(0, min(width - 1, bucket_idx))
+        buckets[bucket_idx] += delta
+
+    # Normalize so max bucket = 1.0
+    max_val = max(buckets) if buckets else 0
+    if max_val > 0:
+        buckets = [v / max_val for v in buckets]
+
+    return buckets
+
+
+def calculate_7d_buckets_from_history(
+    history: Dict, reset_time_7d: int, width: int
+) -> list[float]:
+    """Calculate per-bucket usage from 5h session history for the 7d window.
+
+    Each 5h session's utilization represents the total usage in that period,
+    so we can directly map sessions to buckets.
+
+    Args:
+        history: The full history dict from load_history()
+        reset_time_7d: Unix timestamp when the 7d window resets
+        width: Number of buckets (chart width)
+
+    Returns:
+        List of bucket values, normalized so max bucket = 1.0
+    """
+    if width <= 0 or reset_time_7d <= 0:
+        return [0.0] * width
+
+    window_start = reset_time_7d - 7 * 24 * 3600
+    bucket_duration = 7 * 24 * 3600 / width
+    buckets = [0.0] * width
+
+    # Get the active account's session history
+    active_account = history.get("active_account")
+    if not active_account:
+        return [0.0] * width
+
+    account = history.get("accounts", {}).get(active_account, {})
+    sessions_5h = account.get("history", {}).get("sessions_5h", [])
+
+    # Also include the current session if it exists
+    current_5h = account.get("current", {}).get("session_5h")
+
+    # Collect all sessions that fall within the 7d window
+    all_sessions = []
+    for session in sessions_5h:
+        reset_at = session.get("reset_at", 0)
+        utilization = session.get("utilization", 0)
+        if reset_at > window_start:
+            # Use the middle of the session for bucketing (reset_at - 2.5h)
+            session_mid = reset_at - 2.5 * 3600
+            all_sessions.append((session_mid, utilization))
+
+    # Add current session (use its last_updated as the time reference)
+    if current_5h:
+        last_updated = current_5h.get("last_updated", 0)
+        utilization = current_5h.get("utilization", 0)
+        if last_updated > window_start:
+            all_sessions.append((last_updated, utilization))
+
+    # Map sessions to buckets
+    for session_time, utilization in all_sessions:
+        bucket_idx = int((session_time - window_start) / bucket_duration)
+        bucket_idx = max(0, min(width - 1, bucket_idx))
+        # If multiple sessions fall in same bucket, use the max utilization
+        buckets[bucket_idx] = max(buckets[bucket_idx], utilization)
+
+    # Normalize so max bucket = 1.0
+    max_val = max(buckets) if buckets else 0
+    if max_val > 0:
+        buckets = [v / max_val for v in buckets]
+
+    return buckets
+
+
+def render_usage_timeline_chart(buckets: list[float], width: int) -> tuple[str, str]:
+    """Render a 2-row usage timeline bar chart.
+
+    Args:
+        buckets: List of normalized bucket values (0.0-1.0)
+        width: Chart width (should match len(buckets))
+
+    Returns:
+        Tuple of (top_row, bottom_row) strings
+    """
+    # Block characters for vertical bars (8 levels)
+    blocks = "▁▂▃▄▅▆▇█"
+
+    top_row = []
+    bottom_row = []
+
+    for i, value in enumerate(buckets):
+        # Convert 0.0-1.0 to 0-16 levels
+        level = int(value * 16)
+        level = max(0, min(16, level))
+
+        if level == 0:
+            bottom_char = " "
+            top_char = " "
+        elif level <= 8:
+            # Bottom row only (levels 1-8)
+            bottom_char = blocks[level - 1]
+            top_char = " "
+        else:
+            # Bottom full, top row fills (levels 9-16)
+            bottom_char = "█"
+            top_char = blocks[level - 9]
+
+        bottom_row.append(bottom_char)
+        top_row.append(top_char)
+
+    return ("".join(top_row), "".join(bottom_row))
+
+
+def render_5h_time_labels(reset_time_5h: int, width: int) -> str:
+    """Render time labels for the 5h chart: start, midpoint, end.
+
+    Args:
+        reset_time_5h: Unix timestamp when the 5h session resets
+        width: Chart width (number of buckets)
+
+    Returns:
+        String with times at left, center, right, colored subdued
+    """
+    if reset_time_5h <= 0 or width <= 0:
+        return ""
+
+    session_start = reset_time_5h - 5 * 3600
+    session_mid = reset_time_5h - 2.5 * 3600
+    session_end = reset_time_5h
+
+    # Format times
+    start_dt = datetime.fromtimestamp(session_start, tz=timezone.utc).astimezone()
+    mid_dt = datetime.fromtimestamp(session_mid, tz=timezone.utc).astimezone()
+    end_dt = datetime.fromtimestamp(session_end, tz=timezone.utc).astimezone()
+
+    start_str = start_dt.strftime("%H:%M")
+    mid_str = mid_dt.strftime("%H:%M")
+    end_str = end_dt.strftime("%H:%M")
+
+    # Build the label line: start left-aligned, mid centered, end right-aligned
+    chars = [" "] * width
+
+    # Place start time at left
+    for i, c in enumerate(start_str):
+        if i < width:
+            chars[i] = c
+
+    # Place mid time at center
+    mid_pos = (width - len(mid_str)) // 2
+    for i, c in enumerate(mid_str):
+        if mid_pos + i < width:
+            chars[mid_pos + i] = c
+
+    # Place end time at right
+    end_pos = width - len(end_str)
+    for i, c in enumerate(end_str):
+        if end_pos + i < width:
+            chars[end_pos + i] = c
+
+    label_line = "".join(chars)
+    return f'<span color="{COLOR_SUBDUED}">{label_line}</span>'
+
+
+def render_7d_day_labels(reset_time_7d: int, width: int) -> str:
+    """Render day-of-week labels for the 7d chart.
+
+    Args:
+        reset_time_7d: Unix timestamp when the 7d window resets
+        width: Chart width (number of buckets)
+
+    Returns:
+        String with day letters positioned at midnight boundaries, colored subdued
+    """
+    if reset_time_7d <= 0 or width <= 0:
+        return ""
+
+    window_start = reset_time_7d - 7 * 24 * 3600
+    window_duration = 7 * 24 * 3600
+    bucket_duration = window_duration / width
+
+    # 3-letter day names (Monday = 0 to match Python's weekday())
+    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    # Build the label line
+    chars = [" "] * width
+
+    # Find the first midnight at or after window_start
+    start_dt = datetime.fromtimestamp(window_start, tz=timezone.utc).astimezone()
+    # Round up to next midnight
+    if start_dt.hour > 0 or start_dt.minute > 0 or start_dt.second > 0:
+        next_midnight = start_dt.replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ) + timedelta(days=1)
+    else:
+        next_midnight = start_dt
+
+    # Place day names at each midnight
+    current_midnight = next_midnight
+    window_end = reset_time_7d
+    while current_midnight.timestamp() < window_end:
+        # Calculate bucket index for this midnight
+        time_offset = current_midnight.timestamp() - window_start
+        bucket_idx = int(time_offset / bucket_duration)
+
+        if 0 <= bucket_idx < width:
+            dow = current_midnight.weekday()  # Monday = 0, Sunday = 6
+            name = day_names[dow]
+            for j, c in enumerate(name):
+                if bucket_idx + j < width:
+                    chars[bucket_idx + j] = c
+
+        # Move to next day
+        current_midnight += timedelta(days=1)
+
+    label_line = "".join(chars)
+    return f'<span color="{COLOR_SUBDUED}">{label_line}</span>'
+
+
+def render_usage_timeline_chart_colored(
+    buckets: list[float], width: int
+) -> tuple[str, str]:
+    """Render a 2-row usage timeline bar chart with Pango color gradient.
+
+    Args:
+        buckets: List of normalized bucket values (0.0-1.0)
+        width: Chart width (should match len(buckets))
+
+    Returns:
+        Tuple of (top_row_markup, bottom_row_markup) strings
+    """
+    blocks = "▁▂▃▄▅▆▇█"
+
+    top_parts = []
+    bottom_parts = []
+
+    for i, value in enumerate(buckets):
+        level = int(value * 16)
+        level = max(0, min(16, level))
+
+        # Color based on position in timeline (left=start, right=end)
+        pos = i / max(width - 1, 1)
+        color = _time_gradient_color(pos)
+
+        if level == 0:
+            bottom_parts.append(" ")
+            top_parts.append(" ")
+        elif level <= 8:
+            bottom_char = blocks[level - 1]
+            bottom_parts.append(f'<span color="{color}">{bottom_char}</span>')
+            top_parts.append(" ")
+        else:
+            bottom_char = "█"
+            top_char = blocks[level - 9]
+            bottom_parts.append(f'<span color="{color}">{bottom_char}</span>')
+            top_parts.append(f'<span color="{color}">{top_char}</span>')
+
+    # Wrap each row in a span with background color (dim at 25% opacity)
+    bg_color = f"{COLOR_DIM}40"
+    top_row = f'<span bgcolor="{bg_color}">{"".join(top_parts)}</span>'
+    bottom_row = f'<span bgcolor="{bg_color}">{"".join(bottom_parts)}</span>'
+
+    return (top_row, bottom_row)
 
 
 def get_hourglass_icon(elapsed_percentage: float) -> str:
@@ -935,7 +1430,7 @@ def get_time_elapsed_percentage(reset_timestamp: int, window_hours: float) -> fl
 
 
 def format_end_time(reset_timestamp: int) -> str:
-    """Format reset timestamp to 'ends ...' phrase like 'ends at 14:00' or 'ends on Monday at 14:00'."""
+    """Format reset timestamp to 'ends ...' phrase like 'ends at 14:00' or 'ends Monday at 14:00'."""
     if reset_timestamp == 0:
         return "ends at unknown"
     reset_dt = datetime.fromtimestamp(reset_timestamp, tz=timezone.utc).astimezone()
@@ -947,7 +1442,7 @@ def format_end_time(reset_timestamp: int) -> str:
     elif (reset_dt.date() - now.date()).days == 1:
         return f"ends tomorrow at {time_str}"
     else:
-        return f"ends on {reset_dt.strftime('%A')} at {time_str}"
+        return f"ends {reset_dt.strftime('%A')} at {time_str}"
 
 
 def get_compact_usage_bar(percentage: int, width: int = 10) -> str:
@@ -970,6 +1465,7 @@ def format_waybar_output(
     cred_is_fallback: bool = False,
     prefer_source: Optional[str] = None,
     display_mode: str = "normal",
+    usage_snapshots: Optional[list[tuple[float, float]]] = None,
 ) -> Optional[Dict]:
     """Format output for Waybar.
 
@@ -1027,27 +1523,34 @@ def format_waybar_output(
 
     # Format tooltip
     tooltip = format_tooltip(
-        data, last_check_time, profile, cred_source, cred_is_fallback, prefer_source
+        data,
+        last_check_time,
+        profile,
+        cred_source,
+        cred_is_fallback,
+        prefer_source,
+        usage_snapshots,
     )
 
     # Format text based on display mode
     if display_mode == "compact":
         if show_alternate and is_5h_active:
-            text = f"{icons['claude']} {reset_short}"
+            text = f"{icons['zap']} {reset_short}"
         else:
-            text = f"{icons['claude']} {percentage}%"
+            text = f"{icons['zap']} {percentage}%"
     elif display_mode == "normal":
-        text = f"{icons['claude']} {percentage}% ({reset_short})"
+        hourglass = get_hourglass_icon(time_elapsed_pct)
+        text = f"{icons['zap']} {percentage}%  {hourglass} {int(time_elapsed_pct)}%"
     elif display_mode == "expanded":
         if show_alternate and is_5h_active:
             hourglass = get_hourglass_icon(time_elapsed_pct)
             bar = get_compact_time_bar(int(time_elapsed_pct))
-            text = f"{icons['claude']} {bar}  {hourglass} {int(time_elapsed_pct):2d}%"
+            text = f"{icons['zap']} {bar}  {hourglass} {int(time_elapsed_pct):2d}%"
         else:
             bar = get_compact_usage_bar(percentage)
-            text = f"{icons['claude']} {bar}  {icons['zap']} {percentage:2d}%"
+            text = f"{icons['zap']} {bar}  {icons['zap']} {percentage:2d}%"
     else:
-        text = f"{icons['claude']} {percentage}%"
+        text = f"{icons['zap']} {percentage}%"
 
     return {
         "text": text,
@@ -1082,6 +1585,10 @@ def monitor(prefer_source_override: Optional[str] = None):
     expired_7d_triggered: bool = False
     last_check_start: float = 0.0
     signal_received: list = [False]  # Use list for mutability in signal handler
+    # Track usage snapshots for timeline chart - load from history if available
+    loaded_snapshots, loaded_reset = load_current_snapshots()
+    usage_snapshots: list[tuple[float, float]] = loaded_snapshots
+    last_5h_reset: int = loaded_reset
 
     def get_prefer_source() -> Optional[str]:
         """Get prefer_source from override or config."""
@@ -1156,6 +1663,14 @@ def monitor(prefer_source_override: Optional[str] = None):
                         )
                         has_token = token_valid
                         if data is not None:
+                            # Check if 5h session reset (new session started)
+                            if data["5h_reset"] != last_5h_reset:
+                                usage_snapshots.clear()
+                                last_5h_reset = data["5h_reset"]
+                            # Record snapshot for timeline chart
+                            usage_snapshots.append(
+                                (current_time, data["5h_utilization"])
+                            )
                             usage_data = data
                             current_token = token
                             cred_source = source
@@ -1166,8 +1681,12 @@ def monitor(prefer_source_override: Optional[str] = None):
                             # Reset expiry triggers when we get new data
                             expired_5h_triggered = False
                             expired_7d_triggered = False
-                            # Update history with profile info (use cached if not refreshed)
-                            update_history(data, profile if profile else profile_data)
+                            # Update history with profile info and snapshots
+                            update_history(
+                                data,
+                                profile if profile else profile_data,
+                                usage_snapshots,
+                            )
                         last_check_time = datetime.now()
                         check_result[0] = None
                 check_thread = None
@@ -1213,6 +1732,7 @@ def monitor(prefer_source_override: Optional[str] = None):
                 cred_is_fallback,
                 prefer_source,
                 display_mode,
+                usage_snapshots,
             )
             if output:
                 output_json = json.dumps(output)
