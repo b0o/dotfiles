@@ -1,0 +1,404 @@
+"""Time formatting and output formatting for Claude usage monitor."""
+
+import re
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+from .constants import BAR_WIDTH, COLOR_SUBDUED, ICONS
+from .history import load_history
+from .rendering import (
+    _gradient_color,
+    _time_gradient_color,
+    calculate_7d_buckets_from_history,
+    calculate_usage_buckets,
+    get_compact_time_bar,
+    get_compact_usage_bar,
+    get_hourglass_icon,
+    get_progress_bar,
+    get_progress_bar_colored,
+    get_time_bar,
+    get_time_bar_colored,
+    get_time_elapsed_percentage,
+    render_5h_time_labels,
+    render_7d_day_labels,
+    render_usage_timeline_chart_colored,
+)
+
+
+def format_reset_time(reset_timestamp: int) -> str:
+    """Format reset timestamp to human-readable time like 'in 2 hours (11:00)'."""
+    if reset_timestamp == 0:
+        return "unknown"
+    reset_dt = datetime.fromtimestamp(reset_timestamp, tz=timezone.utc).astimezone()
+    now = datetime.now(timezone.utc).astimezone()
+
+    relative = format_reset_short(reset_timestamp)
+
+    # Format the absolute time part
+    if reset_dt.date() == now.date():
+        absolute = reset_dt.strftime("%H:%M")
+    elif (reset_dt.date() - now.date()).days == 1:
+        absolute = f"tomorrow {reset_dt.strftime('%H:%M')}"
+    else:
+        absolute = reset_dt.strftime("%A %H:%M")
+
+    return f"{relative} ({absolute})"
+
+
+def format_reset_short(reset_timestamp: int) -> str:
+    """Format reset timestamp to short form like '3h' or '12m'."""
+    from waybar_utils import format_delta_short
+
+    if reset_timestamp <= 0:
+        return "0m"
+
+    reset_dt = datetime.fromtimestamp(reset_timestamp, tz=timezone.utc).astimezone()
+    now = datetime.now(timezone.utc).astimezone()
+    delta = reset_dt - now
+
+    if delta.total_seconds() <= 0:
+        return "0m"
+
+    return format_delta_short(delta)
+
+
+def format_relative_time(dt: datetime) -> str:
+    """Format a datetime as a human-readable relative time."""
+    delta = datetime.now() - dt
+    seconds = int(delta.total_seconds())
+
+    if seconds < 5:
+        return "just now"
+    elif seconds < 60:
+        return f"{seconds} seconds ago"
+    elif seconds < 120:
+        return "1 minute ago"
+    elif seconds < 3600:
+        return f"{seconds // 60} minutes ago"
+    elif seconds < 7200:
+        return "1 hour ago"
+    else:
+        return f"{seconds // 3600} hours ago"
+
+
+def format_plan_name(profile: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Format the plan name from profile data (without 'Claude' prefix)."""
+    if not profile:
+        return None
+    org_type = profile.get("organization", {}).get("organization_type", "")
+    tier = profile.get("organization", {}).get("rate_limit_tier", "")
+
+    if not org_type:
+        return None
+
+    # Map organization_type to friendly name
+    plan_names = {
+        "claude_max": "Max",
+        "claude_pro": "Pro",
+        "claude_enterprise": "Enterprise",
+        "claude_team": "Team",
+    }
+    plan = plan_names.get(
+        org_type, org_type.replace("claude_", "").title() if org_type else ""
+    )
+
+    # Extract multiplier from tier (e.g., "default_claude_max_5x" -> "5x")
+    multiplier = ""
+    if tier:
+        match = re.search(r"(\d+x)$", tier)
+        if match:
+            multiplier = f" {match.group(1)}"
+
+    return f"{plan}{multiplier}" if plan else "Free"
+
+
+def format_end_time(reset_timestamp: int) -> str:
+    """Format reset timestamp to 'ends ...' phrase like 'ends at 14:00' or 'ends Monday at 14:00'."""
+    if reset_timestamp == 0:
+        return "ends at unknown"
+    reset_dt = datetime.fromtimestamp(reset_timestamp, tz=timezone.utc).astimezone()
+    now = datetime.now(timezone.utc).astimezone()
+
+    time_str = reset_dt.strftime("%H:%M")
+    if reset_dt.date() == now.date():
+        return f"ends at {time_str}"
+    elif (reset_dt.date() - now.date()).days == 1:
+        return f"ends tomorrow at {time_str}"
+    else:
+        return f"ends {reset_dt.strftime('%A')} at {time_str}"
+
+
+def format_tooltip(
+    data: Dict[str, Any],
+    last_check_time: Optional[datetime] = None,
+    profile: Optional[Dict[str, Any]] = None,
+    cred_source: Optional[str] = None,
+    cred_is_fallback: bool = False,
+    prefer_source: Optional[str] = None,
+    usage_snapshots: Optional[list[tuple[float, float]]] = None,
+) -> str:
+    """Format the tooltip with usage information."""
+    util_5h = data["5h_utilization"] * 100
+    util_7d = data["7d_utilization"] * 100
+    bar_5h = get_progress_bar(int(util_5h), width=BAR_WIDTH)
+    bar_7d = get_progress_bar(int(util_7d), width=BAR_WIDTH)
+    bar_5h_colored = get_progress_bar_colored(int(util_5h), width=BAR_WIDTH)
+    bar_7d_colored = get_progress_bar_colored(int(util_7d), width=BAR_WIDTH)
+
+    time_elapsed_5h = get_time_elapsed_percentage(data["5h_reset"], 5.0)
+    time_elapsed_7d = get_time_elapsed_percentage(data["7d_reset"], 7 * 24.0)
+    time_bar_5h = get_time_bar(int(time_elapsed_5h), width=BAR_WIDTH)
+    time_bar_7d = get_time_bar(int(time_elapsed_7d), width=BAR_WIDTH)
+    time_bar_5h_colored = get_time_bar_colored(int(time_elapsed_5h), width=BAR_WIDTH)
+    time_bar_7d_colored = get_time_bar_colored(int(time_elapsed_7d), width=BAR_WIDTH)
+    hourglass_5h = get_hourglass_icon(time_elapsed_5h)
+    hourglass_7d = get_hourglass_icon(time_elapsed_7d)
+
+    end_time_5h = format_end_time(data["5h_reset"])
+    end_time_7d = format_end_time(data["7d_reset"])
+    remaining_5h = format_reset_short(data["5h_reset"])
+    remaining_7d = format_reset_short(data["7d_reset"])
+
+    header_5h = f'   <b>5-hour session</b> <span color="{COLOR_SUBDUED}">{ICONS["bullet"]} {end_time_5h} (in {remaining_5h})</span>'
+    header_7d = f'   <b>7-day window</b> <span color="{COLOR_SUBDUED}">{ICONS["bullet"]} {end_time_7d} (in {remaining_7d})</span>'
+
+    # Build plain-text lines for width calculation, then markup lines for display
+    # Color percentages: use gradient color only if >85%, otherwise subdued
+    usage_5h_pct_color = (
+        _gradient_color(util_5h / 100) if util_5h > 85 else COLOR_SUBDUED
+    )
+    usage_7d_pct_color = (
+        _gradient_color(util_7d / 100) if util_7d > 85 else COLOR_SUBDUED
+    )
+    time_5h_pct_color = (
+        _time_gradient_color(time_elapsed_5h / 100)
+        if time_elapsed_5h > 85
+        else COLOR_SUBDUED
+    )
+    time_7d_pct_color = (
+        _time_gradient_color(time_elapsed_7d / 100)
+        if time_elapsed_7d > 85
+        else COLOR_SUBDUED
+    )
+
+    bar_line_5h_plain = f"{ICONS['zap']}  {bar_5h} {util_5h:4.1f}%"
+    bar_line_5h_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{ICONS["zap"]}</span>  {bar_5h_colored} <span color="{usage_5h_pct_color}">{util_5h:4.1f}%</span>'
+    time_line_5h_plain = f"{hourglass_5h}  {time_bar_5h} {time_elapsed_5h:4.1f}%"
+    time_line_5h_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_5h}</span>  {time_bar_5h_colored} <span color="{time_5h_pct_color}">{time_elapsed_5h:4.1f}%</span>'
+
+    bar_line_7d_plain = f"{ICONS['zap']}  {bar_7d} {util_7d:4.1f}%"
+    bar_line_7d_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{ICONS["zap"]}</span>  {bar_7d_colored} <span color="{usage_7d_pct_color}">{util_7d:4.1f}%</span>'
+    time_line_7d_plain = f"{hourglass_7d}  {time_bar_7d} {time_elapsed_7d:4.1f}%"
+    time_line_7d_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_7d}</span>  {time_bar_7d_colored} <span color="{time_7d_pct_color}">{time_elapsed_7d:4.1f}%</span>'
+
+    # Build header plain text for width calculation
+    header_5h_plain = (
+        f"   5-hour session {ICONS['bullet']} {end_time_5h} (in {remaining_5h})"
+    )
+    header_7d_plain = (
+        f"   7-day window {ICONS['bullet']} {end_time_7d} (in {remaining_7d})"
+    )
+
+    # Collect plain text lines for width calculation
+    plain_lines = [
+        "",
+        header_5h_plain,
+        bar_line_5h_plain,
+        time_line_5h_plain,
+        "",
+        header_7d_plain,
+        bar_line_7d_plain,
+        time_line_7d_plain,
+    ]
+
+    # Footer with credential source, user info and last check time
+    footer_parts = []
+    if cred_source:
+        if prefer_source is None:
+            footer_parts.append(cred_source)
+        elif cred_is_fallback:
+            footer_parts.append(f"{cred_source} (fallback)")
+        else:
+            footer_parts.append(f"[{cred_source}]")
+    if profile:
+        email = profile.get("account", {}).get("email")
+        if email:
+            footer_parts.append(email)
+    if last_check_time:
+        footer_parts.append(f"checked {format_relative_time(last_check_time)}")
+    footer = f" {ICONS['bullet']} ".join(footer_parts) if footer_parts else None
+
+    plan_name = format_plan_name(profile)
+    bullet = f'<span color="{COLOR_SUBDUED}">{ICONS["bullet"]}</span>'
+    if plan_name:
+        title_plain = (
+            f"Claude {ICONS['bullet']} Usage Monitor {ICONS['bullet']} {plan_name} Plan"
+        )
+        title_markup = f"Claude {bullet} Usage Monitor {bullet} {plan_name} Plan"
+    else:
+        title_plain = f"Claude {ICONS['bullet']} Usage Monitor"
+        title_markup = f"Claude {bullet} Usage Monitor"
+
+    max_width = max(len(line) for line in plain_lines)
+    # Center based on plain text width, then apply markup
+    pad = max(0, max_width - len(title_plain))
+    pad_left = pad // 2
+    pad_right = pad - pad_left
+    centered_title = " " * pad_left + title_markup + " " * pad_right
+
+    # Build final markup output
+    lines = []
+    lines.append(f"<b>{centered_title}</b>")
+    lines.append("")
+    lines.append(header_5h)
+    lines.append(bar_line_5h_markup)
+    # Add usage timeline chart (between usage bar and time bar)
+    buckets = calculate_usage_buckets(
+        usage_snapshots or [], data["5h_reset"], BAR_WIDTH
+    )
+    top_row, bottom_row = render_usage_timeline_chart_colored(buckets, BAR_WIDTH)
+    lines.append(f"   {top_row}")
+    lines.append(f"   {bottom_row}")
+    lines.append(time_line_5h_markup)
+    time_labels_5h = render_5h_time_labels(data["5h_reset"], BAR_WIDTH)
+    lines.append(f"   {time_labels_5h}")
+    if data["5h_status"] != "allowed":
+        lines.append(
+            f'  Status: <span color="#FF7D90"><b>{data["5h_status"]}</b></span>'
+        )
+    lines.append("")
+
+    lines.append(header_7d)
+    lines.append(bar_line_7d_markup)
+    # Add 7d usage timeline chart from session history (between usage bar and time bar)
+    history = load_history()
+    buckets_7d = calculate_7d_buckets_from_history(history, data["7d_reset"], BAR_WIDTH)
+    top_row_7d, bottom_row_7d = render_usage_timeline_chart_colored(
+        buckets_7d, BAR_WIDTH
+    )
+    lines.append(f"   {top_row_7d}")
+    lines.append(f"   {bottom_row_7d}")
+    lines.append(time_line_7d_markup)
+    day_labels = render_7d_day_labels(data["7d_reset"], BAR_WIDTH)
+    lines.append(f"   {day_labels}")
+    if data["7d_status"] != "allowed":
+        lines.append(
+            f'  Status: <span color="#FF7D90"><b>{data["7d_status"]}</b></span>'
+        )
+
+    if data["status"] != "allowed":
+        lines.append("")
+        lines.append(
+            f'Overall status: <span color="#FF7D90"><b>{data["status"]}</b></span>'
+        )
+
+    if footer:
+        lines.append("")
+        lines.append(f'<span color="{COLOR_SUBDUED}">{footer.center(max_width)}</span>')
+
+    return "\n".join(lines)
+
+
+def format_waybar_output(
+    data: Optional[Dict[str, Any]],
+    last_check_time: Optional[datetime] = None,
+    show_alternate: bool = False,
+    has_token: bool = True,
+    profile: Optional[Dict[str, Any]] = None,
+    cred_source: Optional[str] = None,
+    cred_is_fallback: bool = False,
+    prefer_source: Optional[str] = None,
+    display_mode: str = "normal",
+    usage_snapshots: Optional[list[tuple[float, float]]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Format output for Waybar.
+
+    Display modes:
+    - compact: alternates between "{icon} {pct}%" and "{icon} {time}"
+    - normal: "{icon} {pct}% ({time})"
+    - expanded: "{icon} {bar} {pct}%" alternating bar between usage and time elapsed
+    """
+    if not has_token:
+        return {
+            "text": "󰛄",
+            "tooltip": "No active token",
+            "percentage": 0,
+            "class": "inactive",
+        }
+
+    if not data:
+        return None
+
+    # Use the representative claim to determine which utilization to show
+    # "five_hour" means the 5h limit is the active constraint
+    is_5h_active = data["representative_claim"] == "five_hour"
+    if is_5h_active:
+        primary_util = data["5h_utilization"]
+        reset_time = data["5h_reset"]
+        time_elapsed_pct = get_time_elapsed_percentage(reset_time, 5.0)
+    else:
+        primary_util = data["7d_utilization"]
+        reset_time = data["7d_reset"]
+        time_elapsed_pct = get_time_elapsed_percentage(reset_time, 7 * 24.0)
+
+    percentage = int(primary_util * 100)
+    reset_short = format_reset_short(reset_time)
+
+    # Determine CSS class based on status and usage percentage
+    # Check if any status is not allowed - that's critical
+    if (
+        data["status"] != "allowed"
+        or data["5h_status"] != "allowed"
+        or data["7d_status"] != "allowed"
+    ):
+        css_class = "critical"
+    elif not is_5h_active:
+        css_class = "inactive"
+    elif percentage == 0:
+        css_class = "inactive"
+    elif percentage <= 33:
+        css_class = "low"
+    elif percentage <= 66:
+        css_class = "med"
+    elif percentage <= 90:
+        css_class = "high"
+    else:
+        css_class = "critical"
+
+    # Format tooltip
+    tooltip = format_tooltip(
+        data,
+        last_check_time,
+        profile,
+        cred_source,
+        cred_is_fallback,
+        prefer_source,
+        usage_snapshots,
+    )
+
+    # Format text based on display mode
+    if display_mode == "compact":
+        if show_alternate and is_5h_active:
+            text = f"{ICONS['zap']} {reset_short}"
+        else:
+            text = f"{ICONS['zap']} {percentage}%"
+    elif display_mode == "normal":
+        hourglass = get_hourglass_icon(time_elapsed_pct)
+        text = f"{ICONS['zap']} {percentage}%  {hourglass} {int(time_elapsed_pct)}%"
+    elif display_mode == "expanded":
+        if show_alternate and is_5h_active:
+            hourglass = get_hourglass_icon(time_elapsed_pct)
+            bar = get_compact_time_bar(int(time_elapsed_pct))
+            text = f"{ICONS['zap']} {bar}  {hourglass} {int(time_elapsed_pct):2d}%"
+        else:
+            bar = get_compact_usage_bar(percentage)
+            text = f"{ICONS['zap']} {bar}  {ICONS['zap']} {percentage:2d}%"
+    else:
+        text = f"{ICONS['zap']} {percentage}%"
+
+    return {
+        "text": text,
+        "tooltip": tooltip,
+        "percentage": percentage,
+        "class": css_class,
+    }
