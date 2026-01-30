@@ -228,7 +228,9 @@ def categorize_dns_servers(
     return mullvad_servers, unknown_servers, approved_servers
 
 
-def format_ip_section(data: dict | None, label: str, error: str | None = None) -> list[str]:
+def format_ip_section(
+    data: dict | None, label: str, error: str | None = None
+) -> list[str]:
     if not data:
         if error in ("timeout", "connection"):
             return [f"{label}: ✗ Connection error"]
@@ -280,9 +282,13 @@ def format_tooltip(
 
     lines.append("")
 
-    lines.extend(format_ip_section(status.get("ipv4"), "IPv4", status.get("ipv4_error")))
+    lines.extend(
+        format_ip_section(status.get("ipv4"), "IPv4", status.get("ipv4_error"))
+    )
     lines.append("")
-    lines.extend(format_ip_section(status.get("ipv6"), "IPv6", status.get("ipv6_error")))
+    lines.extend(
+        format_ip_section(status.get("ipv6"), "IPv6", status.get("ipv6_error"))
+    )
     lines.append("")
 
     dns_servers = status.get("dns", [])
@@ -405,6 +411,7 @@ def show_menu() -> None:
         show_rofi_error("No DNS data available. Run a check first.")
         sys.exit(1)
 
+    assert cache is not None
     status = cache.get("status", {})
     dns_servers = status.get("dns", [])
     if not dns_servers:
@@ -504,6 +511,7 @@ def approve_all() -> None:
         show_rofi_error("No DNS data available. Run a check first.")
         sys.exit(1)
 
+    assert cache is not None
     status = cache.get("status", {})
 
     dns_servers = status.get("dns", [])
@@ -527,6 +535,7 @@ def unapprove_all() -> None:
         show_rofi_error("No DNS data available. Run a check first.")
         sys.exit(1)
 
+    assert cache is not None
     status = cache.get("status", {})
 
     dns_servers = status.get("dns", [])
