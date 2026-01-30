@@ -20,7 +20,7 @@ import airportsdata
 from timezonefinder import TimezoneFinder
 from tzlocal import get_localzone
 
-from waybar_utils import format_relative_short, format_relative_long
+from waybar_utils import format_relative_short, format_relative_long, format_delta_hm
 
 ICON_SUNRISE = "󰖜"
 ICON_SUNSET = "󰖛"
@@ -200,63 +200,119 @@ def format_output(
         text = f"{next_icon} {relative_short}"
         css_class = "sunrise"
 
-    # Determine adjacent sunrise/sunset pair
-    # We always want one in the past and one in the future
-    # - Daytime (after sunrise, before sunset): show today's sunrise (past) and today's sunset (future)
-    # - Nighttime after sunset: show today's sunset (past) and tomorrow's sunrise (future)
-    # - Nighttime before sunrise: show yesterday's sunset (past) and today's sunrise (future)
-    if now < sunrise_time:
-        # Before sunrise - it's night, show yesterday's sunset and today's sunrise
-        yesterday = now - timedelta(days=1)
-        _, tooltip_sunset = get_sun_times(lat, lon, yesterday)
-        tooltip_sunrise = sunrise_time
-    elif now >= sunset_time and not sunset_just_happened:
-        # After sunset - it's night, show today's sunset and tomorrow's sunrise
-        tomorrow = now + timedelta(days=1)
-        tooltip_sunrise, _ = get_sun_times(lat, lon, tomorrow)
-        tooltip_sunset = sunset_time
-    else:
-        # Daytime (or sunset just happened) - show today's sunrise and sunset
-        tooltip_sunrise = sunrise_time
-        tooltip_sunset = sunset_time
+    # Get sun times for yesterday, today, and tomorrow (plus day before for diff calc)
+    tomorrow = now + timedelta(days=1)
+    yesterday = now - timedelta(days=1)
+    day_before_yesterday = now - timedelta(days=2)
 
-    # Build raw text for each line (without markup) to calculate widths
+    day_before_sunrise, day_before_sunset = get_sun_times(
+        lat, lon, day_before_yesterday
+    )
+    yesterday_sunrise, yesterday_sunset = get_sun_times(lat, lon, yesterday)
+    tomorrow_sunrise, tomorrow_sunset = get_sun_times(lat, lon, tomorrow)
+
+    # Calculate daylight durations
+    day_before_daylight = day_before_sunset - day_before_sunrise
+    yesterday_daylight = yesterday_sunset - yesterday_sunrise
+    today_daylight = sunset_time - sunrise_time
+    tomorrow_daylight = tomorrow_sunset - tomorrow_sunrise
+
+    # Build sections for yesterday, today, tomorrow with daylight diff from previous day
+    days = [
+        (
+            "Yesterday",
+            yesterday,
+            yesterday_sunrise,
+            yesterday_sunset,
+            yesterday_daylight - day_before_daylight,
+        ),
+        ("Today", now, sunrise_time, sunset_time, today_daylight - yesterday_daylight),
+        (
+            "Tomorrow",
+            tomorrow,
+            tomorrow_sunrise,
+            tomorrow_sunset,
+            tomorrow_daylight - today_daylight,
+        ),
+    ]
+
+    # Build raw text for width calculation
     location_text = location_name
     date_text = f"{now.strftime('%a %b %d %Y')} · {now.strftime('%H:%M')}"
 
-    sunrise_time_str = tooltip_sunrise.strftime("%H:%M")
-    sunrise_relative = format_relative_long(tooltip_sunrise, now)
-    sunrise_in_past = tooltip_sunrise < now
-    # Icon + 2 spaces + "Sunrise" + 2 spaces + time + 3 spaces + relative
-    sunrise_text = f"X  Sunrise  {sunrise_time_str}   {sunrise_relative}"
+    def format_event_text(event_time: datetime) -> str:
+        time_str = event_time.strftime("%H:%M")
+        relative = format_relative_long(event_time, now)
+        return f"X  Sunrise  {time_str}   {relative}"
 
-    sunset_time_str = tooltip_sunset.strftime("%H:%M")
-    sunset_relative = format_relative_long(tooltip_sunset, now)
-    sunset_text = f"X  Sunset   {sunset_time_str}   {sunset_relative}"
-
-    # Find the longest line
-    max_width = max(
-        len(location_text), len(date_text), len(sunrise_text), len(sunset_text)
-    )
+    # Calculate max width from all possible lines
+    sample_texts = [location_text, date_text]
+    for _, _, sr, ss, _ in days:
+        sample_texts.append(format_event_text(sr))
+        sample_texts.append(format_event_text(ss))
+    max_width = max(len(t) for t in sample_texts)
 
     # Center the header lines
     location_centered = location_text.center(max_width)
     date_centered = date_text.center(max_width)
 
+    # Find the next event (first future event)
+    all_events = [
+        (yesterday_sunrise, "sunrise"),
+        (yesterday_sunset, "sunset"),
+        (sunrise_time, "sunrise"),
+        (sunset_time, "sunset"),
+        (tomorrow_sunrise, "sunrise"),
+        (tomorrow_sunset, "sunset"),
+    ]
+    next_event_time = min((t for t, _ in all_events if t > now), default=None)
+
     # Format tooltip with Pango markup
     header = f'<b>{location_centered}</b>\n<span alpha="75%">{date_centered}</span>'
 
-    # Sunrise line with Pango markup - yellow icon, monospace time
-    sunrise_line = f'<span color="#FFD080">{ICON_SUNRISE}</span>  Sunrise  <tt><b>{sunrise_time_str}</b></tt>  <span alpha="75%">{sunrise_relative}</span>'
+    def format_event_line(event_type: str, event_time: datetime) -> str:
+        time_str = event_time.strftime("%H:%M")
+        relative = format_relative_long(event_time, now)
+        is_past = event_time < now
+        is_next = event_time == next_event_time
+        if event_type == "sunrise":
+            icon = ICON_SUNRISE
+            color = "#FFD080"
+            label = "Sunrise"
+        else:
+            icon = ICON_SUNSET
+            color = "#ff9969"
+            label = "Sunset "
 
-    # Sunset line with Pango markup - orange icon, monospace time
-    sunset_line = f'<span color="#ff9969">{ICON_SUNSET}</span>  Sunset   <tt><b>{sunset_time_str}</b></tt>  <span alpha="75%">{sunset_relative}</span>'
+        if is_past:
+            return f'<span alpha="80%"><span color="{color}">{icon}</span>  {label}  <tt>{time_str}</tt>  {relative}</span>'
+        elif is_next:
+            return f'<b><span color="{color}">{icon}</span>  {label}  <tt>{time_str}</tt>  <span alpha="75%">{relative}</span></b>'
+        else:
+            return f'<span color="{color}">{icon}</span>  {label}  <tt>{time_str}</tt>  <span alpha="75%">{relative}</span>'
 
-    # Order lines so past event is on top, future event is on bottom
-    if sunrise_in_past:
-        tooltip = f"{header}\n\n{sunrise_line}\n{sunset_line}"
-    else:
-        tooltip = f"{header}\n\n{sunset_line}\n{sunrise_line}"
+    def format_day_section(
+        day_label: str,
+        day_date: datetime,
+        sr: datetime,
+        ss: datetime,
+        daylight_diff: timedelta,
+    ) -> str:
+        date_str = day_date.strftime("%a %b %d")
+        daylight = ss - sr
+        daylight_str = format_delta_hm(daylight)
+        # Show diff in minutes and seconds
+        total_secs = int(daylight_diff.total_seconds())
+        diff_mins, diff_secs = divmod(abs(total_secs), 60)
+        sign = "+" if total_secs >= 0 else "-"
+        diff_str = f"{sign}{diff_mins}m {diff_secs:02d}s"
+        section_header = f'<span alpha="60%"><small>{date_str} · {daylight_str} day · {diff_str}</small></span>'
+        sunrise_line = format_event_line("sunrise", sr)
+        sunset_line = format_event_line("sunset", ss)
+        return f"{section_header}\n{sunrise_line}\n{sunset_line}"
+
+    sections = [format_day_section(*day) for day in days]
+    tooltip = f"{header}\n\n" + "\n\n".join(sections)
 
     return {
         "text": text,
