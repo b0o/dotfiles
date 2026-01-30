@@ -184,14 +184,16 @@ def get_valid_token(
                 oauth = data.get("claudeAiOauth", {})
                 token = oauth.get("accessToken")
                 expires_at = oauth.get("expiresAt")
+                # Check if current token is valid
                 if token and expires_at:
                     expires_at_sec = expires_at / 1000
                     if expires_at_sec > now + TOKEN_REFRESH_MARGIN:
                         return token
-                    if oauth.get("refreshToken"):
-                        new_token = refresh_claude_token()
-                        if new_token:
-                            return new_token
+                # Token expired or missing - try to refresh if we have a refresh token
+                if oauth.get("refreshToken"):
+                    new_token = refresh_claude_token()
+                    if new_token:
+                        return new_token
             except (json.JSONDecodeError, KeyError, ValueError):
                 pass
         return None
@@ -204,14 +206,16 @@ def get_valid_token(
                 anthropic = data.get("anthropic", {})
                 token = anthropic.get("access")
                 expires_at = anthropic.get("expires")
+                # Check if current token is valid
                 if token and expires_at:
                     expires_at_sec = expires_at / 1000
                     if expires_at_sec > now + TOKEN_REFRESH_MARGIN:
                         return token
-                    if anthropic.get("refresh"):
-                        new_token = refresh_opencode_token()
-                        if new_token:
-                            return new_token
+                # Token expired or missing - try to refresh if we have a refresh token
+                if anthropic.get("refresh"):
+                    new_token = refresh_opencode_token()
+                    if new_token:
+                        return new_token
             except (json.JSONDecodeError, KeyError, ValueError):
                 pass
         return None
