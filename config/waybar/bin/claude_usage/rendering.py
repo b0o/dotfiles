@@ -48,6 +48,40 @@ def _gradient_color(position: float) -> str:
     return _interpolate_colors(colors, position)
 
 
+def _chart_gradient_color(position: float) -> str:
+    """Return a hex color for a position 0.0-1.0 along the chart gradient.
+
+    Purple scale with increasing saturation/brightness for timeline charts.
+    """
+    colors = [
+        (0x4A, 0x3A, 0x5C),  # #4A3A5C - dark muted purple
+        (0x5D, 0x4A, 0x72),  # #5D4A72
+        (0x72, 0x5A, 0x8C),  # #725A8C
+        (0x87, 0x6A, 0xA6),  # #876AA6
+        (0x9D, 0x7A, 0xC2),  # #9D7AC2
+        (0xB3, 0x8A, 0xDE),  # #B38ADE
+        (0xC9, 0x9A, 0xFA),  # #C99AFA - bright saturated purple
+    ]
+    return _interpolate_colors(colors, position)
+
+
+def _cumulative_gradient_color(position: float) -> str:
+    """Return a hex color for a position 0.0-1.0 along the cumulative chart gradient.
+
+    Orange scale with increasing saturation/brightness for cumulative usage charts.
+    """
+    colors = [
+        (0x7B, 0x49, 0x37),  # #7B4937 - dark burnt orange
+        (0x9A, 0x55, 0x3B),  # #9A553B
+        (0xB5, 0x5A, 0x3D),  # #B55A3D
+        (0xC3, 0x61, 0x42),  # #C36142
+        (0xC6, 0x61, 0x3F),  # #C6613F
+        (0xD0, 0x6C, 0x4A),  # #D06C4A
+        (0xD9, 0x77, 0x57),  # #D97757 - bright orange
+    ]
+    return _interpolate_colors(colors, position)
+
+
 def _time_gradient_color(position: float) -> str:
     """Return a hex color for a position 0.0-1.0 along the time gradient.
 
@@ -225,7 +259,7 @@ def get_compact_time_bar(percentage: int, width: int = 10) -> str:
 
 def calculate_usage_buckets(
     snapshots: list[tuple[float, float]], reset_time: int, width: int
-) -> list[float]:
+) -> tuple[list[float], list[float]]:
     """Calculate per-bucket usage deltas from snapshots.
 
     Args:
@@ -234,14 +268,16 @@ def calculate_usage_buckets(
         width: Number of buckets (chart width)
 
     Returns:
-        List of bucket values, normalized so max bucket = 1.0
+        Tuple of (normalized_buckets, raw_buckets) where:
+        - normalized_buckets: values scaled so max bucket = 1.0 (for bar height)
+        - raw_buckets: cumulative utilization at each bucket (for color)
     """
     if not snapshots or width <= 0 or reset_time <= 0:
-        return [0.0] * width
+        return ([0.0] * width, [0.0] * width)
 
     session_start = reset_time - 5 * 3600
     bucket_duration = 5 * 3600 / width
-    buckets = [0.0] * width
+    delta_buckets = [0.0] * width
 
     # Calculate deltas between consecutive snapshots and assign to buckets
     for i in range(1, len(snapshots)):
@@ -256,19 +292,29 @@ def calculate_usage_buckets(
         # Assign delta to the bucket where t_curr falls
         bucket_idx = int((t_curr - session_start) / bucket_duration)
         bucket_idx = max(0, min(width - 1, bucket_idx))
-        buckets[bucket_idx] += delta
+        delta_buckets[bucket_idx] += delta
 
-    # Normalize so max bucket = 1.0
-    max_val = max(buckets) if buckets else 0
+    # Calculate cumulative utilization for each bucket (for coloring)
+    # This represents the total usage up to and including that bucket
+    raw_buckets = [0.0] * width
+    cumulative = 0.0
+    for i, delta in enumerate(delta_buckets):
+        cumulative += delta
+        raw_buckets[i] = cumulative
+
+    # Normalize deltas so max bucket = 1.0 (for bar height)
+    max_val = max(delta_buckets) if delta_buckets else 0
     if max_val > 0:
-        buckets = [v / max_val for v in buckets]
+        normalized_buckets = [v / max_val for v in delta_buckets]
+    else:
+        normalized_buckets = [0.0] * width
 
-    return buckets
+    return (normalized_buckets, raw_buckets)
 
 
 def calculate_7d_buckets_from_history(
     history: Dict[str, Any], reset_time_7d: int, width: int
-) -> list[float]:
+) -> tuple[list[float], list[float]]:
     """Calculate per-bucket usage from 5h session history for the 7d window.
 
     Each 5h session's utilization represents the total usage in that period,
@@ -280,19 +326,21 @@ def calculate_7d_buckets_from_history(
         width: Number of buckets (chart width)
 
     Returns:
-        List of bucket values, normalized so max bucket = 1.0
+        Tuple of (normalized_buckets, raw_buckets) where:
+        - normalized_buckets: values scaled so max bucket = 1.0 (for bar height)
+        - raw_buckets: actual utilization values 0.0-1.0 (for color)
     """
     if width <= 0 or reset_time_7d <= 0:
-        return [0.0] * width
+        return ([0.0] * width, [0.0] * width)
 
     window_start = reset_time_7d - 7 * 24 * 3600
     bucket_duration = 7 * 24 * 3600 / width
-    buckets = [0.0] * width
+    raw_buckets = [0.0] * width
 
     # Get the active account's session history
     active_account = history.get("active_account")
     if not active_account:
-        return [0.0] * width
+        return ([0.0] * width, [0.0] * width)
 
     account = history.get("accounts", {}).get(active_account, {})
     sessions_5h = account.get("history", {}).get("sessions_5h", [])
@@ -317,67 +365,209 @@ def calculate_7d_buckets_from_history(
         if last_updated > window_start:
             all_sessions.append((last_updated, utilization))
 
-    # Map sessions to buckets
+    # Map sessions to buckets - raw_buckets stores actual utilization (0.0-1.0)
     for session_time, utilization in all_sessions:
         bucket_idx = int((session_time - window_start) / bucket_duration)
         bucket_idx = max(0, min(width - 1, bucket_idx))
         # If multiple sessions fall in same bucket, use the max utilization
-        buckets[bucket_idx] = max(buckets[bucket_idx], utilization)
+        raw_buckets[bucket_idx] = max(raw_buckets[bucket_idx], utilization)
 
-    # Normalize so max bucket = 1.0
-    max_val = max(buckets) if buckets else 0
+    # Normalize so max bucket = 1.0 (for bar height display)
+    max_val = max(raw_buckets) if raw_buckets else 0
     if max_val > 0:
-        buckets = [v / max_val for v in buckets]
+        normalized_buckets = [v / max_val for v in raw_buckets]
+    else:
+        normalized_buckets = [0.0] * width
 
-    return buckets
-
-
-def render_usage_timeline_chart(buckets: list[float], width: int) -> tuple[str, str]:
-    """Render a 2-row usage timeline bar chart.
-
-    Args:
-        buckets: List of normalized bucket values (0.0-1.0)
-        width: Chart width (should match len(buckets))
-
-    Returns:
-        Tuple of (top_row, bottom_row) strings
-    """
-    # Block characters for vertical bars (8 levels)
-    blocks = "▁▂▃▄▅▆▇█"
-
-    top_row = []
-    bottom_row = []
-
-    for i, value in enumerate(buckets):
-        # Convert 0.0-1.0 to 0-16 levels
-        level = int(value * 16)
-        level = max(0, min(16, level))
-
-        if level == 0:
-            bottom_char = " "
-            top_char = " "
-        elif level <= 8:
-            # Bottom row only (levels 1-8)
-            bottom_char = blocks[level - 1]
-            top_char = " "
-        else:
-            # Bottom full, top row fills (levels 9-16)
-            bottom_char = "█"
-            top_char = blocks[level - 9]
-
-        bottom_row.append(bottom_char)
-        top_row.append(top_char)
-
-    return ("".join(top_row), "".join(bottom_row))
+    return (normalized_buckets, raw_buckets)
 
 
 def render_usage_timeline_chart_colored(
-    buckets: list[float], width: int
+    buckets: list[float], width: int, raw_buckets: list[float] | None = None
 ) -> tuple[str, str]:
     """Render a 2-row usage timeline bar chart with Pango color gradient.
 
     Args:
-        buckets: List of normalized bucket values (0.0-1.0)
+        buckets: List of normalized bucket values (0.0-1.0) for bar height
+        width: Chart width (should match len(buckets))
+        raw_buckets: Optional list of raw utilization values (0.0-1.0) for color.
+                     If provided, color is based on absolute usage, not relative height.
+
+    Returns:
+        Tuple of (top_row_markup, bottom_row_markup) strings
+    """
+    blocks = "▁▂▃▄▅▆▇█"
+
+    top_parts = []
+    bottom_parts = []
+
+    for i, value in enumerate(buckets):
+        level = int(value * 16)
+        level = max(0, min(16, level))
+
+        # Color based on absolute utilization if raw_buckets provided, else normalized value
+        color_value = raw_buckets[i] if raw_buckets else value
+        color = _chart_gradient_color(color_value)
+
+        if level == 0:
+            bottom_parts.append(" ")
+            top_parts.append(" ")
+        elif level <= 8:
+            bottom_char = blocks[level - 1]
+            bottom_parts.append(f'<span color="{color}">{bottom_char}</span>')
+            top_parts.append(" ")
+        else:
+            bottom_char = "█"
+            top_char = blocks[level - 9]
+            bottom_parts.append(f'<span color="{color}">{bottom_char}</span>')
+            top_parts.append(f'<span color="{color}">{top_char}</span>')
+
+    # Wrap each row in a span with background color (dim at 25% opacity)
+    bg_color = f"{COLOR_DIM}40"
+    top_row = f'<span bgcolor="{bg_color}">{"".join(top_parts)}</span>'
+    bottom_row = f'<span bgcolor="{bg_color}">{"".join(bottom_parts)}</span>'
+
+    return (top_row, bottom_row)
+
+
+def calculate_cumulative_buckets(
+    snapshots: list[tuple[float, float]], reset_time: int, width: int
+) -> list[float]:
+    """Calculate cumulative usage at each bucket from snapshots.
+
+    The snapshots already contain cumulative utilization values (0.0-1.0).
+    Buckets after current time are set to 0 (no data yet).
+
+    Args:
+        snapshots: List of (timestamp, utilization) tuples, utilization is 0.0-1.0
+        reset_time: Unix timestamp when the 5h session resets
+        width: Number of buckets (chart width)
+
+    Returns:
+        List of cumulative utilization values (0.0-1.0) at each bucket
+    """
+    if not snapshots or width <= 0 or reset_time <= 0:
+        return [0.0] * width
+
+    now = time.time()
+    session_start = reset_time - 5 * 3600
+    bucket_duration = 5 * 3600 / width
+    buckets = [0.0] * width
+
+    # Sort snapshots by timestamp
+    sorted_snapshots = sorted(snapshots, key=lambda x: x[0])
+
+    # For each bucket, find the utilization at that point in time
+    # Buckets in the future (after now) stay at 0
+    for i in range(width):
+        bucket_end = session_start + (i + 1) * bucket_duration
+        if bucket_end > now:
+            # Future bucket - no data yet
+            break
+        # Find the last snapshot before or at bucket_end
+        last_util = 0.0
+        for ts, util in sorted_snapshots:
+            if ts <= bucket_end:
+                last_util = util
+            else:
+                break
+        buckets[i] = last_util
+
+    return buckets
+
+
+def calculate_cumulative_7d_buckets(
+    history: Dict[str, Any], reset_time_7d: int, width: int, current_utilization: float
+) -> list[float]:
+    """Calculate cumulative usage at each bucket for the 7d window.
+
+    Args:
+        history: The full history dict from load_history()
+        reset_time_7d: Unix timestamp when the 7d window resets
+        width: Number of buckets (chart width)
+        current_utilization: Current 7d utilization (0.0-1.0) from API
+
+    Returns:
+        List of cumulative utilization values (0.0-1.0) at each bucket
+    """
+    if width <= 0 or reset_time_7d <= 0:
+        return [0.0] * width
+
+    now = time.time()
+    window_start = reset_time_7d - 7 * 24 * 3600
+    bucket_duration = 7 * 24 * 3600 / width
+    buckets = [0.0] * width
+
+    # Get the active account's session history
+    active_account = history.get("active_account")
+    if not active_account:
+        return [0.0] * width
+
+    account = history.get("accounts", {}).get(active_account, {})
+    sessions_5h = account.get("history", {}).get("sessions_5h", [])
+
+    # Collect historical sessions with their timestamps and utilizations
+    # These are completed 5h sessions within the 7d window
+    all_sessions = []
+    for session in sessions_5h:
+        reset_at = session.get("reset_at", 0)
+        utilization = session.get("utilization", 0)
+        if reset_at > window_start:
+            all_sessions.append((reset_at, utilization))
+
+    # Sort by timestamp
+    all_sessions.sort(key=lambda x: x[0])
+
+    # Calculate the cumulative utilization at each bucket
+    # We need to interpolate: at the end (now), it should equal current_utilization
+    # Historical sessions contribute proportionally
+
+    # First, calculate running sum at each historical session point
+    cumulative_at_sessions = []
+    running_sum = 0.0
+    for ts, util in all_sessions:
+        running_sum += util
+        cumulative_at_sessions.append((ts, running_sum))
+
+    # The total from historical sessions
+    historical_total = running_sum
+
+    # For each bucket up to current time, interpolate the cumulative value
+    for i in range(width):
+        bucket_end = window_start + (i + 1) * bucket_duration
+        if bucket_end > now:
+            # Future bucket - no data yet
+            break
+
+        # Find cumulative usage up to this bucket
+        cumulative = 0.0
+        for ts, cum_util in cumulative_at_sessions:
+            if ts <= bucket_end:
+                cumulative = cum_util
+            else:
+                break
+
+        # Scale so that at current time we match current_utilization
+        # The API's 7d_utilization is the authoritative value
+        if historical_total > 0:
+            # Scale historical data to match current utilization
+            buckets[i] = (cumulative / historical_total) * current_utilization
+        else:
+            # No historical data, just use current utilization for the current bucket
+            buckets[i] = (
+                current_utilization if bucket_end >= now - bucket_duration else 0.0
+            )
+
+    return buckets
+
+
+def render_cumulative_chart_colored(
+    buckets: list[float], width: int
+) -> tuple[str, str]:
+    """Render a 2-row cumulative usage chart with Pango color gradient.
+
+    Args:
+        buckets: List of cumulative utilization values (0.0-1.0)
         width: Chart width (should match len(buckets))
 
     Returns:
@@ -392,9 +582,8 @@ def render_usage_timeline_chart_colored(
         level = int(value * 16)
         level = max(0, min(16, level))
 
-        # Color based on position in timeline (left=start, right=end)
-        pos = i / max(width - 1, 1)
-        color = _time_gradient_color(pos)
+        # Color based on absolute cumulative value
+        color = _cumulative_gradient_color(value)
 
         if level == 0:
             bottom_parts.append(" ")
