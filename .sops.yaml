@@ -1,0 +1,12 @@
+# TODO: Enable schema once https://github.com/getsops/sops/pull/2015#issuecomment-3783613303 is addressed
+# _yaml-language-server: $schema=https://raw.githubusercontent.com/miiyakumo/sops/fb89aeaae6d1bc8cecab27d636f1650029702b39/schema/sops.json
+
+# TODO: Can sops validate generated files using a JSON schema?
+
+keys:
+  - &b0o age1kxffvzyck23m4e2zr7g7e9g2zk4w52mw5glyndnd686cp6dy3ysqrp4h5d
+creation_rules:
+  - path_regex: secrets\.yaml$
+    key_groups:
+      - age:
+          - *b0o
