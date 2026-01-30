@@ -257,8 +257,8 @@ def format_tooltip(
         usage_snapshots or [], data["5h_reset"], BAR_WIDTH
     )
     top_row, bottom_row = render_usage_timeline_chart_colored(buckets, BAR_WIDTH)
-    lines.append(f"   {top_row}")
-    lines.append(f"   {bottom_row}")
+    # Combine chart rows with reduced line_height to close gap between block characters
+    lines.append(f'<span line_height="0.92">   {top_row}\n   {bottom_row}</span>')
     lines.append(time_line_5h_markup)
     time_labels_5h = render_5h_time_labels(data["5h_reset"], BAR_WIDTH)
     lines.append(f"   {time_labels_5h}")
@@ -276,8 +276,8 @@ def format_tooltip(
     top_row_7d, bottom_row_7d = render_usage_timeline_chart_colored(
         buckets_7d, BAR_WIDTH
     )
-    lines.append(f"   {top_row_7d}")
-    lines.append(f"   {bottom_row_7d}")
+    # Combine chart rows with reduced line_height to close gap between block characters
+    lines.append(f'<span line_height="0.92">   {top_row_7d}\n   {bottom_row_7d}</span>')
     lines.append(time_line_7d_markup)
     day_labels = render_7d_day_labels(data["7d_reset"], BAR_WIDTH)
     lines.append(f"   {day_labels}")
