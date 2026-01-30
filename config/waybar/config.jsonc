@@ -20,6 +20,7 @@
       "systemd-failed-units",
       "custom/mullvad",
       "clock",
+      "custom/sun-times",
       "tray",
     ],
   },

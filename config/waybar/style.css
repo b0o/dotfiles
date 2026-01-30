@@ -112,6 +112,7 @@ tooltip {
 #custom-command-center,
 #custom-claude-usage,
 #custom-mullvad,
+#custom-sun-times,
 #idle_inhibitor,
 #systemd-failed-units,
 #mpris,
@@ -129,6 +130,7 @@ tooltip {
 #custom-command-center,
 #custom-claude-usage,
 #custom-mullvad,
+#custom-sun-times,
 #idle_inhibitor,
 #systemd-failed-units,
 #mpris,
@@ -143,6 +145,7 @@ tooltip {
 #custom-command-center:hover,
 #custom-claude-usage:hover,
 #custom-mullvad:hover,
+#custom-sun-times:hover,
 #idle_inhibitor:hover,
 #systemd-failed-units:hover,
 #mpris:hover,
@@ -295,4 +298,16 @@ label:focus {
   100% {
     opacity: 1;
   }
+}
+
+#custom-sun-times {
+  color: @dark_fg_dim;
+}
+
+#custom-sun-times.sunrise-soon {
+  color: #f5d67a;
+}
+
+#custom-sun-times.sunset-soon {
+  color: #f5a67a;
 }

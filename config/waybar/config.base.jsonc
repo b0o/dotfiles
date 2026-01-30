@@ -58,12 +58,12 @@
     "on-click": "zsh -c 'rofi-systemd -f'",
   },
   "pulseaudio": {
-    "format": "{icon}  {volume}%",
+    "format": "{icon} {volume}%",
     "format-muted": "  {volume}%",
     "format-icons": {
-      "headphone": "",
-      "hands-free": "",
-      "headset": "",
+      "headphone": " ",
+      "hands-free": " ",
+      "headset": " ",
       "default": [" ", " ", " ", " ", " ", " "],
     },
     "on-click": "zsh -c 'niri-tools scratchpad toggle volume'",
@@ -107,7 +107,7 @@
     "exec": "~/.config/waybar/bin/claude-usage.py",
     "return-type": "json",
     "format": "{}",
-    "escape": true,
+    "escape": false,
     "tooltip": true,
     "restart-interval": 1,
     "states": {
@@ -155,5 +155,13 @@
       "show-menu": "~/.config/waybar/bin/mullvad-status.py --show-menu",
       "check-web": "xdg-open https://mullvad.net/check/",
     },
+  },
+  "custom/sun-times": {
+    "exec": "~/.config/waybar/bin/sun-times.py --location PDX",
+    "return-type": "json",
+    "format": "{}",
+    "escape": false,
+    "tooltip": true,
+    "restart-interval": 1,
   },
 }
