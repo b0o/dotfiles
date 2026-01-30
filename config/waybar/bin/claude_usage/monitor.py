@@ -181,6 +181,10 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
             cycle_position = int(current_time) % 30
             show_alternate = cycle_position >= 15
 
+            # Determine chart alternation cycle: 5s cumulative, 5s bucketed
+            chart_cycle_position = int(current_time) % 10
+            show_cumulative_chart = chart_cycle_position < 5
+
             # Format and output
             prefer_source = get_prefer_source()
             display_mode = get_display_mode()
@@ -195,6 +199,7 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
                 prefer_source,
                 display_mode,
                 usage_snapshots,
+                show_cumulative_chart,
             )
             if output:
                 output_json = json.dumps(output)

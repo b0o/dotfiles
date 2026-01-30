@@ -4,12 +4,16 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from .constants import BAR_WIDTH, COLOR_SUBDUED, ICONS
+from .constants import BAR_WIDTH, COLOR_DIM, COLOR_SUBDUED, ICONS
 from .history import load_history
 from .rendering import (
+    _chart_gradient_color,
+    _cumulative_gradient_color,
     _gradient_color,
     _time_gradient_color,
     calculate_7d_buckets_from_history,
+    calculate_cumulative_7d_buckets,
+    calculate_cumulative_buckets,
     calculate_usage_buckets,
     get_compact_time_bar,
     get_compact_usage_bar,
@@ -21,6 +25,7 @@ from .rendering import (
     get_time_elapsed_percentage,
     render_5h_time_labels,
     render_7d_day_labels,
+    render_cumulative_chart_colored,
     render_usage_timeline_chart_colored,
 )
 
@@ -136,6 +141,7 @@ def format_tooltip(
     cred_is_fallback: bool = False,
     prefer_source: Optional[str] = None,
     usage_snapshots: Optional[list[tuple[float, float]]] = None,
+    show_cumulative_chart: bool = True,
 ) -> str:
     """Format the tooltip with usage information."""
     util_5h = data["5h_utilization"] * 100
@@ -252,13 +258,34 @@ def format_tooltip(
     lines.append("")
     lines.append(header_5h)
     lines.append(bar_line_5h_markup)
-    # Add usage timeline chart (between usage bar and time bar)
-    buckets = calculate_usage_buckets(
+    # Add usage chart - alternate between cumulative (orange) and bucketed (purple)
+    buckets, raw_buckets = calculate_usage_buckets(
         usage_snapshots or [], data["5h_reset"], BAR_WIDTH
     )
-    top_row, bottom_row = render_usage_timeline_chart_colored(buckets, BAR_WIDTH)
-    # Combine chart rows with reduced line_height to close gap between block characters
-    lines.append(f'<span line_height="0.92">   {top_row}\n   {bottom_row}</span>')
+    cumulative_5h = calculate_cumulative_buckets(
+        usage_snapshots or [], data["5h_reset"], BAR_WIDTH
+    )
+    if show_cumulative_chart:
+        chart_top_5h, chart_bottom_5h = render_cumulative_chart_colored(
+            cumulative_5h, BAR_WIDTH
+        )
+    else:
+        chart_top_5h, chart_bottom_5h = render_usage_timeline_chart_colored(
+            buckets, BAR_WIDTH, raw_buckets
+        )
+    # Icons for chart types: bucketed (𝚫) on top, cumulative (𝚺) on bottom
+    # Highlight the active chart's icon, dim the other
+    bucketed_color = (
+        _chart_gradient_color(0.7) if not show_cumulative_chart else COLOR_DIM
+    )
+    cumulative_color = (
+        _cumulative_gradient_color(0.7) if show_cumulative_chart else COLOR_DIM
+    )
+    icon_top = f'<span color="{bucketed_color}">𝚫</span>'
+    icon_bottom = f'<span color="{cumulative_color}">𝚺</span>'
+    chart_5h = f"{chart_top_5h} {icon_top}\n   {chart_bottom_5h} {icon_bottom}"
+    # Add chart with line_height adjustment
+    lines.append(f'<span line_height="0.92">   {chart_5h}</span>')
     lines.append(time_line_5h_markup)
     time_labels_5h = render_5h_time_labels(data["5h_reset"], BAR_WIDTH)
     lines.append(f"   {time_labels_5h}")
@@ -270,14 +297,35 @@ def format_tooltip(
 
     lines.append(header_7d)
     lines.append(bar_line_7d_markup)
-    # Add 7d usage timeline chart from session history (between usage bar and time bar)
+    # Add 7d usage chart - alternate between cumulative (orange) and bucketed (purple)
     history = load_history()
-    buckets_7d = calculate_7d_buckets_from_history(history, data["7d_reset"], BAR_WIDTH)
-    top_row_7d, bottom_row_7d = render_usage_timeline_chart_colored(
-        buckets_7d, BAR_WIDTH
+    buckets_7d, raw_buckets_7d = calculate_7d_buckets_from_history(
+        history, data["7d_reset"], BAR_WIDTH
     )
-    # Combine chart rows with reduced line_height to close gap between block characters
-    lines.append(f'<span line_height="0.92">   {top_row_7d}\n   {bottom_row_7d}</span>')
+    cumulative_7d = calculate_cumulative_7d_buckets(
+        history, data["7d_reset"], BAR_WIDTH, data["7d_utilization"]
+    )
+    if show_cumulative_chart:
+        chart_top_7d, chart_bottom_7d = render_cumulative_chart_colored(
+            cumulative_7d, BAR_WIDTH
+        )
+    else:
+        chart_top_7d, chart_bottom_7d = render_usage_timeline_chart_colored(
+            buckets_7d, BAR_WIDTH, raw_buckets_7d
+        )
+    # Icons for chart types: bucketed (𝚫) on top, cumulative (𝚺) on bottom
+    # Highlight the active chart's icon, dim the other
+    bucketed_color_7d = (
+        _chart_gradient_color(0.7) if not show_cumulative_chart else COLOR_DIM
+    )
+    cumulative_color_7d = (
+        _cumulative_gradient_color(0.7) if show_cumulative_chart else COLOR_DIM
+    )
+    icon_top_7d = f'<span color="{bucketed_color_7d}">𝚫</span>'
+    icon_bottom_7d = f'<span color="{cumulative_color_7d}">𝚺</span>'
+    chart_7d = f"{chart_top_7d} {icon_top_7d}\n   {chart_bottom_7d} {icon_bottom_7d}"
+    # Add chart with line_height adjustment
+    lines.append(f'<span line_height="0.92">   {chart_7d}</span>')
     lines.append(time_line_7d_markup)
     day_labels = render_7d_day_labels(data["7d_reset"], BAR_WIDTH)
     lines.append(f"   {day_labels}")
@@ -310,6 +358,7 @@ def format_waybar_output(
     prefer_source: Optional[str] = None,
     display_mode: str = "normal",
     usage_snapshots: Optional[list[tuple[float, float]]] = None,
+    show_cumulative_chart: bool = True,
 ) -> Optional[Dict[str, Any]]:
     """Format output for Waybar.
 
@@ -374,6 +423,7 @@ def format_waybar_output(
         cred_is_fallback,
         prefer_source,
         usage_snapshots,
+        show_cumulative_chart,
     )
 
     # Format text based on display mode
