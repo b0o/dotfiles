@@ -129,8 +129,39 @@ def pick-action [files: list<path>] {
 # Interactive screenshot capture: select region, save to file and copy to clipboard
 def "main capture" [
   --dir: path
+  --still (-s)    # Freeze screen during capture (requires `still`)
+  --pointer (-p)  # Include pointer/cursor in screenshot
 ] {
   let dir = $dir | default $default_dir
+
+  # If --still is requested and we're not already inside a still call, re-invoke inside still.
+  # The inner invocation only does slurp + grim and prints the output path to stdout,
+  # so that still exits as soon as capture is done. Notification/copy happen here in the parent.
+  if $still and ($env.SCREENSHOT_INSIDE_STILL? | default "" | is-empty) {
+    let still_args = if $pointer { ["-p"] } else { [] }
+    let capture_args = ["capture" "--still" "--dir" $dir ...(if $pointer { ["--pointer"] } else { [] })]
+    let cmd = $"SCREENSHOT_INSIDE_STILL=1 ($env.CURRENT_FILE) ($capture_args | str join ' ')"
+    let result = ^still ...$still_args -c $cmd | complete
+    if $result.exit_code != 0 {
+      return
+    }
+    let out = $result.stdout | str trim
+    if ($out | is-empty) {
+      return
+    }
+
+    wl-copy -F auto $out -L text/plain $out
+
+    let action = notify-send -a screenshot -i $out --action=default="Edit" "Screenshot Saved" $"Saved to ($out)" | str trim
+    if $action == "default" {
+      satty --filename $out
+    }
+    return
+  }
+
+  let grim_pointer = if $pointer { ["-c"] } else { [] }
+  let inside_still = not ($env.SCREENSHOT_INSIDE_STILL? | default "" | is-empty)
+
   let selection = slurp | complete
   if $selection.exit_code != 0 or ($selection.stdout | str trim | is-empty) {
     return
@@ -181,12 +212,18 @@ def "main capture" [
   } else {
     # Region screenshot
     let path = $dir | path join $"($timestamp).png"
-    let result = grim -g $selection $path | complete
+    let result = grim ...$grim_pointer -g $selection $path | complete
     if $result.exit_code != 0 {
       notify-send -a screenshot -u critical "Screenshot Failed" "Failed to save screenshot"
       return
     }
     $path
+  }
+
+  # When inside still, just print the path so the parent handles notification/copy
+  if $inside_still {
+    print $out
+    return
   }
 
   wl-copy -F auto $out -L text/plain $out
