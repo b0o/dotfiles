@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@opencode-ai/plugin": "1.1.47",
+    "@opencode-ai/sdk": "^1.1.46"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.8"
+  }
+}
