@@ -9,9 +9,7 @@ settings:
 scratchpads:
   term:
     app_id: com.mitchellh.ghostty
-    command:
-      - ghostty
-      - +new-window
+    command: ghostty
     size: 60%x60%
     position:
       DP-1: 10%,35%
