@@ -68,6 +68,27 @@ overview {
   }
 }
 
+recent-windows {
+  debounce-ms 750
+  open-delay-ms 150
+  highlight {
+    active-color "#9f78ff74"
+    urgent-color "#ff999974"
+    padding 30
+    corner-radius 6
+  }
+  previews {
+    max-height 640
+    max-scale 0.5
+  }
+  binds {
+    Mod+Tab         { next-window; }
+    Mod+Shift+Tab   { previous-window; }
+    Mod+Escape       { next-window     filter="app-id"; }
+    Mod+Shift+Escape { previous-window filter="app-id"; }
+  }
+}
+
 // https://github.com/YaLTeR/niri/wiki/Configuration:-Layout
 layout {
   gaps 48
