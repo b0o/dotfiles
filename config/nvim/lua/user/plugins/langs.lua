@@ -374,8 +374,6 @@ return {
       local ft = maputil.ft
 
       ft({ 'markdown', 'mdx' }, function(bufmap)
-        vim.opt_local.wrap = true
-
         bufmap('n', { '<localleader>C', '<localleader><localleader>cc' }, function()
           ---@diagnostic disable-next-line: invisible
           local config = require('render-markdown.state').config
@@ -396,6 +394,8 @@ return {
   },
   {
     '3rd/image.nvim',
+    -- TODO: enable for zellij when image support is added (see https://github.com/misaelaguayo/zellij/pull/1)
+    cond = function() return vim.env.ZELLIJ == nil end,
     opts = {
       backend = 'kitty',
       processor = 'magick_cli',
@@ -443,6 +443,8 @@ return {
   },
   {
     '3rd/diagram.nvim',
+    -- TODO: enable for zellij when image support is added (see https://github.com/misaelaguayo/zellij/pull/1)
+    cond = function() return vim.env.ZELLIJ == nil end,
     dependencies = {
       '3rd/image.nvim',
     },

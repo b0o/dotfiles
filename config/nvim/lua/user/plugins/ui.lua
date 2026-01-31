@@ -98,6 +98,7 @@ return {
   },
   {
     'folke/noice.nvim',
+    -- enabled = false,
     event = 'VeryLazy',
     keys = {
       { '<leader>L', '<Cmd>NoiceHistory<cr>', desc = 'Noice: History log' },

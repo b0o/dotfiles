@@ -37,7 +37,7 @@ return {
               '^Error requesting document symbols$',
             }
             return not vim.iter(ignores):any(
-            ---@param pat string
+              ---@param pat string
               function(pat) return string.find(notif.msg, pat) ~= nil end
             )
           end,
@@ -98,29 +98,14 @@ return {
         { bang = true }
       )
 
-      vim.api.nvim_create_user_command(
-        'Gbrowse',
-        function() Snacks.gitbrowse() end,
-        {}
-      )
+      vim.api.nvim_create_user_command('Gbrowse', function() Snacks.gitbrowse() end, {})
 
-      vim.api.nvim_create_user_command(
-        'Notifications',
-        function() Snacks.notifier.show_history() end,
-        {}
-      )
+      vim.api.nvim_create_user_command('Notifications', function() Snacks.notifier.show_history() end, {})
+      map('n', '<leader>no', '<cmd>Notifications<cr>', 'Snacks: Show notification history')
 
-      vim.api.nvim_create_user_command(
-        'Scratch',
-        function() Snacks.scratch() end,
-        {}
-      )
+      vim.api.nvim_create_user_command('Scratch', function() Snacks.scratch() end, {})
 
-      vim.api.nvim_create_user_command(
-        'ScratchSelect',
-        function() Snacks.scratch.select() end,
-        {}
-      )
+      vim.api.nvim_create_user_command('ScratchSelect', function() Snacks.scratch.select() end, {})
 
       map('n', ')', function() Snacks.words.jump(vim.v.count1, true) end, 'Snacks: Jump to next word')
 
