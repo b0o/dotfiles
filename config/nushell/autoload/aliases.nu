@@ -36,7 +36,8 @@ alias zj = zellij
 
 # docs
 
-alias m = man
+alias man = viman
+alias m = viman
 
 # utilities
 
