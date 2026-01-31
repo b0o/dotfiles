@@ -10,7 +10,25 @@ end
 function M.toggle_format_on_save() M.set_format_on_save(not format_on_save) end
 
 ---@type table<string, conform.FormatterConfigOverride|fun(bufnr: integer): nil|conform.FormatterConfigOverride>
-M.formatters = {}
+M.formatters = {
+  -- SEE: https://pruner-formatter.github.io/guides/neovim-integration.html
+  pruner = {
+    command = 'pruner',
+    args = function(_, ctx)
+      local args = { 'format' }
+      local textwidth = vim.api.nvim_get_option_value('textwidth', { buf = ctx.buf })
+      if textwidth and textwidth > 0 then
+        table.insert(args, '--print-width=' .. textwidth)
+      end
+      local filetype = vim.api.nvim_get_option_value('filetype', { buf = ctx.buf })
+      if filetype then
+        table.insert(args, '--lang=' .. filetype)
+      end
+      return args
+    end,
+    stdin = true,
+  },
+}
 
 ---@type table<string, conform.FiletypeFormatterInternal|fun(bufnr: integer):conform.FiletypeFormatterInternal>
 M.formatters_by_ft = {
@@ -19,8 +37,6 @@ M.formatters_by_ft = {
   go = { 'gofmt', 'goimports' },
   lua = { 'stylua' },
   nix = { 'alejandra' },
-
-  -- python = { 'isort', 'black' },
 
   javascript = { 'dprint' },
   javascriptreact = { 'dprint' },
@@ -32,9 +48,7 @@ M.formatters_by_ft = {
   dockerfile = { 'dprint' },
   json = { 'dprint' },
   jsonc = { 'dprint' },
-  markdown = {
-    'dprint' --[[ , 'injected' ]],
-  },
+  markdown = { 'pruner' },
   mdx = { 'prettierd' }, -- TODO: Use dprint when MDX is supported: https://github.com/dprint/dprint-plugin-markdown/issues/93
   toml = { 'dprint' },
 
