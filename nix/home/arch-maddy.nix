@@ -39,6 +39,14 @@ in {
 
   dconf.enable = true;
   targets.genericLinux.enable = true;
+  targets.genericLinux = {
+    enable = true;
+    nixGL = {
+      packages = pkgs.nixgl;
+      defaultWrapper = "nvidia";
+      installScripts = ["nvidia" "mesa"];
+    };
+  };
 
   programs = {
     home-manager.enable = true;

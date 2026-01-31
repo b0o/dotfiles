@@ -67,7 +67,4 @@
     });
   };
 in
-  inputs.nixpkgs.lib.composeManyExtensions [
-    additions
-    modifications
-  ]
+  inputs.nixpkgs.lib.composeManyExtensions [additions nixgl modifications]
