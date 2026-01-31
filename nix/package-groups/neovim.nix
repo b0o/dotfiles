@@ -1,8 +1,4 @@
-{
-  pkgs,
-  inputs,
-  ...
-}:
+{pkgs, ...}:
 with pkgs; [
   # Give neovim access to a C compiler for tree-sitter grammars
   (neovim.overrideAttrs (old: {

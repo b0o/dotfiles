@@ -1,4 +1,4 @@
-{pkgs}:
+{pkgs, ...}:
 pkgs.stdenv.mkDerivation rec {
   pname = "ttf-pragmasevka";
   version = "1.7.0";

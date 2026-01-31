@@ -1,8 +1,4 @@
-{
-  pkgs,
-  inputs,
-  ...
-}:
+{pkgs, ...}:
 with pkgs; [
   # Shells
   bash # bourne-again shell
