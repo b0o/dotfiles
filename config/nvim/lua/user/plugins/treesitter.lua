@@ -44,7 +44,7 @@ return {
         'typescript',
         { 'tsx', filetypes = { 'typescriptreact', 'javascriptreact' } },
         'vim',
-        'vimdoc',
+        { 'vimdoc', filetypes = { 'help' } },
         'yaml',
         'zig',
       }
@@ -54,7 +54,8 @@ return {
           .iter(parsers)
           :filter(function(p) return type(p) == 'string' or p.install == nil or p.install == true end)
           :map(function(p) return type(p) == 'string' and p or p[1] end)
-          :totable()
+          :totable(),
+        { summary = true }
       )
 
       vim.api.nvim_create_autocmd('FileType', {
@@ -63,9 +64,13 @@ return {
           :map(function(p) return type(p) == 'string' and p or p.filetypes or { p[1] } end)
           :flatten()
           :totable(),
-        callback = function() vim.treesitter.start() end,
+        callback = function()
+          vim.treesitter.start()
+          vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+        end,
       })
 
+      -- TODO: install with nix
       vim.treesitter.language.register('markdown', { 'mdx' })
       local cython_parser = vim.fn.stdpath 'cache' .. '/../tree-sitter/lib/cython.so'
       if vim.fn.filereadable(cython_parser) == 1 then
