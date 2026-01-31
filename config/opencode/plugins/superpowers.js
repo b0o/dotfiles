@@ -1,0 +1,1 @@
+/home/maddy/.config/opencode/superpowers/.opencode/plugins/superpowers.js
