@@ -41,7 +41,7 @@ export def complete-comma-separated-options [
 }
 
 export def carapace-complete [
-  --skip: int = 1 # Number of spans to skip
+  --skip: int = 1 # Number of spans to skip (default: 1)
   --no-args # Skip spans starting with "-"
   spans: list<string>, # Spans under completion
   cmd: string, # Base command for completion

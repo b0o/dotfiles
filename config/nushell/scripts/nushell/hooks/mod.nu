@@ -262,12 +262,14 @@ def hook-init [name: string, hook: record] {
       "load-env " ++ ($hook_env | to nuon)
     }
 
+    let timeit = $hook.timeit? == true and not $overlay
+
     let out = [
-      (if $hook.timeit? == true { $"hooks time start ($name)" })
+      (if $timeit { $"hooks time start ($name)" })
       $load_env
       $res.stdout
       $on_load
-      (if $hook.timeit? == true { $"hooks time stop ($name)" })
+      (if $timeit { $"hooks time stop ($name)" })
     ] | compact --empty | str join "\n" | default ""
 
     if $module {
@@ -552,11 +554,6 @@ export def --env use [
 ] {
   mkdir $hooks_dir
 
-  let hooks = $hooks | upsert __nu_hooks {
-    enabled: true
-    env: {{ _nu_hooks_loaded: true }}
-  }
-
   # TODO: Allow `use` to be called multiple times
   $env._nu_hooks = $hooks
 
@@ -820,14 +817,19 @@ def --env save-time [marker: string, name: string] {
   $env._nu_hooks_time = ($env._nu_hooks_time? | default {}) | upsert $name $hook_time
 }
 
+# For internal use only
+# Register the load start time of a hook
 export def --env "time start" [name: string] {
   save-time start $name
 }
 
+# For internal use only
+# Register the load stop time of a hook
 export def --env "time stop" [name: string] {
   save-time stop $name
 }
 
+# Show a summary of hook load times
 export def "time list" [] {
   if ('_nu_hooks_time' not-in $env) {
     print -e "hooks time tracking is not enabled, pass --timeit to `hooks use` to enable"
