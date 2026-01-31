@@ -1,21 +1,22 @@
-use nushell/hooks
+let config = $env.XDG_CONFIG_HOME? | default ($env.HOME | path join .config)
 
 let hm_session_vars = "~/.nix-profile/etc/profile.d/hm-session-vars.sh" | path expand
-let user_dirs = [$env.XDG_CONFIG_HOME "user-dirs.dirs"] | path join | path expand
+let user_dirs = [$config "user-dirs.dirs"] | path join | path expand
 
-hooks use {
+hooks use --timeit {
   env: {
     enabled: true
     cmd: {
       hooks serialize env-smart --default {
         EDITOR: "nvim"
+        XDG_CONFIG_HOME: $config
         GIT_PROJECTS_DIR: $"($env.HOME)/git"
-        XDG_CONFIG_HOME: $"($env.HOME)/.config"
         XDG_DATA_HOME: $"($env.HOME)/.local/share"
         XDG_CACHE_HOME: $"($env.HOME)/.cache"
-        DOTFILES_HOME: $"($env.XDG_CONFIG_HOME? | default ($env.HOME | path join .config))/dotfiles"
+        DOTFILES_HOME: $"($config)/dotfiles"
         PATH: [
-          $"($env.HOME)/bin"
+          $"($env.HOME)/bin" # TODO: remove
+          $"($env.HOME)/.config/bin"
           $"($env.HOME)/.nix-profile/bin"
           $"($env.HOME)/.local/bin"
           $"($env.HOME)/.cache/.bun/bin"
@@ -143,6 +144,12 @@ hooks use {
     on_load: {
       $env.config.hooks.pre_prompt ++= [{ direnv export json | from json | default {} | load-env }]
     }
+  }
+  formats: {
+    enabled: true
+    plugin: true
+    plugin_cmd: nu_plugin_formats
+    depends: nu_plugin_formats
   }
   skim: {
     enabled: true

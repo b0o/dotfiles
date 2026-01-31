@@ -18,4 +18,5 @@ $env.config.keybindings ++= [
 ]
 
 # TODO: lazy loading
+use nushell/hooks
 do --env { source ./hooks.nu }

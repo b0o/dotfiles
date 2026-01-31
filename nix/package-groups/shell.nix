@@ -7,6 +7,7 @@ with pkgs; [
   nushell # modern shell
 
   # Nushell plugins
+  nushellPlugins.formats
   nushellPlugins.skim
 
   # Terminal multiplexer
