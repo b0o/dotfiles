@@ -79,7 +79,7 @@ font-style-bold-italic = default
 #
 # To generally disable most ligatures, use `-calt`, `-liga`, and `-dlig` (as
 # separate repetitive entries in your config).
-font-feature =
+# font-feature =
 
 # Font size in points. This value can be a non-integer and the nearest integer
 # pixel size will be selected. If you have a high dpi display where 1pt = 2px
@@ -112,11 +112,11 @@ font-size = 12
 #
 # Common axes are: `wght` (weight), `slnt` (slant), `ital` (italic), `opsz`
 # (optical size), `wdth` (width), `GRAD` (gradient), etc.
-font-variation =
+# font-variation =
 
-font-variation-bold =
-font-variation-italic =
-font-variation-bold-italic =
+# font-variation-bold =
+# font-variation-italic =
+# font-variation-bold-italic =
 
 # Force one or a range of Unicode codepoints to map to a specific named font.
 # This is useful if you want to support special symbols or if you want to use
@@ -134,7 +134,7 @@ font-variation-bold-italic =
 #
 # Changing this configuration at runtime will only affect new terminals,
 # i.e. new windows, tabs, etc.
-font-codepoint-map =
+# font-codepoint-map =
 
 # Draw fonts with a thicker stroke, if supported. This is only supported
 # currently on MacOS.
@@ -1259,7 +1259,9 @@ macos-window-shadow = true
 #   * `single-instance` - Enable cgroups only for Ghostty instances launched
 #     as single-instance applications (see gtk-single-instance).
 #
-linux-cgroup = single-instance
+# linux-cgroup = single-instance
+# linux-cgroup = always
+linux-cgroup = never
 
 # Memory limit for any individual terminal process (tab, split, window,
 # etc.) in bytes. If this is unset then no memory limit will be set.
@@ -1268,7 +1270,7 @@ linux-cgroup = single-instance
 # controller, which is a soft limit. You should configure something like
 # systemd-oom to handle killing processes that have too much memory
 # pressure.
-linux-cgroup-memory-limit =
+linux-cgroup-memory-limit = 1_000_000_000
 
 # If this is false, then any cgroup initialization (for linux-cgroup)
 # will be allowed to fail and the failure is ignored. This is useful if
