@@ -138,7 +138,6 @@ local cutbuf = lazy.require 'user.util.cutbuf'
 map('n', '<localleader>x', cutbuf.cut, 'cutbuf: cut')
 map('n', '<localleader>c', cutbuf.copy, 'cutbuf: copy')
 map('n', '<localleader>p', cutbuf.paste, 'cutbuf: paste')
-map('n', '<localleader>X', cutbuf.swap, 'cutbuf: swap')
 
 ---- Window Management
 local smart_size = require 'user.util.smart-size'
@@ -161,7 +160,8 @@ map('n', '<leader>yy', '"+yy', 'Yank line to system clipboard')
 map('n', '<C-y>', [[pumvisible() ? "\<C-y>" : '"+yy']], { expr = true, desc = 'Yank line to system clipboard' })
 map('x', '<C-y>', [[pumvisible() ? "\<C-y>" : '"+y']], { expr = true, desc = 'Yank line to system clipboard' })
 
-local function get_current_file_or_nvim_tree_node()
+-- TODO: Fyler support
+local function get_current_file_or_tree_node()
   ---@type string
   local file
   ---@type string[]
@@ -206,7 +206,7 @@ local function get_current_file_or_nvim_tree_node()
 end
 
 map('n', '<leader>Y', function()
-  local file = get_current_file_or_nvim_tree_node()
+  local file = get_current_file_or_tree_node()
   if not file then
     vim.notify('No file found', vim.log.levels.WARN)
     return
@@ -217,7 +217,7 @@ map('n', '<leader>Y', function()
 end, 'Yank file contents')
 
 map('n', '<leader>ym', function()
-  local file = get_current_file_or_nvim_tree_node()
+  local file = get_current_file_or_tree_node()
   if not file then
     vim.notify('No file found', vim.log.levels.WARN)
     return
@@ -245,6 +245,12 @@ map('n', '<leader>ypp', function()
   require('user.fn').osc52_smart_copy('+', { file })
   vim.notify('Copied ' .. file, vim.log.levels.INFO)
 end, 'Yank file path (relative)')
+
+map('n', '<leader>y@', function()
+  local file = '@' .. vim.fn.expand '%:.'
+  require('user.fn').osc52_smart_copy('+', { file })
+  vim.notify('Copied ' .. file, vim.log.levels.INFO)
+end, 'Yank file path (@ prefix)')
 
 map('n', '<leader>ypA', function()
   local line = vim.fn.line '.'
@@ -281,11 +287,31 @@ end, 'Yank last command')
 
 map('nx', '<C-p>', '"+p', 'Paste from system clipboard')
 
-map('n', { '<C-M-j>', xk '<C-M-j>', '<M-Cr>' }, '"dY"dp', 'Duplicate line downwards')
-map('n', '<C-M-k>', '"dY"dP', 'Duplicate line upwards')
+local duplicate_range = function(dir)
+  return function()
+    local is_visual = vim.fn.mode():match '[vV\22]'
+    local col = vim.fn.col '.'
+    local s, e = vim.fn.line(is_visual and 'v' or '.'), vim.fn.line '.'
+    if s > e then
+      s, e = e, s
+    end
+    if is_visual then
+      vim.cmd 'normal! \27'
+    end
 
-map('x', { '<C-M-j>', xk '<C-M-j>', '<M-Cr>' }, '"dy`<"dPjgv', 'Duplicate selection downwards')
-map('x', '<C-M-k>', '"dy`>"dpgv', 'Duplicate selection upwards')
+    local lines = vim.api.nvim_buf_get_lines(0, s - 1, e, false)
+    local insert_at = dir == 1 and e or s - 1
+    vim.api.nvim_buf_set_lines(0, insert_at, insert_at, false, lines)
+    vim.fn.cursor(dir == 1 and e + 1 or s, col)
+
+    if is_visual then
+      vim.cmd('normal! V' .. (#lines > 1 and (#lines - 1) .. 'j' or ''))
+    end
+  end
+end
+
+map('nx', { '<C-M-j>', xk '<C-M-j>' }, duplicate_range(1), 'Duplicate line/selection downwards')
+map('nx', '<C-M-k>', duplicate_range(-1), 'Duplicate line/selection upwards')
 
 local wrap_visual_selection_prev = nil
 local wrap_visual_selection = function(params)
@@ -444,7 +470,8 @@ map('c', '<C-d>', '<Delete>', { silent = false, desc = 'Kill char forward' })
 map('c', '<C-e>', '<End>', { silent = false, desc = 'Goto end of line' })
 map('c', '<C-f>', '<Right>', { silent = false, desc = 'Goto char forward' })
 map('c', '<C-g>', '<C-c>', { silent = false, desc = 'Cancel' })
-map('c', '<C-k>', [[<C-\>e(" ".getcmdline())[:getcmdpos()-1][1:]<Cr>]], { silent = false, desc = 'Kill to EOL' })
+map('c', '<C-k>', [[<C-\>e(" ".getcmdline())[:getcmdpos()-1][1:]<Cr>]], { silent = false, desc = 'Kill to EOL' }) -- FIXME
+-- TODO: convert to lua:
 map('c', '<M-f>', [[<C-\>euser#fn#cmdlineMoveWord( 1, 0)<Cr>]], { silent = false, desc = 'Goto word forward' })
 map('c', '<M-b>', [[<C-\>euser#fn#cmdlineMoveWord(-1, 0)<Cr>]], { silent = false, desc = 'Goto word backward' })
 map('c', '<M-d>', [[<C-\>euser#fn#cmdlineMoveWord( 1, 1)<Cr>]], { silent = false, desc = 'Kill word forward' })
@@ -666,10 +693,27 @@ map('n', '<leader>S', '<Cmd>new<Cr>', 'Split (horiz, new)')
 map('n', '<leader>sn', '<Cmd>new<Cr>', 'Split (horiz, new)')
 map('n', '<leader>V', '<Cmd>vnew<Cr>', 'Split (vert, new)')
 map('n', '<leader>vn', '<Cmd>vnew<Cr>', 'Split (vert, new)')
-map('n', '<leader>ss', '<Cmd>split<Cr>', 'Split (horiz, cur)')
-map('n', '<leader>st', '<Cmd>split<Cr>', 'Split (horiz, cur)')
-map('n', '<leader>vv', '<Cmd>vsplit<Cr>', 'Split (vert, cur)')
-map('n', '<leader>vt', '<Cmd>vsplit<Cr>', 'Split (vert, cur)')
+
+local function split_preserve_cursor(cmd)
+  return function()
+    local pos = vim.api.nvim_win_get_cursor(0)
+    vim.cmd(cmd)
+    vim.api.nvim_win_set_cursor(0, pos)
+  end
+end
+
+map('n', '<leader>ss', split_preserve_cursor 'split', 'Split (horiz, cur)')
+map('n', '<leader>st', split_preserve_cursor 'split', 'Split (horiz, cur)')
+map('n', '<leader>vv', split_preserve_cursor 'vsplit', 'Split (vert, cur)')
+map('n', '<leader>vt', split_preserve_cursor 'vsplit', 'Split (vert, cur)')
+
+map('n', '<leader>vm', function()
+  local cur_win = vim.api.nvim_get_current_win()
+  vim.cmd 'leftabove vnew'
+  vim.api.nvim_set_current_win(cur_win)
+  vim.cmd 'rightbelow vnew'
+  vim.api.nvim_set_current_win(cur_win)
+end, 'Split (vert, middle, new)')
 
 -- swap p and P
 map('v', 'p', 'P', 'paste without overwriting with the original selection')
@@ -764,3 +808,7 @@ map('x', '.', [[<Esc>.]], { remap = true, silent = true, desc = 'Repeat last com
 
 ---- folke/lazy.nvim
 map('n', '<leader>ll', '<Cmd>Lazy<cr>', 'Lazy')
+
+---- Session management
+map('n', 'ZSS', '<Cmd>SessionSave<Cr>', 'Session: Save')
+map('n', 'ZSL', '<Cmd>SessionLoad<Cr>', 'Session: Load')

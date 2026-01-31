@@ -1,6 +1,7 @@
 local smart_splits = lazy_require 'smart-splits'
 local zellij_nav = lazy_require 'zellij-nav'
 local wrap = require('user.util.map').wrap
+local xk = require('user.keys').xk
 
 ---@type LazySpec[]
 return {
@@ -8,9 +9,11 @@ return {
     'sindrets/winshift.nvim',
     cmd = 'WinShift',
     keys = {
-      { '<Leader>M', '<Cmd>WinShift<Cr>', desc = 'WinShift: Start' },
-      { '<Leader>mm', '<Cmd>WinShift<Cr>', desc = 'WinShift: Start' },
-      { '<Leader>ws', '<Cmd>WinShift swap<Cr>', desc = 'WinShift: Swap' },
+      { '<leader>M', '<Cmd>WinShift<Cr>', desc = 'WinShift: Start' },
+      { '<leader>mm', '<Cmd>WinShift<Cr>', desc = 'WinShift: Start' },
+      { '<localleader>X', '<Cmd>WinShift swap<Cr>', desc = 'WinShift: Swap' },
+      { xk '<C-S-h>', '<Cmd>WinShift left<Cr>', desc = 'WinShift: Left' },
+      { xk '<C-S-l>', '<Cmd>WinShift right<Cr>', desc = 'WinShift: Right' },
     },
     opts = {
       highlight_moving_win = true,
@@ -21,6 +24,7 @@ return {
         cursorcolumn = false,
         colorcolumn = '',
       },
+      window_picker = function() return require('window-picker').pick_window() end,
     },
   },
   {

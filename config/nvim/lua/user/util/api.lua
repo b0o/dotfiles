@@ -174,4 +174,10 @@ function M.buf_get_wins(buf)
   return wins
 end
 
+--- Sends keys to Neovim as if typed by the user
+---@param keys string The key sequence to send (e.g. '<CR>', '<Space>', '<C-]><CR>')
+function M.feedkeys(keys)
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, true, true), 'n', true)
+end
+
 return M

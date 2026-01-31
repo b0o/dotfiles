@@ -529,16 +529,21 @@ M.find_dapui_float = function()
   end)
 end
 
+---@class user.fn.Osc52SmartCopyOpts
+---@field force? boolean  @if true, always send osc52 sequence even if a clipboard tool is available
+---@field append_newline? boolean  @if true, append a trailing newline to the copied text
+
 ---@param reg string
 ---@param lines (string|string[])[]
----@param force? boolean  @if true, always send osc52 sequence even if a clipboard tool is available
-M.osc52_smart_copy = function(reg, lines, force)
-  lines = vim.iter({ lines, '' }):flatten(math.huge):totable()
+---@param opts? user.fn.Osc52SmartCopyOpts
+M.osc52_smart_copy = function(reg, lines, opts)
+  opts = opts or {}
+  lines = vim.iter(opts.append_newline and { lines, '' } or { lines }):flatten(math.huge):totable()
   if reg and reg ~= '' then
     vim.fn.setreg(reg, vim.iter(lines):join '\n')
   end
   -- Only send the OSC 52 if connected via SSH
-  if not force and vim.env.SSH_CONNECTION == nil then
+  if not opts.force and vim.env.SSH_CONNECTION == nil then
     return
   end
   require('vim.ui.clipboard.osc52').copy(reg)(lines)
