@@ -3,6 +3,7 @@
 
 # TODO: store bookmarks in json file
 # TODO: configurable default bookmark
+# TODO: in l, and fzf, show direct symlink, not recursively expanded
 
 # Get the comark directory path
 def comark-dir [] {
@@ -110,8 +111,11 @@ export def rename, [old: string, new: string] {
   print $"bookmark ($old) renamed to ($new)"
 }
 
-def resolve-bookmark [alias: string] {
-  let bookmark_path = ((comark-dir) | path join $alias)
+def resolve-bookmark [
+  --direct (-d) # Resolve direct symlink only (not recursively)
+  alias: string
+] {
+  let bookmark_path = (comark-dir) | path join $alias
   if not ($bookmark_path | path exists --no-symlink ) {
     error make -u {msg: $"bookmark does not exist: ($alias)"}
   }
@@ -121,10 +125,11 @@ def resolve-bookmark [alias: string] {
     return (realpath -m $bookmark_path)
   }
   let target = ($bookmark_path | path expand)
+  let res = if $direct { readlink $bookmark_path } else { $target }
   if ($target | path type) == "dir" {
-    return $"($target)/"
+    return $"($res)/"
   }
-  $target
+  $res
 }
 
 # Print bookmark destination path
@@ -249,7 +254,7 @@ export def l, [pattern?: string] {
 
 
 # Change directory to bookmark
-export def --env cd, [alias?: string@complete-alias] {
+export def --env cd, [alias?: string@complete-alias]: nothing -> nothing {
   if ($alias | is-empty) {
     cd ~ # TODO: cd to "default" bookmark (when JSON file is implemented)
     return
@@ -337,14 +342,17 @@ def parse-fzf-output [output: string] {
 # File search with depth control
 # Returns the selected file path or empty string
 def file-search [
-  directory: string    # Directory to search in
-  saved_query: string  # Initial query
+  directory: string     # Directory to search in (absolute path for fd)
+  saved_query: string   # Initial query
+  display_base: string  # Base path for display (e.g., "./" or "~/Documents/")
 ] {
   mut search_depth = 1  # Start with non-recursive (only immediate files)
   mut file_query = $saved_query
   mut current_dir = $directory
+  mut current_display_base = $display_base
   mut current_filter = "all"  # Can be "all", "dir", or "file"
   mut show_ignored = false  # Whether to show VCS ignored files
+  mut show_absolute = false  # Whether to show absolute paths
 
   while true {
     # Build fd command with type filter
@@ -364,8 +372,23 @@ def file-search [
     }
 
     # Search for files and directories with current depth
+    # Transform paths to use display base prefix (normalize slashes)
+    let display_prefix = $current_display_base | str trim --right --char '/'
+    let search_dir = $current_dir | str trim --right --char '/'
+    let use_absolute = $show_absolute
     let file_list = (
       ^fd --follow --hidden --exclude .git --max-depth $search_depth ...$type_args ...$ignore_args . $current_dir
+      | lines
+      | each { |p|
+        if $use_absolute {
+          $p
+        } else {
+          # fd returns paths with search_dir prefix - strip it and use display prefix instead
+          let rel = $p | str replace $search_dir '' | str trim --left --char '/'
+          $"($display_prefix)/($rel)"
+        }
+      }
+      | str join "\n"
     )
 
     let depth_indicator = "󰙅 " + (if $search_depth == 999 { "∞" } else { $"($search_depth)" })
@@ -378,22 +401,23 @@ def file-search [
     }
 
     let ignore_indicator = (if $show_ignored { "󰄱 gitignore" } else { "󰄵 gitignore" })
+    let path_indicator = (if $show_absolute { "󰝰 abs" } else { "󰝰 rel" })
 
     let info = [
       "󰘵 a ignore    󰘵 d 󰈲 dirs    󰘵 u up dir   󰘵 / depth+"
       "󰘵 , go back   󰘵 f 󰈲 files   󰘵 i in dir   󰘵 . depth-"
-      "󰘵 o cur dir"
+      "󰘵 o cur dir   󰘵 e abs/rel"
     ] | str join "\n"
 
     let file_sel = (
       $file_list
       | ^fzf --layout=reverse
       --query $file_query
-      --expect='alt-,,alt-/,alt-.,alt-a,alt-d,alt-f,alt-i,alt-o,alt-u,alt-1,alt-2,alt-3,alt-4,alt-5,alt-6,alt-7,alt-8,alt-9'
+      --expect='alt-,,alt-/,alt-.,alt-a,alt-d,alt-e,alt-f,alt-i,alt-o,alt-u,alt-1,alt-2,alt-3,alt-4,alt-5,alt-6,alt-7,alt-8,alt-9'
       --print-query
       --no-exit-0
-      --prompt $"($ignore_indicator)  ($filter_indicator)  ($depth_indicator)   "
-      --header $current_dir
+      --prompt $"($ignore_indicator)  ($filter_indicator)  ($path_indicator)  ($depth_indicator)   "
+      --header $search_dir
       --footer $info
       | complete
     )
@@ -411,8 +435,8 @@ def file-search [
     let line2 = ($file_lines | get 2? | default "")
 
     # Check if line0 or line1 is a key we expect
-    let line0_is_key = $line0 in ["alt-,", "alt-/", "alt-.", "alt-a", "alt-d", "alt-f", "alt-i", "alt-o", "alt-u", "alt-1", "alt-2", "alt-3", "alt-4", "alt-5", "alt-6", "alt-7", "alt-8", "alt-9"]
-    let line1_is_key = $line1 in ["alt-,", "alt-/", "alt-.", "alt-a", "alt-d", "alt-f", "alt-i", "alt-o", "alt-u", "alt-1", "alt-2", "alt-3", "alt-4", "alt-5", "alt-6", "alt-7", "alt-8", "alt-9"]
+    let line0_is_key = $line0 in ["alt-,", "alt-/", "alt-.", "alt-a", "alt-d", "alt-e", "alt-f", "alt-i", "alt-o", "alt-u", "alt-1", "alt-2", "alt-3", "alt-4", "alt-5", "alt-6", "alt-7", "alt-8", "alt-9"]
+    let line1_is_key = $line1 in ["alt-,", "alt-/", "alt-.", "alt-a", "alt-d", "alt-e", "alt-f", "alt-i", "alt-o", "alt-u", "alt-1", "alt-2", "alt-3", "alt-4", "alt-5", "alt-6", "alt-7", "alt-8", "alt-9"]
 
     let file_query_out = if $line0_is_key { "" } else { $line0 }
     let file_key = if $line0_is_key { $line0 } else if $line1_is_key { $line1 } else { "" }
@@ -437,12 +461,19 @@ def file-search [
 
     # If alt-o pressed, accept current directory
     if $file_key == "alt-o" {
-      return $current_dir
+      return (if $show_absolute { $current_dir } else { $current_display_base })
     }
 
     # Handle show ignored files toggle
     if $file_key == "alt-a" {
       $show_ignored = not $show_ignored
+      $file_query = $file_query_out
+      continue
+    }
+
+    # Handle absolute/relative path toggle
+    if $file_key == "alt-e" {
+      $show_absolute = not $show_absolute
       $file_query = $file_query_out
       continue
     }
@@ -516,16 +547,20 @@ def file-search [
 
     # Handle directory navigation
     if $file_key == "alt-i" {
-      # Enter the selected directory if it's a directory
+      # Enter the selected directory if it's a directory, otherwise accept the file
       if not ($file_selection | is-empty) {
         let selection_path = ($file_selection | path expand)
         if ($selection_path | path exists) and (($selection_path | path type) == "dir") {
           $current_dir = $selection_path
+          $current_display_base = $file_selection
           $file_query = $file_query_out
           continue
+        } else {
+          # It's a file - accept it
+          return $file_selection
         }
       }
-      # If not a directory, just ignore and continue
+      # No selection, just continue
       $file_query = $file_query_out
       continue
     } else if $file_key == "alt-u" {
@@ -533,6 +568,16 @@ def file-search [
       let parent = ($current_dir | path dirname)
       if $parent != $current_dir {  # Make sure we're not at root
         $current_dir = $parent
+        # Handle relative path display properly
+        # path dirname doesn't work correctly for "." or ".." or paths ending in ".."
+        let display_trimmed = $current_display_base | str trim --right --char '/'
+        $current_display_base = if $display_trimmed == "." {
+          ".."
+        } else if $display_trimmed == ".." or ($display_trimmed | str ends-with "/..") {
+          $"../($display_trimmed)"
+        } else {
+          $display_trimmed | path dirname
+        }
       }
       $file_query = $file_query_out
       continue
@@ -581,10 +626,11 @@ def generate-filtered-bookmarks [filter: string, parent_path?: oneof<string,noth
 # Select bookmark with fzf
 export def f, [
   query?: string
-  --directory (-d)     # Only show bookmarks that point to a directory
-  --file (-f)          # Only show bookmarks that point to a file
-  --path (-p): string  # Start directly in file search mode for this path
-  --record             # Output result as nushell record like { alias?: string, path: string, is_root: bool }|null
+  --directory (-d)          # Only show bookmarks that point to a directory
+  --file (-f)               # Only show bookmarks that point to a file
+  --path (-p): string       # Start directly in file search mode for this path
+  --display-base: string    # Base path for display in file search (e.g., "./" or "~/")
+  --record                  # Output result as nushell record like { alias?: string, path: string, is_root: bool }|null
 ] {
   comark-init
 
@@ -596,7 +642,9 @@ export def f, [
   if ($path | is-not-empty) {
     let expanded_path = ($path | path expand)
     if ($expanded_path | path exists) and (($expanded_path | path type) == "dir") {
-      let result = (file-search $expanded_path ($query | default ""))
+      # Use display_base if provided, otherwise use the original path
+      let base = if ($display_base | is-not-empty) { $display_base } else { $path }
+      let result = (file-search $expanded_path ($query | default "") $base)
       if $record {
         return { alias: null, path: $result, is_root: false }
       } else {
@@ -754,8 +802,9 @@ export def f, [
         })
       }
 
-      # Enter file search mode
-      let result = (file-search $bookmark_path $parsed.query)
+      # Enter file search mode - use bookmark path (without trailing /) as display base
+      let display_path = ($bookmark_path | str trim --right --char '/')
+      let result = (file-search $bookmark_path $parsed.query $display_path)
 
       if not ($result | is-empty) {
         # return $result
@@ -1020,6 +1069,9 @@ export def fzf,path [] {
     {type: "dot", prefix: "."}
   } else if ($current_word | str starts-with '../') or ($current_word == '..') {
     {type: "dotdot", prefix: ".."}
+  } else if not ($current_word | str starts-with '/') {
+    # Prefix-less relative paths (including empty) are treated as "./" style
+    {type: "dot", prefix: "."}
   } else {
     {type: "other", prefix: ""}
   }
@@ -1027,80 +1079,41 @@ export def fzf,path [] {
   # Expand tilde for path operations
   let expanded_word = ($current_word | path expand)
 
-  # Determine search directory and initial query
+  # Helper to format display path based on style
+  let format_display = {|p|
+    if $path_style.type == "dot" and not ($current_word | str starts-with './') and $p != "." {
+      $"./($p)"
+    } else {
+      $p
+    }
+  }
+
+  # Determine search directory, initial query, and display base
   let search_info = if ($current_word | str trim | is-empty) {
-    {dir: ".", query: ""}
+    {dir: ".", query: "", display_base: "."}
   } else if ($expanded_word | path exists) and ($expanded_word | path type) == "dir" {
-    {dir: $expanded_word, query: ""}
+    let display = do $format_display ($current_word | str trim --right --char '/')
+    {dir: $expanded_word, query: "", display_base: $display}
   } else {
     # Path doesn't exist or is a file - use parent dir and basename as query
     let parent_dir = ($expanded_word | path dirname)
     let basename = ($expanded_word | path basename)
     if ($parent_dir | path exists) {
-      {dir: $parent_dir, query: $basename}
+      let parent_display = $current_word | path dirname
+      let display = do $format_display $parent_display
+      {dir: $parent_dir, query: $basename, display_base: $display}
     } else {
-      {dir: ".", query: ""}
+      {dir: ".", query: "", display_base: "."}
     }
   }
 
   # Use comark's file search
-  let selected = (f, $search_info.query --path $search_info.dir)
+  let selected = (f, $search_info.query --path $search_info.dir --display-base $search_info.display_base)
 
   # If something was selected, update the commandline
   if not ($selected | is-empty) {
-    let raw_result = $selected
-
-    # Convert result back to original path style
-    let result = match $path_style.type {
-      "tilde" => {
-        # Convert to tilde-prefixed path
-        let abs_result = ($raw_result | path expand)
-        if ($abs_result | str starts-with $env.HOME) {
-          $abs_result | str replace $env.HOME "~"
-        } else {
-          $raw_result
-        }
-      },
-      "dot" => {
-        # Keep as relative path from current directory
-        if ($raw_result | str starts-with '/') {
-          # Try to make relative, but keep absolute if it fails
-          try {
-            let rel = ($raw_result | path relative-to (pwd))
-            if ($rel | str starts-with './') {
-              $rel
-            } else {
-              $"./($rel)"
-            }
-          } catch {
-            $raw_result
-          }
-        } else if ($raw_result | str starts-with './') {
-          $raw_result
-        } else {
-          $"./($raw_result)"
-        }
-      },
-      "dotdot" => {
-        # Try to maintain parent-relative style if possible
-        if ($raw_result | str starts-with '../') or ($raw_result | str starts-with './') {
-          $raw_result
-        } else if ($raw_result | str starts-with '/') {
-          # Try to make relative to pwd, but fallback to absolute
-          try {
-            $raw_result | path relative-to (pwd)
-          } catch {
-            $raw_result
-          }
-        } else {
-          $raw_result
-        }
-      },
-      _ => {
-        # Keep result as-is for other cases
-        $raw_result
-      }
-    }
+    # Result is already in display format from file-search
+    let result = $selected
 
     # Build the new buffer with the selected item replacing the current word
     # Re-add quotes if original was quoted (and close if it was unclosed)
