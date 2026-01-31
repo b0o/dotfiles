@@ -4,3 +4,6 @@ mise: fish
 niri: fish
 pw: fish
 home-manager: fish
+systemctl: fish # FIXME: nushell completion filtering not working
+journalctl: fish
+sops: zsh

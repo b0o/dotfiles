@@ -1,0 +1,1 @@
+source <(sops completion zsh)
