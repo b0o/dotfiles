@@ -28,6 +28,9 @@ end
 
 function M.on_exit(code, signal, id)
   local client = M.clients.attached[id]
+  if not client then
+    return
+  end
   M.clients.exited[id] = {
     status = 'exited',
     name = client.name,
@@ -36,22 +39,20 @@ function M.on_exit(code, signal, id)
     attached_buffers = vim.deepcopy(client.attached_buffers),
   }
   M.clients.attached[id] = nil
-  vim.notify(
-    'LSP client ' .. client.name .. ' (' .. id .. ') exited with code ' .. code .. ' and signal ' .. signal
-  )
+  vim.notify('LSP client ' .. client.name .. ' (' .. id .. ') exited with code ' .. code .. ' and signal ' .. signal)
 end
 
 ---@param bufnr integer
 ---@param clients? table<integer, vim.lsp.Client|user.util.lsp_status.ClientExitResult>
 ---@return (vim.lsp.Client|user.util.lsp_status.ClientExitResult)[]
 local function buf_clients(bufnr, clients)
-  return vim.iter(clients and { clients } or { M.clients.exited, M.clients.attached })
-      :flatten()
-      :filter(
-        function(client) ---@param client vim.lsp.Client|user.util.lsp_status.ClientExitResult
-          return client.attached_buffers[bufnr] == true
-        end)
-      :totable()
+  return vim
+    .iter(clients and { clients } or { M.clients.exited, M.clients.attached })
+    :flatten()
+    :filter(function(client) ---@param client vim.lsp.Client|user.util.lsp_status.ClientExitResult
+      return client.attached_buffers[bufnr] == true
+    end)
+    :totable()
 end
 
 function M.status_clients_count(status, bufnr)

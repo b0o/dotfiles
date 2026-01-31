@@ -1,4 +1,17 @@
+local xk = require('user.keys').xk
+
+---@class user.plugins.lsp.Server
+---@field [1] string name
+---@field cmd? string|string[]
+---@field filetypes? string[]
+---@field root_markers? string[]
+---@field settings? table
+---@field on_attach? function
+---@field enabled? boolean
+---@field formatting? boolean
+
 local servers = function()
+  ---@type (user.plugins.lsp.Server|string)[]
   return {
     'astro',
     {
@@ -150,6 +163,7 @@ local servers = function()
     },
     {
       'basedpyright',
+      enabled = false,
       formatting = false,
     },
     'cyright',
@@ -159,6 +173,7 @@ local servers = function()
       hover = false,
     },
     'nil_ls',
+    'nixd',
     'nushell',
     {
       'lua_ls',
@@ -641,6 +656,8 @@ return {
             ['<S-Tab>'] = actions.previous_location,
             ['<C-j>'] = actions.preview_scroll_win(-1),
             ['<C-k>'] = actions.preview_scroll_win(1),
+            [xk '<C-S-j>'] = actions.preview_scroll_win(-1),
+            [xk '<C-S-k>'] = actions.preview_scroll_win(1),
             ['<C-d>'] = actions.preview_scroll_win(-5),
             ['<C-u>'] = actions.preview_scroll_win(5),
             ['<C-v>'] = actions.jump_vsplit,

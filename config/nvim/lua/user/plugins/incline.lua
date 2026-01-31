@@ -265,7 +265,7 @@ return {
         end
         scheduled_workspace_callbacks[root:absolute()] = true
         workspace.get_workspace_package_paths(root, {
-          callback = function() workspace.get_workspace_info() end,
+          callback = vim.schedule_wrap(function() workspace.get_workspace_info() end),
         })
       end
 
