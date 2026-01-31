@@ -14,10 +14,10 @@ Maddison's dotfiles, managed with [Nix](https://nixos.org/)
 - Colorscheme: [Lavi](https://github.com/b0o/lavi.nvim)
 - Font: [Pragmasevka Nerd Font](https://github.com/shytikov/pragmasevka)
 - Stats:
-  - 19,000+ lines of code across 175 files
-  - 10,000+ lines of Neovim config (Lua)
-  - 4,000+ lines of Nushell config
-  - In development since 2015, 1,250+ commits since 2018
+  - 25,000+ lines of code across 200+ files
+  - 14,000+ lines of Neovim config (Lua)
+  - 6,000+ lines of Nushell config
+  - In development since 2015, 1,350+ commits since 2018
 
 ## Structure
 
