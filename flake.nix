@@ -2,8 +2,10 @@
   description = "Maddison's Dotfiles";
 
   inputs = {
-    # Nix/NixOS
+    # nixpkgs
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+
+    # Nix/NixOS
     flakey-profile.url = "github:lf-/flakey-profile";
     disko = {
       url = "github:nix-community/disko";
@@ -25,12 +27,6 @@
       url = "github:nix-community/neovim-nightly-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # Nushell
-    # nushell-nightly = {
-    #   url = "github:JoaquinTrinanes/nushell-nightly-flake";
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    # };
 
     # Niri
     niri = {
@@ -68,9 +64,7 @@
   };
 
   outputs = {
-    self,
     nixpkgs,
-    flakey-profile,
     home-manager,
     ...
   } @ inputs: let
@@ -82,8 +76,7 @@
   in rec {
     overlays = {
       default = import ./nix/overlays {inherit inputs;};
-      neovim = inputs.neovim-nightly-overlay.overlays.default;
-      # nushell = inputs.nushell-nightly.overlays.default;
+      ghostty = inputs.ghostty.overlays.releasefast;
       inherit (inputs.niri.overlays) niri;
     };
 
@@ -127,7 +120,10 @@
       arch-maddy = home-manager.lib.homeManagerConfiguration {
         pkgs = legacyPackages."x86_64-linux";
         extraSpecialArgs = {inherit inputs;};
-        modules = [./nix/home/arch-maddy.nix];
+        modules = [
+          ./nix/home/arch-maddy.nix
+          inputs.sops-nix.homeManagerModules.sops
+        ];
       };
     };
   };

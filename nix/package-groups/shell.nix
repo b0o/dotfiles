@@ -1,5 +1,8 @@
 {pkgs, ...}:
 with pkgs; [
+  # Terminals
+  # ghostty
+
   # Shells
   bash # bourne-again shell
   fish # friendly interactive shell
@@ -12,6 +15,7 @@ with pkgs; [
 
   # Terminal multiplexer
   zellij # terminal workspace manager
+  # zellij-pr-passthrough # terminal workspace manager
 
   # Task automation
   just # command runner

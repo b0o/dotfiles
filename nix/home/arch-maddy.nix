@@ -5,40 +5,36 @@
   pkgs,
   ...
 }: let
-  packageGroups = import ../package-groups {
-    inherit inputs pkgs;
-  };
+  packageGroups = import ../package-groups {inherit inputs pkgs;};
+in {
   home = {
     username = "maddy";
-    homeDirectory = "/home/maddy";
-  };
-in {
-  home =
-    home
-    // {
-      stateVersion = "26.05";
+    homeDirectory = "/home/${config.home.username}";
+    stateVersion = "26.05";
 
-      packages =
-        packageGroups.base
-        ++ packageGroups.debugging
-        ++ packageGroups.javascript
-        ++ packageGroups.neovim
-        ++ packageGroups.niri
-        ++ packageGroups.shell;
+    packages =
+      packageGroups.base
+      ++ packageGroups.debugging
+      ++ packageGroups.javascript
+      ++ packageGroups.neovim
+      ++ packageGroups.security
+      ++ packageGroups.shell
+      ++ packageGroups.niri.other
+      ++ (map config.lib.nixGL.wrap packageGroups.niri.graphical);
 
-      activation.stow = lib.hm.dag.entryAfter ["writeBoundary"] ''
-        run ${pkgs.stow}/bin/stow --verbose --target="$XDG_CONFIG_HOME" --dir="$XDG_CONFIG_HOME/dotfiles" --restow config
-      '';
+    activation.stow = lib.hm.dag.entryAfter ["writeBoundary"] ''
+      run ${pkgs.stow}/bin/stow --target="$XDG_CONFIG_HOME" --dir="$XDG_CONFIG_HOME/dotfiles" --restow config
+    '';
 
-      shell.enableShellIntegration = true;
+    shell.enableShellIntegration = true;
 
-      sessionVariables = {
-        GIO_EXTRA_MODULES = "${pkgs.dconf.lib}/lib/gio/modules";
-      };
+    sessionVariables = {
+      GIO_EXTRA_MODULES = "${pkgs.dconf.lib}/lib/gio/modules";
     };
+  };
 
   dconf.enable = true;
-  targets.genericLinux.enable = true;
+
   targets.genericLinux = {
     enable = true;
     nixGL = {
@@ -51,17 +47,8 @@ in {
   programs = {
     home-manager.enable = true;
     nix-search-tv.enable = true;
-
-    ghostty = {
-      enable = true;
-      enableBashIntegration = false;
-      enableZshIntegration = false;
-      enableFishIntegration = false;
-      systemd.enable = true;
-    };
   };
 
-  xdg.configFile."ghostty/config".enable = false; # prevent home-manager from touching this
   sops = {
     defaultSopsFile = ../../secrets.yaml;
     # NOTE: You must manually create/place the age key file before bootstrapping
