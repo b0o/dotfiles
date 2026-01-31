@@ -82,7 +82,10 @@ cmd('M', function(o) require('user.fn').man('tab', unpack(o.fargs)) end, {
   desc = 'Open man page for the given topic in a new tab',
 })
 
-cmd('SessionSave', function() require('user.util.session').session_save() end, {
+cmd('SessionSave', function()
+  require('user.util.session').session_save()
+  vim.notify('Session saved', vim.log.levels.INFO)
+end, {
   desc = 'Save the current session',
 })
 

@@ -6,9 +6,13 @@ return {
     keys = {
       { '<leader>ut', '<Cmd>UndotreeToggle<Cr>', desc = 'Undotree: Toggle' },
     },
-    config = function()
-      vim.g.undotree_SetFocusWhenToggle = 1
-    end,
+    config = function() vim.g.undotree_SetFocusWhenToggle = 1 end,
+  },
+  {
+    'kevinhwang91/nvim-fundo',
+    dependencies = { 'kevinhwang91/promise-async' },
+    lazy = false,
+    opts = {},
   },
   {
     'Shatur/neovim-session-manager',
