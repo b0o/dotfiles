@@ -395,7 +395,7 @@ binds {
   // Toggle tabbed column display mode.
   // Windows in this column will appear as vertical tabs,
   // rather than stacked on top of each other.
-  Mod+F3 { toggle-column-tabbed-display; }
+  Mod+Shift+X { toggle-column-tabbed-display; }
 
   // Awtrix
   Mod+Shift+BracketLeft { spawn "nu" "-c" "use awtrix; awtrix next-app"; }
