@@ -277,34 +277,47 @@ return {
     event = 'VeryLazy',
     config = function()
       local map = require('user.util.map').map
+      local xk = require('user.keys').xk
 
       ---@param dir 'Down' | 'Up'
+      ---@return string|boolean
       local function move_or_scroll(dir)
-        return function()
-          local fn = require 'user.fn'
-          local win = vim.api.nvim_get_current_win()
-          local noice_win = fn.find_noice_float()
-          if noice_win then
-            if require('noice.lsp').scroll(dir == 'Down' and 4 or -4) then
-              return ''
-            end
-          end
-          local diag_win = fn.find_diagnostic_float(win)
-          if diag_win then
-            -- TODO: scroll diagnostic float
+        local fn = require 'user.fn'
+        local win = vim.api.nvim_get_current_win()
+        local noice_win = fn.find_noice_float()
+        if noice_win then
+          if require('noice.lsp').scroll(dir == 'Down' and 4 or -4) then
             return ''
           end
-          local dapui_win = fn.find_dapui_float()
-          if dapui_win then
-            -- TODO: scroll dapui float
-            return ''
-          end
-          return '<Plug>MoveLine' .. dir
         end
+        local diag_win = fn.find_diagnostic_float(win)
+        if diag_win then
+          -- TODO: scroll diagnostic float
+          return ''
+        end
+        local dapui_win = fn.find_dapui_float()
+        if dapui_win then
+          -- TODO: scroll dapui float
+          return ''
+        end
+        return false
       end
 
-      map('n', '<C-j>', move_or_scroll 'Down', { remap = true, expr = true, desc = 'Move block down' })
-      map('n', '<C-k>', move_or_scroll 'Up', { remap = true, expr = true, desc = 'Move block up' })
+      ---@param dir 'Down' | 'Up'
+      local function move_line_or_scroll(dir)
+        return function() return move_or_scroll(dir) or ('<Plug>MoveLine' .. dir) end
+      end
+
+      ---@param dir 'Down' | 'Up'
+      local function move_win_or_scroll(dir)
+        return function() return move_or_scroll(dir) or ('<Cmd>WinShift ' .. string.lower(dir) .. '<Cr>') end
+      end
+
+      map('n', '<C-j>', move_line_or_scroll 'Down', { remap = true, expr = true, desc = 'Move down' })
+      map('n', '<C-k>', move_line_or_scroll 'Up', { remap = true, expr = true, desc = 'Move up' })
+
+      map('n', xk '<C-S-j>', move_win_or_scroll 'Down', { remap = true, expr = true, desc = 'Move down' })
+      map('n', xk '<C-S-k>', move_win_or_scroll 'Up', { remap = true, expr = true, desc = 'Move up' })
 
       map('n', '<C-h>', '<Plug>MoveCharLeft', { remap = true, desc = 'Move block left' })
       map('n', '<C-l>', '<Plug>MoveCharRight', { remap = true, desc = 'Move block right' })
@@ -326,6 +339,7 @@ return {
         TEST = { icon = ' ', color = 'test', alt = { 'TESTING', 'PASSED', 'FAILED' } },
         WARN = { icon = ' ', color = 'warning', alt = { 'WARNING' } },
         XXX = { icon = ' ', color = 'error' },
+        SEE = { icon = ' ', color = 'info', alt = { 'REF' } },
       },
       highlight = {
         pattern = { [[.*<(KEYWORDS)\s*(\(.+\))?\s*(:|$)]] },
