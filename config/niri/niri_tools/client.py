@@ -223,6 +223,35 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
 
     sub.add_parser("menu", help="Show scratchpad menu with rofi")
 
+    toggle_float = sub.add_parser(
+        "toggle-float", help="Toggle a scratchpad between floating and tiled"
+    )
+    toggle_float.add_argument(
+        "name",
+        type=str,
+        nargs="?",
+        default=None,
+        help="Name of the scratchpad (default: focused scratchpad)",
+    )
+
+    float_cmd = sub.add_parser("float", help="Float a scratchpad window")
+    float_cmd.add_argument(
+        "name",
+        type=str,
+        nargs="?",
+        default=None,
+        help="Name of the scratchpad (default: focused scratchpad)",
+    )
+
+    tile_cmd = sub.add_parser("tile", help="Tile a scratchpad window")
+    tile_cmd.add_argument(
+        "name",
+        type=str,
+        nargs="?",
+        default=None,
+        help="Name of the scratchpad (default: focused scratchpad)",
+    )
+
     close = sub.add_parser("close", help="Close a scratchpad window")
     close.add_argument(
         "-w",
@@ -265,6 +294,24 @@ def main(args: argparse.Namespace) -> int:
 
     elif args.scratchpad_command == "menu":
         return send_command({"cmd": "menu"})
+
+    elif args.scratchpad_command == "toggle-float":
+        command = {"cmd": "toggle-float"}
+        if args.name is not None:
+            command["name"] = args.name
+        return send_command(command)
+
+    elif args.scratchpad_command == "float":
+        command = {"cmd": "float"}
+        if args.name is not None:
+            command["name"] = args.name
+        return send_command(command)
+
+    elif args.scratchpad_command == "tile":
+        command = {"cmd": "tile"}
+        if args.name is not None:
+            command["name"] = args.name
+        return send_command(command)
 
     elif args.scratchpad_command == "close":
         command = {"cmd": "close", "confirm": not args.no_confirm}

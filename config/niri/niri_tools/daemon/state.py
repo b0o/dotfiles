@@ -60,6 +60,7 @@ class WorkspaceInfo:
     idx: int
     output: str
     is_active: bool
+    name: str | None
 
     @classmethod
     def from_niri(cls, data: dict[str, Any]) -> "WorkspaceInfo":
@@ -68,6 +69,7 @@ class WorkspaceInfo:
             idx=data["idx"],
             output=data.get("output", ""),
             is_active=data.get("is_active", False),
+            name=data.get("name"),
         )
 
 
@@ -108,6 +110,7 @@ class DaemonState:
     outputs: dict[str, OutputInfo] = field(default_factory=dict)
     focused_output: str | None = None
     focused_window_id: int | None = None
+    previous_focused_window_id: int | None = None
 
     # Scratchpad state
     scratchpads: dict[str, ScratchpadState] = field(default_factory=dict)
@@ -183,6 +186,15 @@ class DaemonState:
             return None
         return self.get_active_workspace_for_output(self.focused_output)
 
+    def is_on_scratchpad_workspace(self, window: "WindowInfo") -> bool:
+        """Check if a window is on the scratchpad workspace."""
+        from ..common import SCRATCHPAD_WORKSPACE
+
+        if window.workspace_id is None:
+            return False
+        ws = self.workspaces.get(window.workspace_id)
+        return ws is not None and ws.name == SCRATCHPAD_WORKSPACE
+
     def get_scratchpad_for_window(self, window_id: int) -> str | None:
         """Get scratchpad name for a window ID, if any."""
         return self.window_to_scratchpad.get(window_id)
@@ -214,6 +226,12 @@ class DaemonState:
         if name in self.scratchpads:
             self.scratchpads[name].visible = False
             self.scratchpads[name].last_used = time.time()
+
+    def update_scratchpad_recency(self, window_id: int) -> None:
+        """Update last_used timestamp if this window is a scratchpad."""
+        if name := self.window_to_scratchpad.get(window_id):
+            if name in self.scratchpads:
+                self.scratchpads[name].last_used = time.time()
 
     def get_most_recent_hidden_scratchpad(self) -> str | None:
         """Get the most recently used scratchpad that is currently hidden."""

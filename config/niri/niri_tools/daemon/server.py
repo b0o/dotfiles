@@ -196,6 +196,18 @@ class DaemonServer:
             confirm = command.get("confirm", True)
             await self.scratchpad_manager.close(window_id, confirm=confirm)
 
+        elif cmd == "toggle-float":
+            name = command.get("name")
+            await self.scratchpad_manager.toggle_float(name)
+
+        elif cmd == "float":
+            name = command.get("name")
+            await self.scratchpad_manager.float_scratchpad(name)
+
+        elif cmd == "tile":
+            name = command.get("name")
+            await self.scratchpad_manager.tile_scratchpad(name)
+
         elif cmd == "restart":
             await self._restart()
 
@@ -287,13 +299,20 @@ class DaemonServer:
             # Clear old focus
             for w in self.state.windows.values():
                 w.is_focused = False
+            # Track previous focused window
+            old_focus = self.state.focused_window_id
             # Set new focus
             if "id" in focus_data:
                 self.state.focused_window_id = focus_data["id"]
                 if window := self.state.windows.get(focus_data["id"]):
                     window.is_focused = True
+                # Update scratchpad recency if this is a scratchpad
+                self.state.update_scratchpad_recency(focus_data["id"])
             else:
                 self.state.focused_window_id = None
+            # Only update previous if we had a valid focus and it changed
+            if old_focus is not None and old_focus != self.state.focused_window_id:
+                self.state.previous_focused_window_id = old_focus
 
         elif "WorkspaceActivated" in event:
             ws_data = event["WorkspaceActivated"]

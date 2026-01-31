@@ -84,12 +84,28 @@ class ScratchpadManager:
 
         if window.is_focused:
             # Currently focused - hide it
-            print(f"Hiding scratchpad '{name}'")
-            await self._hide_scratchpad(name, window_id)
+            if window.is_floating:
+                print(f"Hiding scratchpad '{name}'")
+                await self._hide_scratchpad(name, window_id)
+            else:
+                # Tiled - just focus the previous window instead of hiding
+                print(f"Unfocusing tiled scratchpad '{name}'")
+                await self._focus_previous_window()
         elif window.workspace_id != focused_ws.id:
-            # On different workspace - show it
-            print(f"Showing scratchpad '{name}'")
-            await self._show_scratchpad(name, window_id, config)
+            # On different workspace
+            if window.is_floating:
+                # Floating - show it on current workspace
+                print(f"Showing scratchpad '{name}'")
+                await self._show_scratchpad(name, window_id, config)
+            elif self.state.is_on_scratchpad_workspace(window):
+                # Tiled on scratchpad workspace - move to current workspace
+                print(f"Moving tiled scratchpad '{name}' to current workspace")
+                await self._move_to_current_workspace(window_id)
+                await self._focus_window(window_id)
+            else:
+                # Tiled on another workspace - just focus it where it is
+                print(f"Focusing tiled scratchpad '{name}'")
+                await self._focus_window(window_id)
         else:
             # On same workspace but not focused - focus it
             print(f"Focusing scratchpad '{name}'")
@@ -98,12 +114,31 @@ class ScratchpadManager:
     async def smart_toggle(self) -> None:
         """Smart toggle: hide focused scratchpad or show most recent."""
         # Check if focused window is a scratchpad
-        if self.state.focused_window_id:
-            name = self.state.get_scratchpad_for_window(self.state.focused_window_id)
-            if name:
+        window_id = self.state.focused_window_id
+        name = self.state.get_scratchpad_for_window(window_id) if window_id else None
+
+        # If focus was briefly lost, check if previous window was a visible scratchpad
+        if not name and self.state.previous_focused_window_id:
+            prev_name = self.state.get_scratchpad_for_window(
+                self.state.previous_focused_window_id
+            )
+            if prev_name:
+                prev_state = self.state.scratchpads.get(prev_name)
+                if prev_state and prev_state.visible:
+                    # Previous window was a visible scratchpad - use it
+                    window_id = self.state.previous_focused_window_id
+                    name = prev_name
+
+        if name and window_id:
+            window = self.state.windows.get(window_id)
+            if window and window.is_floating:
                 print(f"Hiding focused scratchpad '{name}'")
-                await self._hide_scratchpad(name, self.state.focused_window_id)
-                return
+                await self._hide_scratchpad(name, window_id)
+            else:
+                # Tiled - just focus the previous window instead of hiding
+                print(f"Unfocusing tiled scratchpad '{name}'")
+                await self._focus_previous_window()
+            return
 
         # Show most recent hidden scratchpad
         name = self.state.get_most_recent_hidden_scratchpad()
@@ -130,6 +165,113 @@ class ScratchpadManager:
         else:
             # Not a tracked scratchpad, but still floating - hide it anyway
             await self._move_to_scratchpad_workspace(self.state.focused_window_id)
+
+    async def toggle_float(self, name: str | None) -> None:
+        """Toggle a scratchpad between floating and tiled.
+
+        Args:
+            name: Scratchpad name (None = focused or most recent scratchpad)
+        """
+        name, window_id, window = await self._resolve_scratchpad(name)
+        if name is None or window_id is None or window is None:
+            return
+
+        # Check if we need to move to current workspace (not focused)
+        bring_to_current = window_id != self.state.focused_window_id
+
+        if window.is_floating:
+            await self._tile_scratchpad(name, window_id, bring_to_current)
+        else:
+            await self._float_scratchpad(name, window_id, bring_to_current)
+
+    async def float_scratchpad(self, name: str | None) -> None:
+        """Float a scratchpad window.
+
+        Args:
+            name: Scratchpad name (None = focused or most recent scratchpad)
+        """
+        name, window_id, window = await self._resolve_scratchpad(name)
+        if name is None or window_id is None or window is None:
+            return
+
+        if window.is_floating:
+            print(f"Scratchpad '{name}' is already floating")
+            return
+
+        # Check if we need to move to current workspace (not focused)
+        bring_to_current = window_id != self.state.focused_window_id
+        await self._float_scratchpad(name, window_id, bring_to_current)
+
+    async def tile_scratchpad(self, name: str | None) -> None:
+        """Tile a scratchpad window.
+
+        Args:
+            name: Scratchpad name (None = focused or most recent scratchpad)
+        """
+        name, window_id, window = await self._resolve_scratchpad(name)
+        if name is None or window_id is None or window is None:
+            return
+
+        if not window.is_floating:
+            print(f"Scratchpad '{name}' is already tiled")
+            return
+
+        # Check if we need to move to current workspace (not focused)
+        bring_to_current = window_id != self.state.focused_window_id
+        await self._tile_scratchpad(name, window_id, bring_to_current)
+
+    async def _resolve_scratchpad(
+        self, name: str | None
+    ) -> tuple[str | None, int | None, "WindowInfo | None"]:
+        """Resolve scratchpad name to name, window_id, and window.
+
+        If name is None, uses the focused window's scratchpad, or falls back
+        to the most recently used scratchpad with a window.
+
+        Returns (None, None, None) on error.
+        """
+        if name is None:
+            # Try focused window first
+            if self.state.focused_window_id:
+                name = self.state.get_scratchpad_for_window(
+                    self.state.focused_window_id
+                )
+                if name:
+                    window_id = self.state.focused_window_id
+                    window = self.state.windows.get(window_id)
+                    if window:
+                        return name, window_id, window
+
+            # Fall back to most recently used scratchpad with a window
+            name = self._get_most_recent_scratchpad_with_window()
+            if not name:
+                await self._notify_error("No scratchpad with a window")
+                return None, None, None
+
+        # Look up by name
+        scratchpad_state = self.state.scratchpads.get(name)
+        if not scratchpad_state or scratchpad_state.window_id is None:
+            await self._notify_error(f"Scratchpad '{name}' has no window")
+            return None, None, None
+        window_id = scratchpad_state.window_id
+
+        window = self.state.windows.get(window_id)
+        if not window:
+            await self._notify_error(f"Window {window_id} not found")
+            return None, None, None
+
+        return name, window_id, window
+
+    def _get_most_recent_scratchpad_with_window(self) -> str | None:
+        """Get the most recently used scratchpad that has a window."""
+        candidates = [
+            (name, state)
+            for name, state in self.state.scratchpads.items()
+            if state.window_id is not None and state.window_id in self.state.windows
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda x: x[1].last_used)[0]
 
     async def adopt(self, window_id: int | None, name: str | None) -> None:
         """Adopt an existing window as a scratchpad.
@@ -307,8 +449,10 @@ class ScratchpadManager:
 
         Keybindings:
             Enter: Toggle scratchpad
+            C-f: Float scratchpad window
+            C-t: Tile scratchpad window
             C-d: Disown scratchpad window
-            C-q: Close scratchpad window
+            C-BackSpace: Close scratchpad window
         """
         items: list[tuple[str, str]] = []  # (display_text, name)
         # Sort by: 1) has window (True first), 2) MRU (most recent first), 3) alpha
@@ -342,16 +486,25 @@ class ScratchpadManager:
                 "i",  # Return index
                 "-mesg",
                 "<span size='small' alpha='70%'>"
-                "&lt;Cr&gt; toggle / &lt;C-d&gt; disown / &lt;C-BackSpace&gt; close"
+                "&lt;Cr&gt; toggle / &lt;C-f&gt; float / &lt;C-t&gt; tile / "
+                "&lt;C-d&gt; disown / &lt;C-BackSpace&gt; close"
                 "</span>",
                 "-kb-remove-char-forward",
                 "Delete",
                 "-kb-remove-word-back",
                 "Control+Alt+h",
+                "-kb-move-char-forward",
+                "",
+                "-kb-clear-line",
+                "",
                 "-kb-custom-1",
                 "Control+d",
                 "-kb-custom-2",
                 "Control+BackSpace",
+                "-kb-custom-3",
+                "Control+f",
+                "-kb-custom-4",
+                "Control+t",
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -390,7 +543,19 @@ class ScratchpadManager:
                 if window_id is not None:
                     await self.close(window_id, confirm=True)
                 else:
-                    await self._notify_error(f"Scratchpad {name} not found")
+                    await self._notify_error(f"Scratchpad {name} has no window")
+            elif exit_code == 12:
+                # C-f - float
+                if window_id is not None:
+                    await self._float_scratchpad(name, window_id, bring_to_current=True)
+                else:
+                    await self._notify_error(f"Scratchpad {name} has no window")
+            elif exit_code == 13:
+                # C-t - tile
+                if window_id is not None:
+                    await self._tile_scratchpad(name, window_id, bring_to_current=True)
+                else:
+                    await self._notify_error(f"Scratchpad {name} has no window")
 
         except Exception as e:
             print(f"Failed to run rofi: {e}", file=sys.stderr)
@@ -507,6 +672,32 @@ class ScratchpadManager:
         await self._move_to_scratchpad_workspace(window_id)
         self.state.mark_scratchpad_hidden(name)
         self.state.save_scratchpad_state()
+
+    async def _float_scratchpad(
+        self, name: str, window_id: int, bring_to_current: bool = False
+    ) -> None:
+        """Float a scratchpad window and configure its size/position."""
+        config = self.state.scratchpad_configs.get(name)
+        if not config:
+            return
+        print(f"Floating scratchpad '{name}'")
+        # Configure first (like _show_scratchpad does)
+        await self._configure_window(window_id, config)
+        # Then move to current workspace if needed
+        if bring_to_current:
+            await self._move_to_current_workspace(window_id)
+        await self._focus_window(window_id)
+
+    async def _tile_scratchpad(
+        self, name: str, window_id: int, bring_to_current: bool = False
+    ) -> None:
+        """Tile a scratchpad window."""
+        print(f"Tiling scratchpad '{name}'")
+        # Move to current workspace first, then tile
+        if bring_to_current:
+            await self._move_to_current_workspace(window_id)
+        await self._run_niri_action("move-window-to-tiling", "--id", str(window_id))
+        await self._focus_window(window_id)
 
     async def _show_scratchpad(
         self, name: str, window_id: int, config: ScratchpadConfig
@@ -635,9 +826,40 @@ class ScratchpadManager:
             SCRATCHPAD_WORKSPACE,
         )
 
+    async def _move_to_current_workspace(self, window_id: int) -> None:
+        """Move a window to the current workspace."""
+        target_output = self.state.focused_output
+        if not target_output:
+            return
+
+        # Move to the focused monitor's active workspace
+        await self._run_niri_action(
+            "move-window-to-monitor",
+            "--id",
+            str(window_id),
+            target_output,
+        )
+
     async def _focus_window(self, window_id: int) -> None:
         """Focus a window by ID."""
+        # Update state immediately to avoid race conditions with rapid toggles
+        # (the niri event will arrive later and confirm this)
+        old_focus = self.state.focused_window_id
+        if old_focus != window_id:
+            self.state.previous_focused_window_id = old_focus
+            self.state.focused_window_id = window_id
+            # Update scratchpad recency
+            self.state.update_scratchpad_recency(window_id)
+
         await self._run_niri_action("focus-window", "--id", str(window_id))
+
+    async def _focus_previous_window(self) -> None:
+        """Focus the previously focused window, if it still exists."""
+        prev_id = self.state.previous_focused_window_id
+        if prev_id is not None and prev_id in self.state.windows:
+            await self._focus_window(prev_id)
+        else:
+            print("No previous window to focus", file=sys.stderr)
 
     async def _run_niri_action(self, action: str, *args: str) -> None:
         """Run a niri msg action command."""
