@@ -1,0 +1,35 @@
+[grammars]
+markdown = "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
+
+[formatters]
+dprint-md = { cmd = "dprint", args = ["fmt", "--stdin", "md"] }
+dprint-js = { cmd = "dprint", args = ["fmt", "--stdin", "js"] }
+dprint-ts = { cmd = "dprint", args = ["fmt", "--stdin", "ts"] }
+dprint-json = { cmd = "dprint", args = ["fmt", "--stdin", "json"] }
+dprint-toml = { cmd = "dprint", args = ["fmt", "--stdin", "toml"] }
+dprint-html = { cmd = "dprint", args = ["fmt", "--stdin", "html"] }
+dprint-css = { cmd = "dprint", args = ["fmt", "--stdin", "css"] }
+dprint-yaml = { cmd = "dprint", args = ["fmt", "--stdin", "yaml"] }
+
+stylua = { cmd = "stylua", args = ["--indent-type=Spaces", "--indent-width=2", "-"] }
+shfmt = { cmd = "shfmt", args = ["-i", "2", "-"] }
+alejandra = { cmd = "alejandra", args = ["-q", "-"] }
+gofmt = { cmd = "gofmt", args = [] }
+
+[languages]
+markdown = ["dprint-md"]
+
+javascript = ["dprint-js"]
+typescript = ["dprint-ts"]
+json = ["dprint-json"]
+toml = ["dprint-toml"]
+html = ["dprint-html"]
+css = ["dprint-css"]
+yaml = ["dprint-yaml"]
+
+lua = ["stylua"]
+nix = ["alejandra"]
+go = ["gofmt"]
+
+sh = ["shfmt"]
+bash = ["shfmt"]

@@ -21,4 +21,5 @@ with pkgs; [
   ## Formatters
   dprint # multi-language formatter
   stylua # lua formatter
+  pruner # TreeSitter-powered formatter orchestrator
 ]
