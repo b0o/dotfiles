@@ -1,6 +1,9 @@
 local xk = require('user.keys').xk
+local feedkeys = lazy_require('user.util.api').feedkeys
 
 very_lazy(function()
+  require('user.plugins.blink.cmdline.docs').setup()
+  require('user.plugins.blink.cmdline.cheatsheet').setup()
   local autocmd = vim.api.nvim_create_autocmd
   local group = vim.api.nvim_create_augroup('user-cmp', { clear = true })
   local orig_menu_border
@@ -44,6 +47,7 @@ return {
       { 'saghen/blink.compat', opts = {} },
     },
     lazy = false, -- blink handles lazy loading internally
+    -- TODO: use `nix shell` to run cargo build instead of `zsh -i`
     -- run with `zsh -i` so Mise loads proper Rust toolchain:
     build = 'zsh -ic "cargo build --release"',
     opts = { ---@type blink.cmp.Config
@@ -57,25 +61,25 @@ return {
         ['<Down>'] = { 'select_next', 'fallback' },
         ['<C-p>'] = { 'select_prev', 'show' },
         ['<C-n>'] = { 'select_next', 'show' },
-        [ xk [[<C-S-n>]] ] = { 'select_next', 'show' },
-        [ xk [[<C-S-p>]] ] = { 'select_prev', 'show' },
+        [xk '<C-S-n>'] = { 'select_next', 'show' },
+        [xk '<C-S-p>'] = { 'select_prev', 'show' },
         ['<C-k>'] = { 'scroll_documentation_up', 'fallback' },
         ['<C-j>'] = { 'scroll_documentation_down', 'fallback' },
+        [xk '<C-S-k>'] = { 'scroll_documentation_up', 'fallback' },
+        [xk '<C-S-j>'] = { 'scroll_documentation_down', 'fallback' },
       },
       cmdline = {
         keymap = {
           ['<CR>'] = {
             function()
-              vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<C-]><Cr>', true, true, true), 'n', true)
+              feedkeys '<C-]><CR>'
               return true
             end,
           },
           [xk '<C-Cr>'] = {
             function(cmp)
               return cmp.select_and_accept {
-                callback = function()
-                  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<CR>', true, true, true), 'n', true)
-                end,
+                callback = function() feedkeys '<CR>' end,
               }
             end,
             'fallback',
@@ -85,19 +89,28 @@ return {
             'show',
             function()
               local cmp = require 'blink.cmp'
-              if cmp.is_visible() then
-                if require('blink.cmp.completion.list').selected_item_idx == nil then
-                  return false
-                end
-                if cmp.accept() then
-                  vim.schedule(
-                    function()
-                      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<Space>', true, true, true), 'n', true)
-                    end
-                  )
-                  return true
-                end
+              if not cmp.is_visible() then
+                feedkeys '<Space>'
+                return true
               end
+              if require('blink.cmp.completion.list').selected_item_idx == nil then
+                return false -- Fall through to select_next
+              end
+              local text_before = vim.fn.getcmdline()
+              if not cmp.accept() then
+                return
+              end
+              vim.schedule(function()
+                local text_after = vim.fn.getcmdline()
+                local text_changed = text_after ~= text_before
+                local is_partial_path = text_after:match '/$'
+                if text_changed or is_partial_path then
+                  cmp.show()
+                else
+                  feedkeys '<Space>'
+                end
+              end)
+              return true
             end,
             'select_next',
             'fallback',
@@ -113,6 +126,8 @@ return {
             'show',
             'fallback',
           },
+          [xk '<C-S-k>'] = { 'scroll_documentation_up', 'fallback' },
+          [xk '<C-S-j>'] = { 'scroll_documentation_down', 'fallback' },
         },
         completion = {
           menu = {
@@ -123,7 +138,7 @@ return {
       completion = {
         list = {
           selection = {
-            -- preselect = false,
+            preselect = false,
             auto_insert = true,
           },
         },
@@ -137,7 +152,7 @@ return {
                   if ctx.kind == 'Color' then
                     return '███'
                   end
-                  local sym = require('lspkind').symbolic(ctx.kind)
+                  local sym = require('lspkind').symbol_map[ctx.kind]
                   if sym == nil or sym == '' then
                     sym = ctx.kind_icon
                   end
@@ -159,9 +174,14 @@ return {
           auto_show = true,
           auto_show_delay_ms = 100,
           update_delay_ms = 85,
+          treesitter_highlighting = true,
           window = {
             max_height = 15,
             border = 'rounded',
+            direction_priority = {
+              menu_north = { 'e', 'w', 'n', 's' },
+              menu_south = { 'e', 'w', 's', 'n' },
+            },
           },
         },
       },
