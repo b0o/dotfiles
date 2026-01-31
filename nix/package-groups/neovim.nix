@@ -1,13 +1,7 @@
 {pkgs, ...}:
 with pkgs; [
-  # Give neovim access to a C compiler for tree-sitter grammars
-  (neovim.overrideAttrs (old: {
-    propagatedBuildInputs =
-      (old.propagatedBuildInputs or []) ++ [stdenv.cc.cc];
-  }))
-
-  # Tree Sitter + Node for installing Treesitter Grammars
-  inputs.neovim-nightly-overlay.packages.${pkgs.stdenv.hostPlatform.system}.tree-sitter
+  neovim-nightly
+  tree-sitter-nightly
 
   ### Lanugage Servers / Tools
   # Nix

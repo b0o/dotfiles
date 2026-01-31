@@ -12,6 +12,13 @@
     ghostty = inputs.ghostty.packages.${system}.default;
     opencode = inputs.opencode.packages.${system}.default;
 
+    # Give neovim access to a C compiler for tree-sitter grammars
+    neovim-nightly = inputs.neovim-nightly-overlay.packages.${system}.neovim.overrideAttrs (old: {
+      propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [final.stdenv.cc.cc];
+    });
+    # Tree Sitter + Node for installing Treesitter Grammars
+    tree-sitter-nightly = inputs.neovim-nightly-overlay.packages.${system}.tree-sitter;
+
     # TODO: remove once https://github.com/NixOS/nixpkgs/pull/481226 is merged
     nushell = let
       version = "0.110.0";
