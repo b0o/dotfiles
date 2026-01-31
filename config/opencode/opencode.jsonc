@@ -51,7 +51,7 @@
     "messages_line_up": "Ò", // ctrl+shift+k TODO: Not working
     "messages_line_down": "Ñ", // ctrl+shift+j TODO: Not working
     "variant_cycle": "ctrl+t",
-    "session_rename": "<leader>n,<leader>ctrl+n",
+    "session_rename": "none",
     "model_cycle_favorite": "<leader>tab",
     "model_cycle_favorite_reverse": "<leader>shift+tab",
   },
