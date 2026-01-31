@@ -1,6 +1,9 @@
+# TODO: move to scripts/ and load with hooks
+# TODO: detect if we're currently using home-manager or flakey-profile and warn if attempting to switch to the other
+
 # Manage Nix user profiles with flakes.
 # See: https://github.com/lf-/flakey-profile
-export module fp {
+export module flakey-profile {
   def --env init [
     --profile (-p): string
     --dir (-d): string
@@ -89,6 +92,9 @@ export module fp {
   export alias upd = update
 }
 
+export module fp { export use flakey-profile * }
+
+use flakey-profile
 use fp
 
 def --wrapped fp [cmd, ...args] {
@@ -102,71 +108,213 @@ def --wrapped fp [cmd, ...args] {
   print -e "  update (up)   Update the flake.lock file"
 }
 
-def _complete-hm [spans: list<string>] {
-  use nushell/completion.nu carapace-complete
-  carapace-complete $spans home-manager
-}
-
-def --env _hm_init [] {
-  let dotfiles_dir = $env | get -o DOTFILES_HOME
-  if ($dotfiles_dir | is-empty) {
-    error make -u {msg: $"Error: DOTFILES_HOME is not set"}
-    return
+export module dotfiles {
+  def --env init [] {
+    let dotfiles_dir = $env | get -o DOTFILES_HOME
+    if ($dotfiles_dir | is-empty) {
+      error make -u {msg: $"Error: DOTFILES_HOME is not set"}
+      return
+    }
+    cd $dotfiles_dir
+    # TODO: Don't hardcode this
+    let home_flake = "arch-maddy"
+    $home_flake
   }
-  cd $dotfiles_dir
-  # TODO: Don't hardcode this
-  let home_flake = "arch-maddy"
-  $home_flake
+
+  export def complete-main [spans: list<string>] {
+    use nushell/completion.nu carapace-complete
+    init
+    carapace-complete $spans home-manager
+  }
+
+  # Dotfiles / Home Manager
+  @complete complete-main
+  export def --wrapped main [
+    ...args: string
+  ] {
+    let home_flake = (init)
+    ^home-manager --flake $".#($home_flake)" ...$args
+  }
+
+  def complete-update [spans: list<string>] {
+    use nushell/completion.nu carapace-complete
+    init
+    carapace-complete --skip=1 $spans nix flake update
+  }
+
+  # Update dotfiles flake.lock
+  @complete complete-update
+  export def --wrapped update [...args: string] {
+    init
+    ^nix flake update ...$args
+  }
+
+  def complete-secrets [spans: list<string>] {
+    use nushell/completion.nu carapace-complete
+    init
+    carapace-complete --skip=1 $spans sops edit
+  }
+
+  # Edit sops-nix managed secrets in $env.EDITOR
+  @complete complete-secrets
+  export def --wrapped secrets [...args: string] {
+    init
+    # TODO: Don't hardcode this
+    let secrets_file = "secrets.yaml"
+    ^sops edit ...$args $secrets_file
+  }
+
+  export alias sw = main switch
+  export alias u = update
+  export alias up = update
+  export alias upd = update
+  export alias sec = secrets
 }
 
-def _complete-hm-update [spans: list<string>] {
-  _hm_init
-  use nushell/completion.nu carapace-complete
-  carapace-complete $spans nix flake update
+export module d {
+  export use dotfiles *
+
+  @complete complete-main
+  export def --wrapped main [...args: string] {
+    dotfiles ...$args
+  }
 }
 
-# Update the $DOTFILES_HOME/flake.lock
-@complete _complete-hm-update
-def --wrapped "hm update" [...args] {
-  _hm_init
-  ^nix flake update ...$args
-}
+use dotfiles
+use d
 
-@complete _complete-hm
-def --wrapped hm [...args] {
-  let home_flake = _hm_init
-  ^home-manager --flake $".#($home_flake)" ...$args
-}
-
-export module ns {
-  export def complete-indexes [context: string, position: int] {
-    use nushell/completion.nu *
-    complete-comma-separated-options $context $position [
+export module nix-search {
+  const indexes = [
       "nixos"
       "nixpkgs"
       "home-manager"
       "darwin"
       "nur"
-    ]
+  ]
+
+  export def _complete-indexes [context: string, position: int] {
+    use nushell/completion.nu *
+    complete-comma-separated-options $context $position $indexes
+  }
+
+  def complete-index [] { $indexes }
+
+  def complete-open-mode [] { ["source" "homepage"] }
+
+  # Open package in browser
+  export def open-pkg [
+    package: string # Package name
+    --index (-i): string@complete-index # Package index
+    --mode (-m): string@complete-open-mode = "source" # Either "source" or "homepage"
+  ] {
+    let result = ^nix-search-tv $mode $"--indexes=($index)" $package | complete
+    if ($result.exit_code != 0) {
+      error make -u $"Failed to get package ($mode) URL"
+    }
+    let url = $result.stdout | str trim
+    ^xdg-open $url
+  }
+
+  export alias open = open-pkg
+
+  # Parse nix-search-tv selection to extract index and package name
+  # Format varies:
+  # - No indexes or multiple indexes: "index/ package"
+  # - Single index: "package" (use provided index)
+  def parse-selection [selection: string, fallback_index: string] {
+    if ($selection | str contains "/ ") {
+      let parts = ($selection | split row "/ " --number 2)
+      { index: ($parts | get 0), package: ($parts | get 1) }
+    } else {
+      { index: $fallback_index, package: $selection }
+    }
   }
 
   # Search nix packages
   export def main [
     # Search query
     ...query: string
-    --indexes (-i): string@complete-indexes # Search index
+    --indexes (-i): string@_complete-indexes # Search index
   ] {
-    let ns_opts = [
-      ...(if ($indexes | is-not-empty) { $indexes | each { ["--indexes" $in] } | flatten })
-    ]
-    let fzf_opts = [
-      --scheme history
-      --preview $"nix-search-tv preview ($ns_opts | str join ' ') {}"
-      ...(if ($query | is-not-empty) { ["--query" ($query | str join " ")] })
-    ]
+    let ns_opts = if ($indexes | is-not-empty) {
+      [$"--indexes=($indexes)"]
+    } else {
+      []
+    }
 
-    nix-search-tv print ...$ns_opts | fzf ...$fzf_opts
+    let icons = { homepage: "󰖟 ", source: " " }
+
+    mut current_query = ($query | str join " ")
+
+    loop {
+      let sel = (
+        ^nix-search-tv print ...$ns_opts
+        | lines
+        | sk
+          --reverse
+          --query $current_query
+          --prompt "^o open  ^c copy  ^d exit > "
+          --preview { ^nix-search-tv preview ...$ns_opts $in }
+          --expect [ctrl-o, ctrl-c]
+          --bind { ctrl-d: abort }
+      )
+
+      if ($sel | is-empty) or ($sel.selected? | is-empty) {
+        return null
+      }
+
+      let action = $sel.action? | default ""
+      let selection = $sel.selected
+
+      let parsed = parse-selection $selection ($indexes | default "")
+
+      if $action == "ctrl-c" {
+        $parsed.package | xc
+        continue
+      }
+
+      if $action == "ctrl-o" {
+        # Open picker for homepage or source
+        let homepage_url = ^nix-search-tv homepage $"--indexes=($parsed.index)" $parsed.package | str trim
+        let source_url = ^nix-search-tv source $"--indexes=($parsed.index)" $parsed.package | str trim
+
+        let open_sel = (
+          [
+            { label: $"($icons.source)source", mode: source, url: $source_url }
+            { label: $"($icons.homepage)homepage", mode: homepage, url: $homepage_url }
+          ]
+          | sk
+            --reverse
+            --prompt $"($parsed.index)/ ($parsed.package) > "
+            --format { $in.label }
+            --preview { $in.url }
+        )
+
+        if ($open_sel | is-not-empty) {
+          open-pkg --index $parsed.index --mode $open_sel.mode $parsed.package
+        }
+
+        return null
+      }
+
+      # Normal selection - return the package name
+      return $selection
+    }
   }
 }
 
+export module ns {
+  export use nix-search *
+
+  # Search nix packages
+  export def main [
+    # Search query
+    ...query: string
+    --indexes (-i): string@_complete-indexes # Search index
+  ] {
+    nix-search --indexes=$indexes ...$query
+  }
+}
+
+use nix-search
 use ns
