@@ -38,6 +38,21 @@ menu:
       - key: "z"
         desc: Zathura
         cmd: zathura $(wl-paste)
+      - key: "i"
+        desc: Image
+        submenu:
+          - key: "e"
+            desc: Edit
+            cmd: |
+              cmd="satty --filename"
+              path=$(wl-paste)
+              if [[ -f $path ]]; then
+                $cmd $path
+              else
+                rofi -show filebrowser \
+                  -mesg "Image to edit" \
+                  -theme-str "configuration { filebrowser { command: \"$cmd\"; } }"
+              fi
       - key: "q"
         desc: QR
         submenu:
@@ -399,6 +414,10 @@ menu:
           - key: "-"
             desc: "Disown"
             cmd: niri-tools scratchpad disown
+          - key: "y"
+            alias: "Mod4+Y"
+            desc: "Disown"
+            cmd: niri-tools scratchpad toggle-float
           - key: "b"
             alias: "Mod4+B"
             desc: "Books"
@@ -487,7 +506,7 @@ menu:
       - key: "Print"
         desc: Screenshot Window or Region
         alias: "r"
-        cmd: $XDG_CONFIG_HOME/niri/bin/screenshot capture
+        cmd: $XDG_CONFIG_HOME/niri/bin/screenshot capture --still --pointer
       - key: "S"
         alias: "s"
         desc: Pick Screenshot
