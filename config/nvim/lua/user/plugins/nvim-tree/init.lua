@@ -11,6 +11,7 @@ local spec = {
       },
     },
     config = function()
+      local xk = require('user.keys').xk
       local api = require 'nvim-tree.api'
       local preview = require 'nvim-tree-preview'
       -- TODO: fix optional field type annotations in nvim-tree-preview
@@ -50,10 +51,13 @@ local spec = {
             end
           end
         end, opts 'Preview')
+        -- TODO: use user.util.map
         vim.keymap.set('n', 'P', preview.watch, opts 'Preview (Watch)')
         vim.keymap.set('n', '<Esc>', preview.unwatch, opts 'Close Preview/Unwatch')
         vim.keymap.set('n', '<C-j>', function() preview.scroll(4) end, opts 'Preview: Scroll Down')
         vim.keymap.set('n', '<C-k>', function() preview.scroll(-4) end, opts 'Preview: Scroll Up')
+        vim.keymap.set('n', xk '<C-S-j>', function() preview.scroll(4) end, opts 'Preview: Scroll Down')
+        vim.keymap.set('n', xk '<C-S-k>', function() preview.scroll(-4) end, opts 'Preview: Scroll Up')
 
         local function get_visual_nodes()
           local core = require 'nvim-tree.core'

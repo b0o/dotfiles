@@ -10,6 +10,7 @@ very_lazy(function()
 
   -- Custom smart breadth-first recursive search
   -- TODO: Make a Fyler PR adding this once I've tested it thoroughly
+  -- FIXME: Broken after Fyler update 5ef9d9 -> 15b4b1
   require('user.util.fyler.search').setup {
     max_depth = 5,
   }
@@ -27,9 +28,9 @@ very_lazy(function()
   map(
     'n',
     xk [[<C-\>]],
-    fn.if_filetype({ 'fyler', 'DiffviewFiles' }, recent_wins.focus_most_recent, function()
+    fn.if_filetype({ 'fyler', 'DiffviewFiles', 'undotree' }, recent_wins.focus_most_recent, function()
       local wins = vim.api.nvim_tabpage_list_wins(0)
-      local tree_win, diffview_win
+      local tree_win, diffview_win, undotree_win
       for _, win in ipairs(wins) do
         local bufnr = vim.api.nvim_win_get_buf(win)
         local filetype = vim.bo[bufnr].filetype
@@ -37,11 +38,14 @@ very_lazy(function()
           tree_win = win
         elseif filetype == 'DiffviewFiles' then
           diffview_win = win
+        elseif filetype == 'undotree' then
+          undotree_win = win
         end
       end
-      -- prefer diffview
       if diffview_win then
         vim.api.nvim_set_current_win(diffview_win)
+      elseif undotree_win then
+        vim.api.nvim_set_current_win(undotree_win)
       elseif tree_win then
         vim.api.nvim_set_current_win(tree_win)
       else
@@ -86,12 +90,24 @@ very_lazy(function()
       if not entry then
         return
       end
-      if entry:is_directory() then
+      if entry.type == 'directory' then
         toggle_dir(entry, ref_id)
       elseif entry.type == 'file' then
         require('overlook.peek').file(entry.path)
       end
     end, 'Fyler: Toggle expanded')
+
+    -- bufmap('n', '<Leader>Y', function()
+    --   local entry = get_selected()
+    --   if not entry or not entry.type == 'file' then
+    --     return
+    --   end
+    --   local Path = require 'user.util.path'
+    --   local path = Path:new(entry.path)
+    --   path:read(function(contents)
+    --     inspect(res)
+    --   end)
+    -- end, 'Fyler: yank fille contents')
   end)
 end)
 

@@ -53,9 +53,7 @@ local spec = {
           ['<Leader>x'] = 'actions.select_split',
           ['<C-r>'] = 'actions.refresh',
           ['<C-s>'] = {
-            callback = function()
-              oil.save()
-            end,
+            callback = function() oil.save() end,
             desc = 'Oil: Save',
             mode = { 'n', 'i', 'v' },
           },
@@ -91,6 +89,9 @@ local spec = {
         end,
       })
     end,
+    keys = {
+      { mode = 'n', '<leader>oi', ':Oil --float<cr>' },
+    },
   },
 }
 
