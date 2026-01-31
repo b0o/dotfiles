@@ -1,4 +1,4 @@
--- Based on https://github.com/stevearc/overseer.nvim/blob/68a2d344cea4a2e11acfb5690dc8ecd1a1ec0ce0/lua/lualine/components/overseer.lua
+-- Custom overseer lualine component with diagnostic counts for running tasks
 
 ---@class LualineOverseerComponent
 ---@field super { init: function }
@@ -6,16 +6,6 @@
 ---@field format_hl fun(self: LualineOverseerComponent, hl: string): string
 ---@field create_hl fun(self: LualineOverseerComponent, color: table|string, text: string): string
 local M = require('lualine.component'):extend()
-
----@alias Status 'FAILURE' | 'CANCELED' | 'SUCCESS' | 'RUNNING'
-
----@type Status[]
-local STATUS = {
-  'FAILURE',
-  'CANCELED',
-  'SUCCESS',
-  'RUNNING',
-}
 
 local diagnostic_type_to_severity = {
   e = vim.diagnostic.severity.ERROR,
@@ -29,9 +19,9 @@ local diagnostic_type_to_severity = {
 }
 
 local severity_to_icon = {
-  [vim.diagnostic.severity.ERROR] = '',
-  [vim.diagnostic.severity.WARN] = '',
-  [vim.diagnostic.severity.INFO] = '',
+  [vim.diagnostic.severity.ERROR] = '',
+  [vim.diagnostic.severity.WARN] = '',
+  [vim.diagnostic.severity.INFO] = '',
 }
 
 ---@param options? { label?: string, colored?: boolean }
@@ -43,16 +33,18 @@ function M:init(options)
   end
   self.symbols = {
     ['FAILURE'] = '󰅚',
-    ['CANCELED'] = '',
+    ['CANCELED'] = '',
     ['SUCCESS'] = '󰄴',
     ['RUNNING'] = '󰑮',
   }
 end
 
 function M:update_colors()
+  local constants = require 'overseer.constants'
+  local STATUS = constants.STATUS
   local extract_color_from_hllist = require('lualine.utils.utils').extract_color_from_hllist
   self.highlight_groups = {}
-  for _, status in ipairs(STATUS) do
+  for _, status in ipairs(STATUS.values) do
     local hl = 'Overseer' .. status
     local color = { fg = extract_color_from_hllist('fg', { hl }, 'Normal') }
     self.highlight_groups[status] = self:create_hl(color, status)
@@ -68,12 +60,19 @@ function M:update_status()
   if not package.loaded['overseer'] then
     return ''
   end
+
   if self.options.colored and not self.highlight_groups then
     self:update_colors()
   end
-  local tasks = require('overseer.task_list').list_tasks(self.options)
-  ---@type { [Status]: overseer.Task[] }
-  local tasks_by_status = require('overseer.util').tbl_group_by(tasks, 'status')
+
+  local constants = require 'overseer.constants'
+  local STATUS = constants.STATUS
+  local task_list = require 'overseer.task_list'
+  local util = require 'overseer.util'
+
+  local tasks = task_list.list_tasks(self.options)
+  ---@type { [string]: overseer.Task[] }
+  local tasks_by_status = util.tbl_group_by(tasks, 'status')
   local statuses = {}
   local running_diagnostic_counts = {
     [vim.diagnostic.severity.ERROR] = 0,
@@ -83,7 +82,7 @@ function M:update_status()
   if self.options.label ~= '' then
     table.insert(statuses, self.options.label)
   end
-  for _, status in ipairs(STATUS) do
+  for _, status in ipairs(STATUS.values) do
     local status_tasks = tasks_by_status[status]
     if self.symbols[status] and status_tasks then
       if self.options.colored then

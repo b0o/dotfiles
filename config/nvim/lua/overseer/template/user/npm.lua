@@ -1,11 +1,9 @@
--- Based on https://github.com/stevearc/overseer.nvim/blob/68a2d344cea4a2e11acfb5690dc8ecd1a1ec0ce0/lua/overseer/template/npm.lua
--- Modified to tweak how pnpm monorepos are handled:
--- - Use user.util.workspace.pnpm to get workspace info
--- - Give priority to focused workspace package scripts
--- - Simplify get_candidate_package_files so the nearest package.json from the cwd is used
+-- Custom npm template with pnpm monorepo support:
+-- - Uses user.util.workspace.pnpm for workspace info
+-- - Prioritizes focused workspace package scripts
+
 local Path = require 'plenary.path'
 local files = require 'overseer.files'
-local overseer = require 'overseer'
 local pnpm = require 'user.util.workspace.pnpm'
 
 ---@type { [string]: string[] }
@@ -16,26 +14,8 @@ local lockfiles = {
   bun = { 'bun.lock', 'bun.lockb' },
 }
 
----@type overseer.TemplateFileDefinition
-local tmpl = {
-  priority = 60,
-  params = {
-    args = { optional = true, type = 'list', delimiter = ' ' },
-    cwd = { optional = true },
-    bin = { optional = true, type = 'string' },
-    name = { optional = true, type = 'string' },
-  },
-  builder = function(params)
-    return {
-      cmd = { params.bin },
-      args = params.args,
-      cwd = params.cwd,
-      name = params.name,
-    }
-  end,
-}
-
 ---@param _opts overseer.SearchParams
+---@diagnostic disable-next-line: unused-local
 local function get_candidate_package_files(_opts)
   return vim.fs.find('package.json', {
     upward = true,
@@ -62,7 +42,7 @@ local function pick_package_manager(package_file)
   local package_dir = vim.fs.dirname(package_file)
   for mgr, candidates in pairs(lockfiles) do
     for _, lockfile in ipairs(candidates) do
-      if files.exists(files.join(package_dir, lockfile)) then
+      if files.exists(vim.fs.joinpath(package_dir, lockfile)) then
         return mgr
       end
     end
@@ -80,7 +60,7 @@ local function get_workspaces(package_mgr, package_json)
         function(p)
           return {
             path = p.relative_path,
-            priority = p.focused and 0 or nil,
+            focused = p.focused,
             name = p.name,
           }
         end,
@@ -91,30 +71,25 @@ local function get_workspaces(package_mgr, package_json)
   return vim.tbl_map(function(p) return { path = p } end, package_json.workspaces or {})
 end
 
+---@type overseer.TemplateFileProvider
 return {
   cache_key = function(opts) return opts.dir end,
-  condition = {
-    callback = function(opts)
-      local package_file = get_package_file(opts)
-      if not package_file then
-        return false, 'No package.json file found'
-      end
-      local package_manager = pick_package_manager(package_file)
-      if vim.fn.executable(package_manager) == 0 then
-        return false, string.format("Could not find command '%s'", package_manager)
-      end
-      return true
-    end,
-  },
   generator = function(opts, cb)
     local package = get_package_file(opts)
     if not package then
-      cb {}
+      cb 'No package.json file found'
       return
     end
     local bin = pick_package_manager(package)
+    if vim.fn.executable(bin) == 0 then
+      cb(string.format("Could not find command '%s'", bin))
+      return
+    end
+
     local data = files.load_json_file(package)
     local ret = {}
+    local cwd = vim.fs.dirname(package)
+
     if data.scripts then
       for k in pairs(data.scripts) do
         local components = { 'default' }
@@ -126,40 +101,31 @@ return {
           table.insert(components, {
             'on_output_parse',
             parser = {
-              diagnostics = require('overseer.parser.lib').watcher_output(
-                '^build: start',
-                '^build: end',
+              diagnostics = {
                 { 'extract', { regex = true }, '\\v^(error|warning|info):\\s+(.*)$', 'type', 'text' },
-                {}
-              ),
+              },
             },
           })
           table.insert(components, { 'on_result_notify', on_change = false })
         end
 
-        table.insert(
-          ret,
-          overseer.wrap_template(tmpl, {
-            name = string.format('%s run %s', bin, k),
-            builder = function(params)
-              params = tmpl.builder(params or {})
-              params.components = vim.deepcopy(params.components or {})
-              vim.list_extend(params.components, components)
-              return params
-            end,
-          }, {
-            args = { 'run', k },
-            bin = bin,
-            cwd = vim.fs.dirname(package),
-          })
-        )
+        table.insert(ret, {
+          name = string.format('%s run %s', bin, k),
+          builder = function()
+            return {
+              cmd = { bin, 'run', k },
+              cwd = cwd,
+              components = components,
+            }
+          end,
+        })
       end
     end
 
     -- Load tasks from workspaces
     for _, workspace in ipairs(get_workspaces(bin, data)) do
-      local workspace_path = files.join(vim.fs.dirname(package), workspace.path)
-      local workspace_package_file = files.join(workspace_path, 'package.json')
+      local workspace_path = vim.fs.joinpath(cwd, workspace.path)
+      local workspace_package_file = vim.fs.joinpath(workspace_path, 'package.json')
       local workspace_data = files.load_json_file(workspace_package_file)
       if workspace_data then
         workspace_data.scripts = workspace_data.scripts or {}
@@ -173,23 +139,41 @@ return {
           if type(v) == 'string' then
             v = { args = { 'run', k } }
           end
-          local name = string.format('[%s] %s %s', workspace.name or workspace.path, bin, k)
-          table.insert(
-            ret,
-            overseer.wrap_template(tmpl, {
-              name = name,
-              priority = workspace.priority,
-            }, {
-              name = name,
-              args = v.args,
-              bin = v.bin or bin,
-              cwd = v.cwd or workspace_path,
-            })
-          )
+          local task_name = string.format('[%s] %s %s', workspace.name or workspace.path, bin, k)
+          local task_bin = v.bin or bin
+          local task_cwd = v.cwd or workspace_path
+          local task_args = v.args
+          local task = {
+            name = task_name,
+            builder = function()
+              return {
+                cmd = { task_bin },
+                args = task_args,
+                cwd = task_cwd,
+              }
+            end,
+          }
+
+          if workspace.focused then
+            table.insert(ret, 1, task)
+          else
+            table.insert(ret, task)
+          end
         end
       end
     end
-    table.insert(ret, overseer.wrap_template(tmpl, { name = bin }, { bin = bin }))
+
+    -- Add bare package manager command
+    table.insert(ret, {
+      name = bin,
+      builder = function()
+        return {
+          cmd = { bin },
+          cwd = cwd,
+        }
+      end,
+    })
+
     cb(ret)
   end,
 }

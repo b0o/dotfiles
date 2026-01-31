@@ -43,31 +43,19 @@ local spec = {
       'OverseerShell',
       'OverseerClose',
       'OverseerOpen',
-      'OverseerRestartLast',
       'OverseerTaskAction',
       'OverseerToggle',
     },
     config = function()
       require('overseer').setup {
-        strategy = {
-          'toggleterm',
-          direction = 'horizontal',
-          auto_scroll = true,
-          use_shell = true,
-          open_on_start = false,
-          hidden = true,
-        },
-        templates = {
-          'builtin',
-          'mise',
+        disable_template_modules = {
+          'overseer.template.npm', -- using custom template at lua/overseer/template/user/npm.lua
         },
         component_aliases = {
           default = {
-            { 'display_duration', detail_level = 2 },
-            'on_output_summarize',
             'on_exit_set_status',
             'on_complete_notify',
-            -- "on_complete_dispose", -- disabled to keep tasks until manually disposed
+            -- 'on_complete_dispose', -- keep tasks until manually disposed
           },
         },
         task_list = {
@@ -76,12 +64,12 @@ local spec = {
           min_width = { 40, 0.1 },
           max_height = { 60, 0.6 },
           min_height = { 15, 0.2 },
-          bindings = {
+          keymaps = {
             ---@diagnostic disable-next-line: assign-type-mismatch
             ['<C-s>'] = false,
-            ['<C-x>'] = 'OpenSplit',
-            ['<C-r>'] = '<CMD>OverseerQuickAction restart<CR>',
-            ['<C-d>'] = '<CMD>OverseerQuickAction dispose<CR>',
+            ['<C-x>'] = { 'keymap.run_action', opts = { action = 'stop' } },
+            ['<C-r>'] = { 'keymap.run_action', opts = { action = 'restart' } },
+            ['<C-d>'] = { 'keymap.run_action', opts = { action = 'dispose' } },
           },
         },
       }
@@ -103,7 +91,17 @@ very_lazy(function()
   local overseer = lazy_require 'overseer'
 
   vim.api.nvim_create_user_command('OverseerRestartLast', function()
-    local tasks = overseer.list_tasks { recent_first = true }
+    -- Sort by most recently active (either started or finished)
+    local function get_last_active_time(task)
+      local start = task.time_start or 0
+      local finish = task.time_finish or 0
+      return math.max(start, finish)
+    end
+    local tasks = overseer.list_tasks {
+      sort = function(a, b)
+        return get_last_active_time(a) > get_last_active_time(b)
+      end,
+    }
     if vim.tbl_isempty(tasks) then
       vim.notify('No tasks found', vim.log.levels.WARN)
     else
