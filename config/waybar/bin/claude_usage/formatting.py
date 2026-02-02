@@ -187,13 +187,31 @@ def format_tooltip(
         else COLOR_SUBDUED
     )
 
-    bar_line_5h_plain = f"{ICONS['zap']}  {bar_5h} {util_5h:4.1f}%"
-    bar_line_5h_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{ICONS["zap"]}</span>  {bar_5h_colored} <span color="{usage_5h_pct_color}">{util_5h:4.1f}%</span>'
+    # Use warning icon instead of zap when status is allowed_warning
+    icon_5h = (
+        ICONS["allowed_warning"]
+        if data["5h_status"] == "allowed_warning"
+        else ICONS["zap"]
+    )
+    icon_7d = (
+        ICONS["allowed_warning"]
+        if data["7d_status"] == "allowed_warning"
+        else ICONS["zap"]
+    )
+    icon_5h_color = (
+        "#FFB86C" if data["5h_status"] == "allowed_warning" else COLOR_SUBDUED
+    )
+    icon_7d_color = (
+        "#FFB86C" if data["7d_status"] == "allowed_warning" else COLOR_SUBDUED
+    )
+
+    bar_line_5h_plain = f"{icon_5h}  {bar_5h} {util_5h:4.1f}%"
+    bar_line_5h_markup = f'<span color="{icon_5h_color}" alpha="85%">{icon_5h}</span>  {bar_5h_colored} <span color="{usage_5h_pct_color}">{util_5h:4.1f}%</span>'
     time_line_5h_plain = f"{hourglass_5h}  {time_bar_5h} {time_elapsed_5h:4.1f}%"
     time_line_5h_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_5h}</span>  {time_bar_5h_colored} <span color="{time_5h_pct_color}">{time_elapsed_5h:4.1f}%</span>'
 
-    bar_line_7d_plain = f"{ICONS['zap']}  {bar_7d} {util_7d:4.1f}%"
-    bar_line_7d_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{ICONS["zap"]}</span>  {bar_7d_colored} <span color="{usage_7d_pct_color}">{util_7d:4.1f}%</span>'
+    bar_line_7d_plain = f"{icon_7d}  {bar_7d} {util_7d:4.1f}%"
+    bar_line_7d_markup = f'<span color="{icon_7d_color}" alpha="85%">{icon_7d}</span>  {bar_7d_colored} <span color="{usage_7d_pct_color}">{util_7d:4.1f}%</span>'
     time_line_7d_plain = f"{hourglass_7d}  {time_bar_7d} {time_elapsed_7d:4.1f}%"
     time_line_7d_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_7d}</span>  {time_bar_7d_colored} <span color="{time_7d_pct_color}">{time_elapsed_7d:4.1f}%</span>'
 
@@ -283,13 +301,14 @@ def format_tooltip(
     )
     icon_top = f'<span color="{bucketed_color}">𝚫</span>'
     icon_bottom = f'<span color="{cumulative_color}">𝚺</span>'
-    chart_5h = f"{chart_top_5h} {icon_top}\n   {chart_bottom_5h} {icon_bottom}"
-    # Add chart with line_height adjustment
-    lines.append(f'<span line_height="0.92">   {chart_5h}</span>')
+    # Add chart rows - line_height must wrap both rows with newline inside the span
+    lines.append(
+        f'<span line_height="0.85">   {chart_top_5h} {icon_top}\n   {chart_bottom_5h} {icon_bottom}</span>'
+    )
     lines.append(time_line_5h_markup)
     time_labels_5h = render_5h_time_labels(data["5h_reset"], BAR_WIDTH)
     lines.append(f"   {time_labels_5h}")
-    if data["5h_status"] != "allowed":
+    if data["5h_status"] not in ("allowed", "allowed_warning"):
         lines.append(
             f'  Status: <span color="#FF7D90"><b>{data["5h_status"]}</b></span>'
         )
@@ -323,18 +342,19 @@ def format_tooltip(
     )
     icon_top_7d = f'<span color="{bucketed_color_7d}">𝚫</span>'
     icon_bottom_7d = f'<span color="{cumulative_color_7d}">𝚺</span>'
-    chart_7d = f"{chart_top_7d} {icon_top_7d}\n   {chart_bottom_7d} {icon_bottom_7d}"
-    # Add chart with line_height adjustment
-    lines.append(f'<span line_height="0.92">   {chart_7d}</span>')
+    # Add chart rows - line_height must wrap both rows with newline inside the span
+    lines.append(
+        f'<span line_height="0.85">   {chart_top_7d} {icon_top_7d}\n   {chart_bottom_7d} {icon_bottom_7d}</span>'
+    )
     lines.append(time_line_7d_markup)
     day_labels = render_7d_day_labels(data["7d_reset"], BAR_WIDTH)
     lines.append(f"   {day_labels}")
-    if data["7d_status"] != "allowed":
+    if data["7d_status"] not in ("allowed", "allowed_warning"):
         lines.append(
             f'  Status: <span color="#FF7D90"><b>{data["7d_status"]}</b></span>'
         )
 
-    if data["status"] != "allowed":
+    if data["status"] not in ("allowed", "allowed_warning"):
         lines.append("")
         lines.append(
             f'Overall status: <span color="#FF7D90"><b>{data["status"]}</b></span>'
@@ -359,6 +379,7 @@ def format_waybar_output(
     display_mode: str = "normal",
     usage_snapshots: Optional[list[tuple[float, float]]] = None,
     show_cumulative_chart: bool = True,
+    token_error: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Format output for Waybar.
 
@@ -368,9 +389,12 @@ def format_waybar_output(
     - expanded: "{icon} {bar} {pct}%" alternating bar between usage and time elapsed
     """
     if not has_token:
+        tooltip = "No active token"
+        if token_error:
+            tooltip += f"\n\n{token_error}"
         return {
             "text": "󰛄",
-            "tooltip": "No active token",
+            "tooltip": tooltip,
             "percentage": 0,
             "class": "inactive",
         }

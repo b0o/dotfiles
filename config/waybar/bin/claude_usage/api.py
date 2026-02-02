@@ -94,21 +94,30 @@ def parse_usage_data(headers: Dict[str, str]) -> Optional[Dict]:
 def fetch_usage_data(
     previous_token: Optional[str] = None,
     prefer_source: Optional[str] = None,
-) -> tuple[Optional[Dict], Optional[Dict], Optional[str], Optional[str], bool, bool]:
+) -> tuple[
+    Optional[Dict],
+    Optional[Dict],
+    Optional[str],
+    Optional[str],
+    bool,
+    bool,
+    Optional[str],
+]:
     """Fetch and parse usage data from the API.
 
-    Returns (data, profile, token, source, is_fallback, has_token).
+    Returns (data, profile, token, source, is_fallback, has_token, error).
     Profile is only fetched if token changed from previous_token.
     Source is "cc" (Claude Code) or "oc" (OpenCode).
     is_fallback is True if using non-preferred source due to preferred being unavailable.
+    error contains the reason for failure if has_token is False.
     """
-    token, source, is_fallback = get_valid_token(prefer_source)
+    token, source, is_fallback, token_error = get_valid_token(prefer_source)
     if not token:
-        return None, None, None, None, False, False
+        return None, None, None, None, False, False, token_error
 
     headers = query_usage_headers(token)
     if not headers:
-        return None, None, token, source, is_fallback, True
+        return None, None, token, source, is_fallback, True, None
 
     usage_data = parse_usage_data(headers)
 
@@ -117,4 +126,4 @@ def fetch_usage_data(
     if token != previous_token:
         profile = fetch_profile(token)
 
-    return usage_data, profile, token, source, is_fallback, True
+    return usage_data, profile, token, source, is_fallback, True, None

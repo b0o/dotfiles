@@ -42,8 +42,9 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
     cred_source: Optional[str] = None
     cred_is_fallback: bool = False
     has_token: bool = True
+    token_error: Optional[str] = None
     check_thread: Optional[threading.Thread] = None
-    check_result: list = [(None, None, None, None, False, True)]
+    check_result: list = [(None, None, None, None, False, True, None)]
     check_lock = threading.Lock()
     expired_5h_triggered: bool = False
     expired_7d_triggered: bool = False
@@ -120,10 +121,11 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
             if check_thread is not None and not check_thread.is_alive():
                 with check_lock:
                     if check_result[0] is not None:
-                        data, profile, token, source, is_fallback, token_valid = (
+                        data, profile, token, source, is_fallback, token_valid, err = (
                             check_result[0]
                         )
                         has_token = token_valid
+                        token_error = err
                         if data is not None:
                             # Check if 5h session reset (new session started)
                             if data["5h_reset"] != last_5h_reset:
@@ -200,6 +202,7 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
                 display_mode,
                 usage_snapshots,
                 show_cumulative_chart,
+                token_error,
             )
             if output:
                 output_json = json.dumps(output)
