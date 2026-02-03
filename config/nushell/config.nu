@@ -8,6 +8,20 @@ $env.config.completions = {
   partial: true
 }
 $env.config.keybindings ++= [
+  # Remap ctrl+o to ctrl+g
+  {
+    modifier: control
+    keycode: char_o
+    mode: [emacs, vi_normal, vi_insert]
+    event: null
+  }
+  {
+    modifier: control
+    keycode: char_g
+    mode: [emacs, vi_normal, vi_insert]
+    event: { send: OpenEditor }
+  }
+  # TODO: fix collision with zellij
   {
     name: completion_menu
     modifier: alt
