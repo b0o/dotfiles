@@ -1,5 +1,8 @@
+query_paths = ["queries"]
+
 [grammars]
 markdown = "https://github.com/tree-sitter-grammars/tree-sitter-markdown"
+nix = "https://github.com/nix-community/tree-sitter-nix"
 
 [formatters]
 dprint-md = { cmd = "dprint", args = ["fmt", "--stdin", "md"] }
@@ -15,6 +18,7 @@ stylua = { cmd = "stylua", args = ["--indent-type=Spaces", "--indent-width=2", "
 shfmt = { cmd = "shfmt", args = ["-i", "2", "-"] }
 alejandra = { cmd = "alejandra", args = ["-q", "-"] }
 gofmt = { cmd = "gofmt", args = [] }
+rustfmt = { cmd = "rustfmt", args = ["--edition=2021", "--emit=stdout"] }
 
 [languages]
 markdown = ["dprint-md"]
@@ -28,8 +32,10 @@ css = ["dprint-css"]
 yaml = ["dprint-yaml"]
 
 lua = ["stylua"]
-nix = ["alejandra"]
 go = ["gofmt"]
+rust = ["rustfmt"]
+
+nix = ["alejandra"]
 
 sh = ["shfmt"]
 bash = ["shfmt"]
