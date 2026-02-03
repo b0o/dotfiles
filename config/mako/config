@@ -34,26 +34,26 @@ ignore-timeout=0
 invisible=0
 
 [urgency=low]
-format=<span color="#6f65aadd"> </span> <b>%s</b>\n   %b
+format=<span color="#6f65aadd"> </span> <b>%s</b>\n%b
 border-color=#574e8edd
 on-notify=exec mpv /usr/share/sounds/freedesktop/stereo/audio-volume-change.oga
 
 [urgency=normal]
-format=<span color="#9074ffdd"> </span> <b>%s</b>\n   %b
+format=<span color="#9074ffdd"> </span> <b>%s</b>\n%b
 border-color=#9074ffdd
 on-notify=exec mpv /usr/share/sounds/freedesktop/stereo/audio-volume-change.oga
 
 [actionable]
-format=<span color="#ff9969"> </span> <b>%s</b>\n   %b
+format=<span color="#ff9969"> </span> <b>%s</b>\n%b
 on-button-left=exec makoctl menu -- rofi -dmenu -p 'Choose Action: '
 
 [urgency=high !actionable]
-format=<span color="#ff688edd"> </span> <b>%s</b>\n   %b
+format=<span color="#ff688edd"> </span> <b>%s</b>\n%b
 border-color=#ff87a5dd
 on-notify=exec mpv --start=5% /usr/share/sounds/deepin/stereo/dialog-error.wav
 
 [urgency=high actionable]
-format=<span color="#ff688edd"> </span> <b>%s</b>\n   %b
+format=<span color="#ff688edd"> </span> <b>%s</b>\n%b
 border-color=#ff87a5dd
 on-notify=exec mpv --start=5% /usr/share/sounds/deepin/stereo/dialog-error.wav
 
