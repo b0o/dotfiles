@@ -14,6 +14,12 @@
       </object>
     </child>
     <child>
+      <object class="GtkMenuItem" id="charts-menu">
+        <property name="label">Charts</property>
+        <property name="submenu">charts-submenu</property>
+      </object>
+    </child>
+    <child>
       <object class="GtkMenuItem" id="refresh">
         <property name="label">Refresh</property>
       </object>
@@ -58,6 +64,18 @@
     <child>
       <object class="GtkMenuItem" id="prefer-auto">
         <property name="label">Auto</property>
+      </object>
+    </child>
+  </object>
+  <object class="GtkMenu" id="charts-submenu">
+    <child>
+      <object class="GtkMenuItem" id="charts-cycle">
+        <property name="label">Cycle</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="charts-stacked">
+        <property name="label">Stacked</property>
       </object>
     </child>
   </object>

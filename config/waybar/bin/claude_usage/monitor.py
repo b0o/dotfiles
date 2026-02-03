@@ -67,6 +67,11 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
         history = load_history()
         return history.get("config", {}).get("display_mode", "normal")
 
+    def get_chart_mode() -> str:
+        """Get chart_mode from config: 'cycle' or 'stacked'."""
+        history = load_history()
+        return history.get("config", {}).get("chart_mode", "cycle")
+
     def handle_refresh_signal(_signum: int, _frame: Any) -> None:
         """Handle SIGUSR1 to trigger refresh."""
         signal_received[0] = True
@@ -183,7 +188,8 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
             cycle_position = int(current_time) % 30
             show_alternate = cycle_position >= 15
 
-            # Determine chart alternation cycle: 5s cumulative, 5s bucketed
+            # Determine chart mode and cycle position
+            chart_mode = get_chart_mode()
             chart_cycle_position = int(current_time) % 10
             show_cumulative_chart = chart_cycle_position < 5
 
@@ -203,6 +209,7 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
                 usage_snapshots,
                 show_cumulative_chart,
                 token_error,
+                chart_mode,
             )
             if output:
                 output_json = json.dumps(output)
@@ -283,6 +290,16 @@ def main() -> None:
         action="store_true",
         help="Cycle display mode: compact <- normal <- expanded <- compact",
     )
+    action_group.add_argument(
+        "--set-charts-cycle",
+        action="store_true",
+        help="Set chart mode to cycle (alternate between cumulative and bucketed)",
+    )
+    action_group.add_argument(
+        "--set-charts-stacked",
+        action="store_true",
+        help="Set chart mode to stacked (show both charts)",
+    )
 
     args = parser.parse_args()
 
@@ -332,6 +349,14 @@ def main() -> None:
         next_mode = modes[(modes.index(current) - 1) % len(modes)]
         set_config("display_mode", next_mode)
         print(f"Display mode: {next_mode}")
+        return
+    elif args.set_charts_cycle:
+        set_config("chart_mode", "cycle")
+        print("Set chart mode to cycle")
+        return
+    elif args.set_charts_stacked:
+        set_config("chart_mode", "stacked")
+        print("Set chart mode to stacked")
         return
 
     # Start monitor with optional runtime override

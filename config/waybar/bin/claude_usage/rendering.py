@@ -85,6 +85,7 @@ def _cumulative_gradient_color(position: float) -> str:
         (0xC6, 0x61, 0x3F),  # #C6613F
         (0xD0, 0x6C, 0x4A),  # #D06C4A
         (0xD9, 0x77, 0x57),  # #D97757 - bright orange
+        (0xD9, 0x6A, 0x7A),  # #D96A7A
     ]
     return _interpolate_colors(colors, position)
 

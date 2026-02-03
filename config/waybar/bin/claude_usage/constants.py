@@ -8,7 +8,7 @@ OUTPUT_INTERVAL = 5.0
 
 # Display
 BAR_WIDTH = 46
-CHART_HEIGHT = 4  # Number of rows for usage charts (8 levels per row)
+CHART_HEIGHT = 5  # Number of rows for usage charts (8 levels per row)
 
 # File paths
 HISTORY_FILE = os.path.expanduser("~/.local/share/claude-usage.json")
@@ -61,8 +61,11 @@ HOURGLASS_FRAMES = [
 
 # Icons
 ICONS = {
+    "star": "󰛄",
     "bullet": "·",
     "zap": "",
     "allowed_warning": "",
     "rejected": "",
+    "delta": "𝚫",
+    "epsilon": "𝚺",
 }

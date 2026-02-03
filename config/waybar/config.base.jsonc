@@ -124,6 +124,8 @@
       "prefer-cc": "~/.config/waybar/bin/claude-usage.py --set-prefer-cc",
       "prefer-oc": "~/.config/waybar/bin/claude-usage.py --set-prefer-oc",
       "prefer-auto": "~/.config/waybar/bin/claude-usage.py --set-prefer-auto",
+      "charts-cycle": "~/.config/waybar/bin/claude-usage.py --set-charts-cycle",
+      "charts-stacked": "~/.config/waybar/bin/claude-usage.py --set-charts-stacked",
       "refresh": "~/.config/waybar/bin/claude-usage.py --refresh",
       "open-usage": "xdg-open https://claude.ai/settings/usage",
     },
