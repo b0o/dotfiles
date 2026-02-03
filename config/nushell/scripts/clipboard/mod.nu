@@ -27,15 +27,26 @@ export def xc [
 }
 
 # Copy last n command(s) to clipboard
-export def xcl [count: int = 1] {
+export def xcl [
+  --markdown (-m)  # Copy as markdown code block
+  count: int = 1
+] {
   let lines = (history | last $count | get command | str join "\n")
-  echo $lines | xc
+  # $lines | xc
+  if $markdown {
+    $lines | xcm --lang nu
+    print -e $"Copied:\n($lines)"
+  } else {
+    $lines | xc
+    print -e $"Copied:\n($lines)"
+  }
   print -e $"Copied:\n($lines)"
 }
 
-# Copy command and its output to clipboard
+export alias xclm = xcl --markdown
+
 # TODO: custom commands do not work
-export def xcc [...args: string] {
+def --wrapped _xcc [...args: string] {
   let cmd = if ($args | is-not-empty) {
     ($args | str join " ")
   } else {
@@ -44,10 +55,21 @@ export def xcc [...args: string] {
 
   let header = $"$ ($cmd)\n"
   let result = (do { nu -l -i -c $cmd } | complete)
-  let full_str = $header + $result.stdout + $result.stderr
+  $header + $result.stdout + $result.stderr
+}
 
+# Copy command and its output to clipboard
+export def --wrapped xcc [...args: string] {
+  let full_str = _xcc ...$args
   print -e $full_str
-  echo $full_str | xc
+  $full_str | xc
+}
+
+# Copy command and its output to clipboard as markdown
+export def xccm --wrapped [...args: string] {
+  let full_str = _xcc ...$args
+  print -e $full_str
+  $full_str | xcm --lang nu
 }
 
 # Copy last n command(s) and its output to clipboard (command(s) are re-run)
@@ -95,6 +117,34 @@ export def xcf [
       open --raw $file_path | xc
     }
   }
+}
+
+export alias xcff = xcf --text
+
+# Copy text wrapped in markdown fenced code block
+export def xcm [
+  --lang (-l): string  # Language for the fence (e.g., nu, py, sh)
+  ...args              # Text to copy (or pipe via $in)
+] {
+  let content = if ($args | is-not-empty) {
+    $args | str join " "
+  } else {
+    $in | into string
+  }
+
+  let fence = if $lang != null { $"```($lang)" } else { "```" }
+  let wrapped = $"($fence)\n($content)\n```"
+
+  $wrapped | xc
+}
+
+# Copy file content wrapped in markdown fenced code block
+export def xcfm [
+  path: path           # File path to copy
+  --lang (-l): string  # Language override (defaults to file extension)
+] {
+  let ext = if $lang != null { $lang } else { $path | path parse | get extension }
+  open --raw $path | xcm -l $ext
 }
 
 export alias xco = xc -o
