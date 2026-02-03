@@ -61,5 +61,6 @@ HOURGLASS_FRAMES = [
 ICONS = {
     "bullet": "·",
     "zap": "",
-    "allowed_warning": "",
+    "allowed_warning": "",
+    "rejected": "",
 }

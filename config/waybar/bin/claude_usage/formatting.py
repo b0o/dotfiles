@@ -187,23 +187,16 @@ def format_tooltip(
         else COLOR_SUBDUED
     )
 
-    # Use warning icon instead of zap when status is allowed_warning
-    icon_5h = (
-        ICONS["allowed_warning"]
-        if data["5h_status"] == "allowed_warning"
-        else ICONS["zap"]
-    )
-    icon_7d = (
-        ICONS["allowed_warning"]
-        if data["7d_status"] == "allowed_warning"
-        else ICONS["zap"]
-    )
-    icon_5h_color = (
-        "#FFB86C" if data["5h_status"] == "allowed_warning" else COLOR_SUBDUED
-    )
-    icon_7d_color = (
-        "#FFB86C" if data["7d_status"] == "allowed_warning" else COLOR_SUBDUED
-    )
+    # Use warning/rejected icon based on status
+    def _get_status_icon_and_color(status: str) -> tuple[str, str]:
+        if status == "allowed_warning":
+            return ICONS["allowed_warning"], "#FFB86C"
+        elif status not in ("allowed", "allowed_warning"):
+            return ICONS["rejected"], "#FF7D90"
+        return ICONS["zap"], COLOR_SUBDUED
+
+    icon_5h, icon_5h_color = _get_status_icon_and_color(data["5h_status"])
+    icon_7d, icon_7d_color = _get_status_icon_and_color(data["7d_status"])
 
     bar_line_5h_plain = f"{icon_5h}  {bar_5h} {util_5h:4.1f}%"
     bar_line_5h_markup = f'<span color="{icon_5h_color}" alpha="85%">{icon_5h}</span>  {bar_5h_colored} <span color="{usage_5h_pct_color}">{util_5h:4.1f}%</span>'
@@ -280,12 +273,12 @@ def format_tooltip(
     buckets, raw_buckets = calculate_usage_buckets(
         usage_snapshots or [], data["5h_reset"], BAR_WIDTH
     )
-    cumulative_5h = calculate_cumulative_buckets(
+    cumulative_5h, current_idx_5h = calculate_cumulative_buckets(
         usage_snapshots or [], data["5h_reset"], BAR_WIDTH
     )
     if show_cumulative_chart:
         chart_top_5h, chart_bottom_5h = render_cumulative_chart_colored(
-            cumulative_5h, BAR_WIDTH
+            cumulative_5h, BAR_WIDTH, current_idx_5h
         )
     else:
         chart_top_5h, chart_bottom_5h = render_usage_timeline_chart_colored(
@@ -308,10 +301,6 @@ def format_tooltip(
     lines.append(time_line_5h_markup)
     time_labels_5h = render_5h_time_labels(data["5h_reset"], BAR_WIDTH)
     lines.append(f"   {time_labels_5h}")
-    if data["5h_status"] not in ("allowed", "allowed_warning"):
-        lines.append(
-            f'  Status: <span color="#FF7D90"><b>{data["5h_status"]}</b></span>'
-        )
     lines.append("")
 
     lines.append(header_7d)
@@ -321,12 +310,12 @@ def format_tooltip(
     buckets_7d, raw_buckets_7d = calculate_7d_buckets_from_history(
         history, data["7d_reset"], BAR_WIDTH
     )
-    cumulative_7d = calculate_cumulative_7d_buckets(
+    cumulative_7d, current_idx_7d = calculate_cumulative_7d_buckets(
         history, data["7d_reset"], BAR_WIDTH, data["7d_utilization"]
     )
     if show_cumulative_chart:
         chart_top_7d, chart_bottom_7d = render_cumulative_chart_colored(
-            cumulative_7d, BAR_WIDTH
+            cumulative_7d, BAR_WIDTH, current_idx_7d
         )
     else:
         chart_top_7d, chart_bottom_7d = render_usage_timeline_chart_colored(
@@ -349,16 +338,6 @@ def format_tooltip(
     lines.append(time_line_7d_markup)
     day_labels = render_7d_day_labels(data["7d_reset"], BAR_WIDTH)
     lines.append(f"   {day_labels}")
-    if data["7d_status"] not in ("allowed", "allowed_warning"):
-        lines.append(
-            f'  Status: <span color="#FF7D90"><b>{data["7d_status"]}</b></span>'
-        )
-
-    if data["status"] not in ("allowed", "allowed_warning"):
-        lines.append("")
-        lines.append(
-            f'Overall status: <span color="#FF7D90"><b>{data["status"]}</b></span>'
-        )
 
     if footer:
         lines.append("")

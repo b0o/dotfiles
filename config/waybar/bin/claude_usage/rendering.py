@@ -432,7 +432,7 @@ def render_usage_timeline_chart_colored(
 
 def calculate_cumulative_buckets(
     snapshots: list[tuple[float, float]], reset_time: int, width: int
-) -> list[float]:
+) -> tuple[list[float], int]:
     """Calculate cumulative usage at each bucket from snapshots.
 
     The snapshots already contain cumulative utilization values (0.0-1.0).
@@ -444,15 +444,18 @@ def calculate_cumulative_buckets(
         width: Number of buckets (chart width)
 
     Returns:
-        List of cumulative utilization values (0.0-1.0) at each bucket
+        Tuple of (buckets, current_index) where:
+        - buckets: List of cumulative utilization values (0.0-1.0) at each bucket
+        - current_index: Index of the last bucket with actual data (-1 if no data)
     """
     if not snapshots or width <= 0 or reset_time <= 0:
-        return [0.0] * width
+        return ([0.0] * width, -1)
 
     now = time.time()
     session_start = reset_time - 5 * 3600
     bucket_duration = 5 * 3600 / width
     buckets = [0.0] * width
+    current_index = -1
 
     # Sort snapshots by timestamp
     sorted_snapshots = sorted(snapshots, key=lambda x: x[0])
@@ -472,13 +475,14 @@ def calculate_cumulative_buckets(
             else:
                 break
         buckets[i] = last_util
+        current_index = i
 
-    return buckets
+    return (buckets, current_index)
 
 
 def calculate_cumulative_7d_buckets(
     history: Dict[str, Any], reset_time_7d: int, width: int, current_utilization: float
-) -> list[float]:
+) -> tuple[list[float], int]:
     """Calculate cumulative usage at each bucket for the 7d window.
 
     Args:
@@ -488,20 +492,23 @@ def calculate_cumulative_7d_buckets(
         current_utilization: Current 7d utilization (0.0-1.0) from API
 
     Returns:
-        List of cumulative utilization values (0.0-1.0) at each bucket
+        Tuple of (buckets, current_index) where:
+        - buckets: List of cumulative utilization values (0.0-1.0) at each bucket
+        - current_index: Index of the last bucket with actual data (-1 if no data)
     """
     if width <= 0 or reset_time_7d <= 0:
-        return [0.0] * width
+        return ([0.0] * width, -1)
 
     now = time.time()
     window_start = reset_time_7d - 7 * 24 * 3600
     bucket_duration = 7 * 24 * 3600 / width
     buckets = [0.0] * width
+    current_index = -1
 
     # Get the active account's session history
     active_account = history.get("active_account")
     if not active_account:
-        return [0.0] * width
+        return ([0.0] * width, -1)
 
     account = history.get("accounts", {}).get(active_account, {})
     sessions_5h = account.get("history", {}).get("sessions_5h", [])
@@ -557,18 +564,23 @@ def calculate_cumulative_7d_buckets(
             buckets[i] = (
                 current_utilization if bucket_end >= now - bucket_duration else 0.0
             )
+        current_index = i
 
-    return buckets
+    return (buckets, current_index)
 
 
 def render_cumulative_chart_colored(
-    buckets: list[float], width: int
+    buckets: list[float], width: int, current_index: int = -1
 ) -> tuple[str, str]:
     """Render a 2-row cumulative usage chart with Pango color gradient.
+
+    Buckets after current_index are rendered as a "shadow" at the current height,
+    indicating the minimum guaranteed usage level.
 
     Args:
         buckets: List of cumulative utilization values (0.0-1.0)
         width: Chart width (should match len(buckets))
+        current_index: Index of the last bucket with actual data (-1 to disable shadow)
 
     Returns:
         Tuple of (top_row_markup, bottom_row_markup) strings
@@ -578,25 +590,37 @@ def render_cumulative_chart_colored(
     top_parts = []
     bottom_parts = []
 
-    for i, value in enumerate(buckets):
-        level = int(value * 16)
-        level = max(0, min(16, level))
+    # Get the current value for shadow projection
+    current_value = buckets[current_index] if current_index >= 0 else 0.0
 
-        # Color based on absolute cumulative value
-        color = _cumulative_gradient_color(value)
+    for i, value in enumerate(buckets):
+        is_shadow = current_index >= 0 and i > current_index
+
+        if is_shadow:
+            # Shadow: render at current_value height with dim color and low opacity
+            level = int(current_value * 16)
+            level = max(0, min(16, level))
+            color = COLOR_DIM
+            alpha = ' alpha="35%"'
+        else:
+            level = int(value * 16)
+            level = max(0, min(16, level))
+            # Color based on absolute cumulative value
+            color = _cumulative_gradient_color(value)
+            alpha = ""
 
         if level == 0:
             bottom_parts.append(" ")
             top_parts.append(" ")
         elif level <= 8:
             bottom_char = blocks[level - 1]
-            bottom_parts.append(f'<span color="{color}">{bottom_char}</span>')
+            bottom_parts.append(f'<span color="{color}"{alpha}>{bottom_char}</span>')
             top_parts.append(" ")
         else:
             bottom_char = "█"
             top_char = blocks[level - 9]
-            bottom_parts.append(f'<span color="{color}">{bottom_char}</span>')
-            top_parts.append(f'<span color="{color}">{top_char}</span>')
+            bottom_parts.append(f'<span color="{color}"{alpha}>{bottom_char}</span>')
+            top_parts.append(f'<span color="{color}"{alpha}>{top_char}</span>')
 
     # Wrap each row in a span with background color (dim at 25% opacity)
     bg_color = f"{COLOR_DIM}40"
