@@ -119,7 +119,20 @@ return {
     opts = {
       integrations = {
         icon = 'nvim_web_devicons',
-        winpick = 'nvim-window-picker',
+        winpick = function(_, callback, opts)
+          local user_filetypes = opts.filter_rules and opts.filter_rules.bo and opts.filter_rules.bo.filetype or {}
+          local filetypes = vim.list_extend({ 'fyler' }, user_filetypes)
+          local winid = require('window-picker').pick_window(vim.tbl_deep_extend('force', opts or {}, {
+            filter_rules = {
+              bo = {
+                filetype = filetypes,
+              },
+            },
+          }))
+          if winid then
+            callback(winid)
+          end
+        end,
       },
       views = {
         finder = {
