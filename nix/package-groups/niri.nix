@@ -21,6 +21,7 @@ with pkgs; {
     pinentry-rofi # rofi frontend for pinentry
 
     # Screenshots
+    grim # Wayland screenshot tool
     slurp # Interactively select a region in a Wayland compositor
     still # Freeze screen of Wayland compositor until command exits, for screenshots
 
