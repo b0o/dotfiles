@@ -8,6 +8,7 @@ with pkgs; [
   alejandra # black-inspired formatting
   nil # language server
   nixd # Nix language server, based on nix libraries
+  nixfmt # nix formatter
   statix # linter
 
   ## LSPs
