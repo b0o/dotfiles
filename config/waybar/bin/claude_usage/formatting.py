@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from .constants import BAR_WIDTH, COLOR_DIM, COLOR_SUBDUED, ICONS
+from .constants import BAR_WIDTH, CHART_HEIGHT, COLOR_DIM, COLOR_SUBDUED, ICONS
 from .history import load_history
 from .rendering import (
     _chart_gradient_color,
@@ -277,14 +277,14 @@ def format_tooltip(
         usage_snapshots or [], data["5h_reset"], BAR_WIDTH
     )
     if show_cumulative_chart:
-        chart_top_5h, chart_bottom_5h = render_cumulative_chart_colored(
+        chart_rows_5h = render_cumulative_chart_colored(
             cumulative_5h, BAR_WIDTH, current_idx_5h
         )
     else:
-        chart_top_5h, chart_bottom_5h = render_usage_timeline_chart_colored(
+        chart_rows_5h = render_usage_timeline_chart_colored(
             buckets, BAR_WIDTH, raw_buckets
         )
-    # Icons for chart types: bucketed (𝚫) on top, cumulative (𝚺) on bottom
+    # Icons for chart types: bucketed (𝚫) on top row, cumulative (𝚺) on bottom row
     # Highlight the active chart's icon, dim the other
     bucketed_color = (
         _chart_gradient_color(0.7) if not show_cumulative_chart else COLOR_DIM
@@ -294,10 +294,16 @@ def format_tooltip(
     )
     icon_top = f'<span color="{bucketed_color}">𝚫</span>'
     icon_bottom = f'<span color="{cumulative_color}">𝚺</span>'
-    # Add chart rows - line_height must wrap both rows with newline inside the span
-    lines.append(
-        f'<span line_height="0.85">   {chart_top_5h} {icon_top}\n   {chart_bottom_5h} {icon_bottom}</span>'
-    )
+    # Add chart rows - line_height must wrap all rows with newline inside the span
+    chart_lines_5h = []
+    for idx, row in enumerate(chart_rows_5h):
+        if idx == 0:
+            chart_lines_5h.append(f"   {row} {icon_top}")
+        elif idx == CHART_HEIGHT - 1:
+            chart_lines_5h.append(f"   {row} {icon_bottom}")
+        else:
+            chart_lines_5h.append(f"   {row}")
+    lines.append(f'<span line_height="0.85">{chr(10).join(chart_lines_5h)}</span>')
     lines.append(time_line_5h_markup)
     time_labels_5h = render_5h_time_labels(data["5h_reset"], BAR_WIDTH)
     lines.append(f"   {time_labels_5h}")
@@ -314,14 +320,14 @@ def format_tooltip(
         history, data["7d_reset"], BAR_WIDTH, data["7d_utilization"]
     )
     if show_cumulative_chart:
-        chart_top_7d, chart_bottom_7d = render_cumulative_chart_colored(
+        chart_rows_7d = render_cumulative_chart_colored(
             cumulative_7d, BAR_WIDTH, current_idx_7d
         )
     else:
-        chart_top_7d, chart_bottom_7d = render_usage_timeline_chart_colored(
+        chart_rows_7d = render_usage_timeline_chart_colored(
             buckets_7d, BAR_WIDTH, raw_buckets_7d
         )
-    # Icons for chart types: bucketed (𝚫) on top, cumulative (𝚺) on bottom
+    # Icons for chart types: bucketed (𝚫) on top row, cumulative (𝚺) on bottom row
     # Highlight the active chart's icon, dim the other
     bucketed_color_7d = (
         _chart_gradient_color(0.7) if not show_cumulative_chart else COLOR_DIM
@@ -331,10 +337,16 @@ def format_tooltip(
     )
     icon_top_7d = f'<span color="{bucketed_color_7d}">𝚫</span>'
     icon_bottom_7d = f'<span color="{cumulative_color_7d}">𝚺</span>'
-    # Add chart rows - line_height must wrap both rows with newline inside the span
-    lines.append(
-        f'<span line_height="0.85">   {chart_top_7d} {icon_top_7d}\n   {chart_bottom_7d} {icon_bottom_7d}</span>'
-    )
+    # Add chart rows - line_height must wrap all rows with newline inside the span
+    chart_lines_7d = []
+    for idx, row in enumerate(chart_rows_7d):
+        if idx == 0:
+            chart_lines_7d.append(f"   {row} {icon_top_7d}")
+        elif idx == CHART_HEIGHT - 1:
+            chart_lines_7d.append(f"   {row} {icon_bottom_7d}")
+        else:
+            chart_lines_7d.append(f"   {row}")
+    lines.append(f'<span line_height="0.85">{chr(10).join(chart_lines_7d)}</span>')
     lines.append(time_line_7d_markup)
     day_labels = render_7d_day_labels(data["7d_reset"], BAR_WIDTH)
     lines.append(f"   {day_labels}")

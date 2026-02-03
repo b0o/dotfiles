@@ -8,6 +8,7 @@ OUTPUT_INTERVAL = 5.0
 
 # Display
 BAR_WIDTH = 46
+CHART_HEIGHT = 4  # Number of rows for usage charts (8 levels per row)
 
 # File paths
 HISTORY_FILE = os.path.expanduser("~/.local/share/claude-usage.json")
@@ -23,6 +24,7 @@ TOKEN_REFRESH_MARGIN = 300  # Refresh if token expires within 5 minutes
 # Colors
 COLOR_SUBDUED = "#c3bae6"  # header details, footer, percentages <=85%, icons
 COLOR_DIM = "#61557d"  # bar bg
+COLOR_SHADOW = "#322b46"  # shadows for charts
 
 # Progress bar characters
 PROGRESS_CHARS = {

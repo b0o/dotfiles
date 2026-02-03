@@ -4,7 +4,14 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
-from .constants import COLOR_DIM, COLOR_SUBDUED, HOURGLASS_FRAMES, PROGRESS_CHARS
+from .constants import (
+    CHART_HEIGHT,
+    COLOR_DIM,
+    COLOR_SHADOW,
+    COLOR_SUBDUED,
+    HOURGLASS_FRAMES,
+    PROGRESS_CHARS,
+)
 
 
 def _interpolate_colors(colors: list[tuple[int, int, int]], position: float) -> str:
@@ -384,8 +391,8 @@ def calculate_7d_buckets_from_history(
 
 def render_usage_timeline_chart_colored(
     buckets: list[float], width: int, raw_buckets: list[float] | None = None
-) -> tuple[str, str]:
-    """Render a 2-row usage timeline bar chart with Pango color gradient.
+) -> list[str]:
+    """Render a multi-row usage timeline bar chart with Pango color gradient.
 
     Args:
         buckets: List of normalized bucket values (0.0-1.0) for bar height
@@ -394,40 +401,49 @@ def render_usage_timeline_chart_colored(
                      If provided, color is based on absolute usage, not relative height.
 
     Returns:
-        Tuple of (top_row_markup, bottom_row_markup) strings
+        List of row markup strings (top to bottom), length = CHART_HEIGHT
     """
     blocks = "▁▂▃▄▅▆▇█"
+    max_level = CHART_HEIGHT * 8
 
-    top_parts = []
-    bottom_parts = []
+    # Initialize row parts (top to bottom)
+    row_parts: list[list[str]] = [[] for _ in range(CHART_HEIGHT)]
 
     for i, value in enumerate(buckets):
-        level = int(value * 16)
-        level = max(0, min(16, level))
+        level = int(value * max_level)
+        level = max(0, min(max_level, level))
 
         # Color based on absolute utilization if raw_buckets provided, else normalized value
         color_value = raw_buckets[i] if raw_buckets else value
         color = _chart_gradient_color(color_value)
 
-        if level == 0:
-            bottom_parts.append(" ")
-            top_parts.append(" ")
-        elif level <= 8:
-            bottom_char = blocks[level - 1]
-            bottom_parts.append(f'<span color="{color}">{bottom_char}</span>')
-            top_parts.append(" ")
-        else:
-            bottom_char = "█"
-            top_char = blocks[level - 9]
-            bottom_parts.append(f'<span color="{color}">{bottom_char}</span>')
-            top_parts.append(f'<span color="{color}">{top_char}</span>')
+        # Fill rows from bottom (index CHART_HEIGHT-1) to top (index 0)
+        for row in range(CHART_HEIGHT):
+            # Row 0 is top, row CHART_HEIGHT-1 is bottom
+            # Bottom row covers levels 1-8, next row 9-16, etc.
+            row_from_bottom = CHART_HEIGHT - 1 - row
+            row_min_level = row_from_bottom * 8 + 1
+            row_max_level = (row_from_bottom + 1) * 8
+
+            if level < row_min_level:
+                # Level doesn't reach this row
+                row_parts[row].append(" ")
+            elif level >= row_max_level:
+                # Level fills this row completely
+                row_parts[row].append(f'<span color="{color}">█</span>')
+            else:
+                # Partial fill in this row
+                partial = level - row_min_level + 1
+                char = blocks[partial - 1]
+                row_parts[row].append(f'<span color="{color}">{char}</span>')
 
     # Wrap each row in a span with background color (dim at 25% opacity)
     bg_color = f"{COLOR_DIM}40"
-    top_row = f'<span bgcolor="{bg_color}">{"".join(top_parts)}</span>'
-    bottom_row = f'<span bgcolor="{bg_color}">{"".join(bottom_parts)}</span>'
+    rows = [
+        f'<span bgcolor="{bg_color}">{"".join(parts)}</span>' for parts in row_parts
+    ]
 
-    return (top_row, bottom_row)
+    return rows
 
 
 def calculate_cumulative_buckets(
@@ -571,8 +587,8 @@ def calculate_cumulative_7d_buckets(
 
 def render_cumulative_chart_colored(
     buckets: list[float], width: int, current_index: int = -1
-) -> tuple[str, str]:
-    """Render a 2-row cumulative usage chart with Pango color gradient.
+) -> list[str]:
+    """Render a multi-row cumulative usage chart with Pango color gradient.
 
     Buckets after current_index are rendered as a "shadow" at the current height,
     indicating the minimum guaranteed usage level.
@@ -583,12 +599,13 @@ def render_cumulative_chart_colored(
         current_index: Index of the last bucket with actual data (-1 to disable shadow)
 
     Returns:
-        Tuple of (top_row_markup, bottom_row_markup) strings
+        List of row markup strings (top to bottom), length = CHART_HEIGHT
     """
     blocks = "▁▂▃▄▅▆▇█"
+    max_level = CHART_HEIGHT * 8
 
-    top_parts = []
-    bottom_parts = []
+    # Initialize row parts (top to bottom)
+    row_parts: list[list[str]] = [[] for _ in range(CHART_HEIGHT)]
 
     # Get the current value for shadow projection
     current_value = buckets[current_index] if current_index >= 0 else 0.0
@@ -598,36 +615,37 @@ def render_cumulative_chart_colored(
 
         if is_shadow:
             # Shadow: render at current_value height with dim color and low opacity
-            level = int(current_value * 16)
-            level = max(0, min(16, level))
-            color = COLOR_DIM
-            alpha = ' alpha="35%"'
+            level = int(current_value * max_level)
+            level = max(0, min(max_level, level))
+            color = COLOR_SHADOW
         else:
-            level = int(value * 16)
-            level = max(0, min(16, level))
+            level = int(value * max_level)
+            level = max(0, min(max_level, level))
             # Color based on absolute cumulative value
             color = _cumulative_gradient_color(value)
-            alpha = ""
 
-        if level == 0:
-            bottom_parts.append(" ")
-            top_parts.append(" ")
-        elif level <= 8:
-            bottom_char = blocks[level - 1]
-            bottom_parts.append(f'<span color="{color}"{alpha}>{bottom_char}</span>')
-            top_parts.append(" ")
-        else:
-            bottom_char = "█"
-            top_char = blocks[level - 9]
-            bottom_parts.append(f'<span color="{color}"{alpha}>{bottom_char}</span>')
-            top_parts.append(f'<span color="{color}"{alpha}>{top_char}</span>')
+        # Fill rows from bottom to top
+        for row in range(CHART_HEIGHT):
+            row_from_bottom = CHART_HEIGHT - 1 - row
+            row_min_level = row_from_bottom * 8 + 1
+            row_max_level = (row_from_bottom + 1) * 8
+
+            if level < row_min_level:
+                row_parts[row].append(" ")
+            elif level >= row_max_level:
+                row_parts[row].append(f'<span color="{color}">█</span>')
+            else:
+                partial = level - row_min_level + 1
+                char = blocks[partial - 1]
+                row_parts[row].append(f'<span color="{color}">{char}</span>')
 
     # Wrap each row in a span with background color (dim at 25% opacity)
     bg_color = f"{COLOR_DIM}40"
-    top_row = f'<span bgcolor="{bg_color}">{"".join(top_parts)}</span>'
-    bottom_row = f'<span bgcolor="{bg_color}">{"".join(bottom_parts)}</span>'
+    rows = [
+        f'<span bgcolor="{bg_color}">{"".join(parts)}</span>' for parts in row_parts
+    ]
 
-    return (top_row, bottom_row)
+    return rows
 
 
 def render_5h_time_labels(reset_time_5h: int, width: int) -> str:
