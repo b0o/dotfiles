@@ -98,9 +98,7 @@ very_lazy(function()
       return math.max(start, finish)
     end
     local tasks = overseer.list_tasks {
-      sort = function(a, b)
-        return get_last_active_time(a) > get_last_active_time(b)
-      end,
+      sort = function(a, b) return get_last_active_time(a) > get_last_active_time(b) end,
     }
     if vim.tbl_isempty(tasks) then
       vim.notify('No tasks found', vim.log.levels.WARN)
