@@ -391,7 +391,10 @@ def calculate_7d_buckets_from_history(
 
 
 def render_usage_timeline_chart_colored(
-    buckets: list[float], width: int, raw_buckets: list[float] | None = None
+    buckets: list[float],
+    width: int,
+    raw_buckets: list[float] | None = None,
+    chart_height: int = CHART_HEIGHT,
 ) -> list[str]:
     """Render a multi-row usage timeline bar chart with Pango color gradient.
 
@@ -400,15 +403,16 @@ def render_usage_timeline_chart_colored(
         width: Chart width (should match len(buckets))
         raw_buckets: Optional list of raw utilization values (0.0-1.0) for color.
                      If provided, color is based on absolute usage, not relative height.
+        chart_height: Number of rows for the chart (default from CHART_HEIGHT constant)
 
     Returns:
-        List of row markup strings (top to bottom), length = CHART_HEIGHT
+        List of row markup strings (top to bottom), length = chart_height
     """
     blocks = "▁▂▃▄▅▆▇█"
-    max_level = CHART_HEIGHT * 8
+    max_level = chart_height * 8
 
     # Initialize row parts (top to bottom)
-    row_parts: list[list[str]] = [[] for _ in range(CHART_HEIGHT)]
+    row_parts: list[list[str]] = [[] for _ in range(chart_height)]
 
     for i, value in enumerate(buckets):
         level = int(value * max_level)
@@ -418,11 +422,11 @@ def render_usage_timeline_chart_colored(
         color_value = raw_buckets[i] if raw_buckets else value
         color = _chart_gradient_color(color_value)
 
-        # Fill rows from bottom (index CHART_HEIGHT-1) to top (index 0)
-        for row in range(CHART_HEIGHT):
-            # Row 0 is top, row CHART_HEIGHT-1 is bottom
+        # Fill rows from bottom (index chart_height-1) to top (index 0)
+        for row in range(chart_height):
+            # Row 0 is top, row chart_height-1 is bottom
             # Bottom row covers levels 1-8, next row 9-16, etc.
-            row_from_bottom = CHART_HEIGHT - 1 - row
+            row_from_bottom = chart_height - 1 - row
             row_min_level = row_from_bottom * 8 + 1
             row_max_level = (row_from_bottom + 1) * 8
 
@@ -587,7 +591,10 @@ def calculate_cumulative_7d_buckets(
 
 
 def render_cumulative_chart_colored(
-    buckets: list[float], width: int, current_index: int = -1
+    buckets: list[float],
+    width: int,
+    current_index: int = -1,
+    chart_height: int = CHART_HEIGHT,
 ) -> list[str]:
     """Render a multi-row cumulative usage chart with Pango color gradient.
 
@@ -598,15 +605,16 @@ def render_cumulative_chart_colored(
         buckets: List of cumulative utilization values (0.0-1.0)
         width: Chart width (should match len(buckets))
         current_index: Index of the last bucket with actual data (-1 to disable shadow)
+        chart_height: Number of rows for the chart (default from CHART_HEIGHT constant)
 
     Returns:
-        List of row markup strings (top to bottom), length = CHART_HEIGHT
+        List of row markup strings (top to bottom), length = chart_height
     """
     blocks = "▁▂▃▄▅▆▇█"
-    max_level = CHART_HEIGHT * 8
+    max_level = chart_height * 8
 
     # Initialize row parts (top to bottom)
-    row_parts: list[list[str]] = [[] for _ in range(CHART_HEIGHT)]
+    row_parts: list[list[str]] = [[] for _ in range(chart_height)]
 
     # Get the current value for shadow projection
     current_value = buckets[current_index] if current_index >= 0 else 0.0
@@ -626,8 +634,8 @@ def render_cumulative_chart_colored(
             color = _cumulative_gradient_color(value)
 
         # Fill rows from bottom to top
-        for row in range(CHART_HEIGHT):
-            row_from_bottom = CHART_HEIGHT - 1 - row
+        for row in range(chart_height):
+            row_from_bottom = chart_height - 1 - row
             row_min_level = row_from_bottom * 8 + 1
             row_max_level = (row_from_bottom + 1) * 8
 

@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from .constants import BAR_WIDTH, CHART_HEIGHT, COLOR_DIM, COLOR_SUBDUED, ICONS
+from .constants import BAR_WIDTH, COLOR_DIM, COLOR_SUBDUED, ICONS
 from .history import load_history
 from .rendering import (
     _chart_gradient_color,
@@ -143,6 +143,7 @@ def format_tooltip(
     usage_snapshots: Optional[list[tuple[float, float]]] = None,
     show_cumulative_chart: bool = True,
     chart_mode: str = "cycle",
+    chart_height: int = 4,
 ) -> str:
     """Format the tooltip with usage information."""
     util_5h = data["5h_utilization"] * 100
@@ -277,10 +278,10 @@ def format_tooltip(
         usage_snapshots or [], data["5h_reset"], BAR_WIDTH
     )
     bucketed_rows_5h = render_usage_timeline_chart_colored(
-        buckets, BAR_WIDTH, raw_buckets
+        buckets, BAR_WIDTH, raw_buckets, chart_height
     )
     cumulative_rows_5h = render_cumulative_chart_colored(
-        cumulative_5h, BAR_WIDTH, current_idx_5h
+        cumulative_5h, BAR_WIDTH, current_idx_5h, chart_height
     )
 
     # Icons for chart types
@@ -337,7 +338,7 @@ def format_tooltip(
         for idx, row in enumerate(chart_rows_5h):
             if idx == 0:
                 chart_lines_5h.append(f"   {row} {icon_top}")
-            elif idx == CHART_HEIGHT - 1:
+            elif idx == chart_height - 1:
                 chart_lines_5h.append(f"   {row} {icon_bottom}")
             else:
                 chart_lines_5h.append(f"   {row}")
@@ -357,10 +358,10 @@ def format_tooltip(
         history, data["7d_reset"], BAR_WIDTH, data["7d_utilization"]
     )
     bucketed_rows_7d = render_usage_timeline_chart_colored(
-        buckets_7d, BAR_WIDTH, raw_buckets_7d
+        buckets_7d, BAR_WIDTH, raw_buckets_7d, chart_height
     )
     cumulative_rows_7d = render_cumulative_chart_colored(
-        cumulative_7d, BAR_WIDTH, current_idx_7d
+        cumulative_7d, BAR_WIDTH, current_idx_7d, chart_height
     )
 
     if chart_mode == "stacked":
@@ -408,7 +409,7 @@ def format_tooltip(
         for idx, row in enumerate(chart_rows_7d):
             if idx == 0:
                 chart_lines_7d.append(f"   {row} {icon_top_7d}")
-            elif idx == CHART_HEIGHT - 1:
+            elif idx == chart_height - 1:
                 chart_lines_7d.append(f"   {row} {icon_bottom_7d}")
             else:
                 chart_lines_7d.append(f"   {row}")
@@ -438,6 +439,7 @@ def format_waybar_output(
     show_cumulative_chart: bool = True,
     token_error: Optional[str] = None,
     chart_mode: str = "cycle",
+    chart_height: int = 4,
 ) -> Optional[Dict[str, Any]]:
     """Format output for Waybar.
 
@@ -507,6 +509,7 @@ def format_waybar_output(
         usage_snapshots,
         show_cumulative_chart,
         chart_mode,
+        chart_height,
     )
 
     # Format text based on display mode

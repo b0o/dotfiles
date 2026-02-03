@@ -72,6 +72,11 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
         history = load_history()
         return history.get("config", {}).get("chart_mode", "cycle")
 
+    def get_chart_height() -> int:
+        """Get chart_height from config (default 4)."""
+        history = load_history()
+        return history.get("config", {}).get("chart_height", 4)
+
     def handle_refresh_signal(_signum: int, _frame: Any) -> None:
         """Handle SIGUSR1 to trigger refresh."""
         signal_received[0] = True
@@ -190,6 +195,7 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
 
             # Determine chart mode and cycle position
             chart_mode = get_chart_mode()
+            chart_height = get_chart_height()
             chart_cycle_position = int(current_time) % 10
             show_cumulative_chart = chart_cycle_position < 5
 
@@ -210,6 +216,7 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
                 show_cumulative_chart,
                 token_error,
                 chart_mode,
+                chart_height,
             )
             if output:
                 output_json = json.dumps(output)
@@ -300,6 +307,13 @@ def main() -> None:
         action="store_true",
         help="Set chart mode to stacked (show both charts)",
     )
+    action_group.add_argument(
+        "--set-chart-height",
+        type=int,
+        choices=[2, 4, 6, 8],
+        metavar="N",
+        help="Set chart height in rows (2, 4, 6, or 8)",
+    )
 
     args = parser.parse_args()
 
@@ -357,6 +371,10 @@ def main() -> None:
     elif args.set_charts_stacked:
         set_config("chart_mode", "stacked")
         print("Set chart mode to stacked")
+        return
+    elif args.set_chart_height:
+        set_config("chart_height", args.set_chart_height)
+        print(f"Set chart height to {args.set_chart_height} rows")
         return
 
     # Start monitor with optional runtime override

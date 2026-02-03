@@ -78,5 +78,36 @@
         <property name="label">Stacked</property>
       </object>
     </child>
+    <child>
+      <object class="GtkSeparatorMenuItem" id="charts-delimiter" />
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="charts-height-menu">
+        <property name="label">Height</property>
+        <property name="submenu">charts-height-submenu</property>
+      </object>
+    </child>
+  </object>
+  <object class="GtkMenu" id="charts-height-submenu">
+    <child>
+      <object class="GtkMenuItem" id="charts-height-2">
+        <property name="label">2 rows</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="charts-height-4">
+        <property name="label">4 rows</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="charts-height-6">
+        <property name="label">6 rows</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="charts-height-8">
+        <property name="label">8 rows</property>
+      </object>
+    </child>
   </object>
 </interface>
