@@ -60,25 +60,27 @@ in {
     # https://gost.run/en/reference/configuration/file/#nameserver
     secrets."gost/nameservers" = {};
 
-    templates."gost-config.json".content = ''
-      {
-        "services": [
-          {
-            "name": "socks-proxy",
-            "addr": ":1080",
-            "handler": {"type": "socks5"},
-            "listener": {"type": "tcp"},
-            "resolver": "socks-proxy"
-          }
-        ],
-        "resolvers": [
-          {
-            "name": "socks-proxy",
-            "nameservers": ${config.sops.placeholder."gost/nameservers"}
-          }
-        ]
-      }
-    '';
+    templates."gost-config.json".content =
+      # json
+      ''
+        {
+          "services": [
+            {
+              "name": "socks-proxy",
+              "addr": ":1080",
+              "handler": {"type": "socks5"},
+              "listener": {"type": "tcp"},
+              "resolver": "socks-proxy"
+            }
+          ],
+          "resolvers": [
+            {
+              "name": "socks-proxy",
+              "nameservers": ${config.sops.placeholder."gost/nameservers"}
+            }
+          ]
+        }
+      '';
   };
 
   systemd.user.services.gost = {
