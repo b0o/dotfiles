@@ -23,10 +23,9 @@
     };
 
     # Neovim
-    neovim-nightly-overlay = {
-      url = "github:nix-community/neovim-nightly-overlay";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # TODO: Switch back to nix-community once PR #1166 is merged
+    # See: https://github.com/nix-community/neovim-nightly-overlay/issues/1164
+    neovim-nightly-overlay.url = "github:Prince213/neovim-nightly-overlay/push-nttnuzwkprtq";
 
     # Niri
     niri = {
@@ -63,29 +62,32 @@
     };
   };
 
-  outputs = {
-    nixpkgs,
-    home-manager,
-    ...
-  } @ inputs: let
-    inherit (nixpkgs) lib;
-    forAllSystems = lib.genAttrs [
-      "x86_64-linux"
-      # "x86_64-darwin"
-    ];
-  in rec {
-    overlays = {
-      default = import ./nix/overlays {inherit inputs;};
-      ghostty = inputs.ghostty.overlays.releasefast;
-      inherit (inputs.niri.overlays) niri;
-    };
+  outputs =
+    {
+      nixpkgs,
+      home-manager,
+      ...
+    }@inputs:
+    let
+      inherit (nixpkgs) lib;
+      forAllSystems = lib.genAttrs [
+        "x86_64-linux"
+        # "x86_64-darwin"
+      ];
+    in
+    rec {
+      overlays = {
+        default = import ./nix/overlays { inherit inputs; };
+        ghostty = inputs.ghostty.overlays.releasefast;
+        inherit (inputs.niri.overlays) niri;
+      };
 
-    devShells = forAllSystems (system: {
-      default = legacyPackages.${system}.callPackage ./shell.nix {};
-    });
+      devShells = forAllSystems (system: {
+        default = legacyPackages.${system}.callPackage ./shell.nix { };
+      });
 
-    legacyPackages = forAllSystems (
-      system:
+      legacyPackages = forAllSystems (
+        system:
         import inputs.nixpkgs {
           inherit system;
           overlays = builtins.attrValues overlays;
@@ -95,36 +97,38 @@
           # (https://nixos.org/manual/nixpkgs/stable/#idm140737322551056)
           config.allowUnfree = true;
         }
-    );
+      );
 
-    packages = forAllSystems (system: let
-      pkgs = legacyPackages."${system}";
-    in {
-      profile.dev =
-        pkgs.callPackage ./nix/profiles/dev.nix {inherit pkgs inputs;};
-      profile.minimal =
-        pkgs.callPackage ./nix/profiles/minimal.nix {inherit pkgs inputs;};
-    });
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = legacyPackages."${system}";
+        in
+        {
+          profile.dev = pkgs.callPackage ./nix/profiles/dev.nix { inherit pkgs inputs; };
+          profile.minimal = pkgs.callPackage ./nix/profiles/minimal.nix { inherit pkgs inputs; };
+        }
+      );
 
-    nixosConfigurations = {
-      boonix = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        specialArgs = {inherit inputs;};
-        modules = [
-          ./nix/hosts/boonix
-        ];
+      nixosConfigurations = {
+        boonix = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          specialArgs = { inherit inputs; };
+          modules = [
+            ./nix/hosts/boonix
+          ];
+        };
+      };
+
+      homeConfigurations = {
+        arch-maddy = home-manager.lib.homeManagerConfiguration {
+          pkgs = legacyPackages."x86_64-linux";
+          extraSpecialArgs = { inherit inputs; };
+          modules = [
+            ./nix/home/arch-maddy.nix
+            inputs.sops-nix.homeManagerModules.sops
+          ];
+        };
       };
     };
-
-    homeConfigurations = {
-      arch-maddy = home-manager.lib.homeManagerConfiguration {
-        pkgs = legacyPackages."x86_64-linux";
-        extraSpecialArgs = {inherit inputs;};
-        modules = [
-          ./nix/home/arch-maddy.nix
-          inputs.sops-nix.homeManagerModules.sops
-        ];
-      };
-    };
-  };
 }

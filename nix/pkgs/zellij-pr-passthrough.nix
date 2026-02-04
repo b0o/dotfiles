@@ -1,6 +1,7 @@
 {
   inputs,
   pkgs,
+  lib,
   ...
 }:
 # Build zellij from source using the fenix Rust toolchain
@@ -10,7 +11,7 @@ let
   # https://github.com/misaelaguayo/zellij
   # TODO: remove once upstreamed
   version = "unstable-2025-01-28";
-  rev = "31f64a7fa27380e467312840e7d51bb86d8e5192";
+  rev = "29f88bfa7c363cd9c5aa26febc5a0262cdf030fd";
 
   inherit (pkgs.stdenv.hostPlatform) system;
   fenixPkgs = inputs.fenix.packages.${system};
@@ -38,10 +39,10 @@ in
     inherit version;
 
     src = pkgs.fetchFromGitHub {
-      owner = "misaelaguayo";
+      owner = "maround95";
       repo = "zellij";
       inherit rev;
-      sha256 = "sha256-wcEsojrbdi7f5EuY8vxKbGJC42AdphAl35iuNCM40UI=";
+      sha256 = "sha256-U9t2WB9io/jj5SLCocNTW12vYcmYEGgpSC5BuH5YbPA=";
     };
 
     cargoLock = {
