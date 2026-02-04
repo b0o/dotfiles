@@ -45,7 +45,3 @@ alias md = gh markdown-preview -p 6419 --disable-auto-open
 alias serve = python -m http.server
 alias icat = kitty +kitten icat
 alias tev = kitty +kitten show_key # terminal event viewer
-
-# ai
-
-alias oc = opencode
