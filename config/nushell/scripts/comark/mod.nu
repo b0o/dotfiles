@@ -345,6 +345,7 @@ def file-search [
   directory: string     # Directory to search in (absolute path for fd)
   saved_query: string   # Initial query
   display_base: string  # Base path for display (e.g., "./" or "~/Documents/")
+  --header: string      # Optional header to show (defaults to search directory)
 ] {
   mut search_depth = 1  # Start with non-recursive (only immediate files)
   mut file_query = $saved_query
@@ -373,19 +374,30 @@ def file-search [
 
     # Search for files and directories with current depth
     # Transform paths to use display base prefix (normalize slashes)
+    # Format: display_path\tabsolute_path (tab-separated for fzf)
     let display_prefix = $current_display_base | str trim --right --char '/'
     let search_dir = $current_dir | str trim --right --char '/'
     let use_absolute = $show_absolute
+    let home_dir = $env.HOME
     let file_list = (
       ^fd --follow --hidden --exclude .git --max-depth $search_depth ...$type_args ...$ignore_args . $current_dir
       | lines
       | each { |p|
         if $use_absolute {
-          $p
+          # When showing absolute paths, replace $HOME with ~ for display
+          let display = $p | str replace $home_dir '~'
+          $"($display)\t($p)"
         } else {
           # fd returns paths with search_dir prefix - strip it and use display prefix instead
           let rel = $p | str replace $search_dir '' | str trim --left --char '/'
-          $"($display_prefix)/($rel)"
+          # Join display_prefix and rel, avoiding double slashes or leading slash when prefix is empty
+          let display = if ($display_prefix | is-empty) {
+            $rel
+          } else {
+            $"($display_prefix)/($rel)"
+          }
+          # Tab-separate: display_path \t absolute_path
+          $"($display)\t($p)"
         }
       }
       | str join "\n"
@@ -412,12 +424,23 @@ def file-search [
     let file_sel = (
       $file_list
       | ^fzf --layout=reverse
+      --delimiter '\t'
+      --with-nth 1
       --query $file_query
       --expect='alt-,,alt-/,alt-.,alt-a,alt-d,alt-e,alt-f,alt-i,alt-o,alt-u,alt-1,alt-2,alt-3,alt-4,alt-5,alt-6,alt-7,alt-8,alt-9'
       --print-query
       --no-exit-0
+      --with-shell 'nu -c'
+      --preview '
+          let path = {2}
+          if ($path | path type) == "dir" {
+            eza -algF --git --group-directories-first -TL1 --color=always $path
+          } else {
+            bat --decorations=never --color=always $path
+          }
+      '
       --prompt $"($ignore_indicator)  ($filter_indicator)  ($path_indicator)  ($depth_indicator)   "
-      --header $search_dir
+      --header (if ($header | is-not-empty) { $header } else { $search_dir | str replace $home_dir '~' })
       --footer $info
       | complete
     )
@@ -444,7 +467,7 @@ def file-search [
     # 1 line: just selection (Enter with no query)
     # 2 lines: key+selection (key with no query) OR query+selection (Enter with query)
     # 3 lines: query+key+selection (key with query)
-    let file_selection = if ($file_lines | length) >= 3 {
+    let file_selection_raw = if ($file_lines | length) >= 3 {
       $line2
     } else if $line0_is_key {
       $line1
@@ -453,6 +476,11 @@ def file-search [
     } else {
       $line1
     }
+
+    # Selection is tab-separated: display_path\tabsolute_path
+    let selection_parts = ($file_selection_raw | split row "\t")
+    let file_selection = ($selection_parts | get 0? | default "")  # Display path
+    let file_selection_abs = ($selection_parts | get 1? | default $file_selection)  # Absolute path
 
     # If alt-, pressed, exit file search and return to bookmarks
     if $file_key == "alt-," {
@@ -549,9 +577,8 @@ def file-search [
     if $file_key == "alt-i" {
       # Enter the selected directory if it's a directory, otherwise accept the file
       if not ($file_selection | is-empty) {
-        let selection_path = ($file_selection | path expand)
-        if ($selection_path | path exists) and (($selection_path | path type) == "dir") {
-          $current_dir = $selection_path
+        if ($file_selection_abs | path exists) and (($file_selection_abs | path type) == "dir") {
+          $current_dir = $file_selection_abs
           $current_display_base = $file_selection
           $file_query = $file_query_out
           continue
@@ -704,7 +731,15 @@ export def f, [
       --tiebreak begin,chunk
       --print-query
       --no-exit-0
-      --preview 'bat --decorations=never --color=always {2} 2>/dev/null || eza -algF --git --group-directories-first -TL1 --color=always {2}'
+      --with-shell 'nu -c'
+      --preview '
+          let path = {2} | path expand
+          if ($path | path type) == "dir" {
+            eza -algF --git --group-directories-first -TL1 --color=always $path
+          } else {
+            bat --decorations=never --color=always $path
+          }
+      '
       --bind 'alt-/:accept'
       --bind 'alt-i:accept'
       --bind 'alt-u:accept'
@@ -802,16 +837,18 @@ export def f, [
         })
       }
 
-      # Enter file search mode - use bookmark path (without trailing /) as display base
-      let display_path = ($bookmark_path | str trim --right --char '/')
-      let result = (file-search $bookmark_path $parsed.query $display_path)
+      # Enter file search mode - show full path in header (with ~ for $HOME), relative paths in list
+      let header_path = ($bookmark_path | str trim --right --char '/' | str replace $env.HOME '~')
+      let result = (file-search $bookmark_path "" "" --header $header_path)
 
       if not ($result | is-empty) {
-        # return $result
+        # Convert relative path back to absolute by joining with bookmark path
+        let bookmark_dir = ($bookmark_path | str trim --right --char '/')
+        let full_path = [$bookmark_dir, $result] | path join
         return (if $record {
-          { alias: $bookmark_name, path: $result, is_root: (($result | path expand) == ($bookmark_path | path expand)) }
+          { alias: $bookmark_name, path: $full_path, is_root: ($full_path == $bookmark_dir) }
         } else {
-          $result
+          $full_path
         })
       }
 
@@ -1108,7 +1145,11 @@ export def fzf,path [] {
   }
 
   # Use comark's file search
-  let selected = (f, $search_info.query --path $search_info.dir --display-base $search_info.display_base)
+  let selected = (
+    f, $search_info.query
+      --path $search_info.dir
+      --display-base $search_info.display_base
+  )
 
   # If something was selected, update the commandline
   if not ($selected | is-empty) {
