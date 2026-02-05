@@ -120,6 +120,10 @@ return {
         signature = {
           enabled = false,
         },
+        popupmenu = {
+          enabled = true,
+          backend = 'nui',
+        },
       },
       -- you can enable a preset for easier configuration
       presets = {
