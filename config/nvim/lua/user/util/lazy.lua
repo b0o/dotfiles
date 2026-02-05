@@ -182,4 +182,14 @@ M.after_load = function(plugin_name, cb)
   })
 end
 
+---SEE: ~/.config/dotfiles/nix/lib/neovim.nix
+---@param plugin_name string @the plugin to search the nix profile for
+---@return string|nil @the path to the plugin, or nil if not found
+M.nix_plugin_dir = function(plugin_name)
+  local nix_path = vim.fn.expand('~/.nix-profile/share/nvim/lazy/' .. plugin_name)
+  if vim.fn.isdirectory(nix_path) == 1 then
+    return nix_path
+  end
+end
+
 return M

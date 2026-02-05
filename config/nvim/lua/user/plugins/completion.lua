@@ -4,6 +4,7 @@ local feedkeys = lazy_require('user.util.api').feedkeys
 very_lazy(function()
   require('user.plugins.blink.cmdline.docs').setup()
   require('user.plugins.blink.cmdline.cheatsheet').setup()
+  -- TODO:: move to `user.plugins.blink.cmdline.noice-ui`
   local autocmd = vim.api.nvim_create_autocmd
   local group = vim.api.nvim_create_augroup('user-cmp', { clear = true })
   local orig_menu_border
@@ -37,19 +38,21 @@ very_lazy(function()
       end
     end,
   })
+  -- /TODO
 end)
+
+local blink_nix_dir = require('user.util.lazy').nix_plugin_dir 'blink.cmp'
 
 ---@type LazySpec[]
 return {
   {
     'saghen/blink.cmp',
+    dir = blink_nix_dir,
+    version = blink_nix_dir == nil and '1.*' or nil, -- Use release version if not available in nix store
     dependencies = {
       { 'saghen/blink.compat', opts = {} },
     },
     lazy = false, -- blink handles lazy loading internally
-    -- TODO: use `nix shell` to run cargo build instead of `zsh -i`
-    -- run with `zsh -i` so Mise loads proper Rust toolchain:
-    build = 'zsh -ic "cargo build --release"',
     opts = { ---@type blink.cmp.Config
       keymap = {
         preset = 'default',
