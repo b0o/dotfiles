@@ -20,6 +20,10 @@ alejandra = { cmd = "alejandra", args = ["-q", "-"] }
 gofmt = { cmd = "gofmt", args = [] }
 rustfmt = { cmd = "rustfmt", args = ["--edition=2021", "--emit=stdout"] }
 
+# TODO: enable once nufmt is more mature
+# nufmt = { cmd = "nufmt", args = ["--stdin"] }
+topiary-nu = { cmd = "topiary-nushell", args = ["format", "--language", "nu"] }
+
 [languages]
 markdown = ["dprint-md"]
 
@@ -34,6 +38,7 @@ yaml = ["dprint-yaml"]
 lua = ["stylua"]
 go = ["gofmt"]
 rust = ["rustfmt"]
+nu = ["topiary-nu"]
 
 nix = ["alejandra"]
 
