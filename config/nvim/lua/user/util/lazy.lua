@@ -73,13 +73,9 @@ end
 -- Only works for modules that export a table.
 M.require_on_index = function(require_path)
   return setmetatable({}, {
-    __index = function(_, key)
-      return require(require_path)[key]
-    end,
+    __index = function(_, key) return require(require_path)[key] end,
 
-    __newindex = function(_, key, value)
-      require(require_path)[key] = value
-    end,
+    __newindex = function(_, key, value) require(require_path)[key] = value end,
   })
 end
 
@@ -88,9 +84,7 @@ end
 -- see instead |lazy.require_on_exported_call()|
 M.require_on_module_call = function(require_path)
   return setmetatable({}, {
-    __call = function(_, ...)
-      return require(require_path)(...)
-    end,
+    __call = function(_, ...) return require(require_path)(...) end,
   })
 end
 
@@ -108,9 +102,7 @@ end
 M.require_on_exported_call = function(require_path)
   return setmetatable({}, {
     __index = function(_, k)
-      return function(...)
-        return require(require_path)[k](...)
-      end
+      return function(...) return require(require_path)[k](...) end
     end,
   })
 end
@@ -119,9 +111,7 @@ end
 -- This is like require_on_module_call plus require_on_exported_call but also
 -- works with arbitrarily nested indices.
 M.require_on_call_rec = function(require_path)
-  return M.on_call_rec(function()
-    return require(require_path)
-  end)
+  return M.on_call_rec(function() return require(require_path) end)
 end
 
 M.require = M.require_on_call_rec
@@ -136,15 +126,11 @@ M.very_lazy = function(cb)
   vim.api.nvim_create_autocmd('User', {
     pattern = 'VeryLazy',
     once = true,
-    callback = function()
-      cb()
-    end,
+    callback = function() cb() end,
   })
 end
 
-M.very_lazy(function()
-  very_lazy_fired = true
-end)
+M.very_lazy(function() very_lazy_fired = true end)
 
 ---Runs a callback after the given plugin is loaded
 ---@param plugin_name string @the plugin to listen for
@@ -154,9 +140,7 @@ M.after_load = function(plugin_name, cb)
     vim.api.nvim_create_autocmd('User', {
       pattern = 'LazyDone',
       once = true,
-      callback = vim.schedule_wrap(function()
-        M.after_load(plugin_name, cb)
-      end),
+      callback = vim.schedule_wrap(function() M.after_load(plugin_name, cb) end),
     })
     return
   end
