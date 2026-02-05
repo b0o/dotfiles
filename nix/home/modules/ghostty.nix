@@ -1,6 +1,5 @@
 # Ghostty terminal configuration
-{ pkgs, ... }:
-{
+_: {
   lavi.ghostty.enable = true;
 
   programs.ghostty = {
