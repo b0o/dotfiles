@@ -347,25 +347,18 @@ def file-search [
 
 # Generate filtered bookmark list for fzf
 def generate-filtered-bookmarks [filter: string, parent_path?: oneof<string,nothing>] {
-  ls (comark-dir)
-  | where type == symlink
-  | each {|e|
-    let alias = $e.name | path basename
-    let target = resolve-bookmark $alias
-    let type = $target | path type
-    {alias: $alias, target: $target, type: $type, entry: $"($alias)\t($target)"}
-  }
+  l,
   | where {|e|
     # Apply type filter
     let type_match = if $filter == "dir" {
-      $e.type == "dir"
+      ($e.target | str ends-with '/')
     } else if $filter == "file" {
-      $e.type == "file"
+      not ($e.target | str ends-with '/')
     } else {
       true
     }
 
-    # Apply parent path filter
+    # Apply parent path filter (parent_path uses display format with ~)
     let parent_match = if ($parent_path | is-empty) {
       true
     } else {
@@ -374,7 +367,7 @@ def generate-filtered-bookmarks [filter: string, parent_path?: oneof<string,noth
 
     $type_match and $parent_match
   }
-  | get entry
+  | each { $"($in.name)\t($in.target)\t($in.path)" }
   | str join "\n"
 }
 
@@ -461,7 +454,7 @@ export def f, [
       --no-exit-0
       --with-shell 'nu -c'
       --preview '
-          let path = {2} | path expand
+          let path = {3}
           if ($path | path type) == "dir" {
             eza -algF --git --group-directories-first -TL1 --color=always $path
           } else {
@@ -552,12 +545,13 @@ export def f, [
 
     let selection_parts = ($parsed.selection | split row "\t")
     let bookmark_name = ($selection_parts | first)
-    let bookmark_path = ($selection_parts | get 1? | default "")
+    let bookmark_target = ($selection_parts | get 1? | default "")  # Display path (with ~)
+    let bookmark_path = ($selection_parts | get 2? | default $bookmark_target)  # Expanded absolute path
 
     # If alt-/ was pressed, search for files in the bookmark directory
     if $parsed.key == "alt-/" {
       # If bookmark points to a file, just return it
-      if not ($bookmark_path | str ends-with '/') {
+      if not ($bookmark_target | str ends-with '/') {
         return (if $record {
           { alias: $bookmark_name, path: $bookmark_path, is_root: true }
         } else {
@@ -565,18 +559,22 @@ export def f, [
         })
       }
 
-      # Enter file search mode - show full path in header (with ~ for $HOME), relative paths in list
-      let header_path = ($bookmark_path | str trim --right --char '/' | str replace $env.HOME '~')
+      # Enter file search mode - show display path in header, relative paths in list
+      let header_path = ($bookmark_target | str trim --right --char '/')
       let result = (file-search $bookmark_path "" "" --header $header_path)
 
       if not ($result | is-empty) {
-        # Convert relative path back to absolute by joining with bookmark path
-        let bookmark_dir = ($bookmark_path | str trim --right --char '/')
-        let full_path = [$bookmark_dir, $result] | path join
+        # Build paths from file search result
+        # Use expanded path for filesystem operations (cd, path type)
+        let expanded_dir = ($bookmark_path | str trim --right --char '/')
+        let full_expanded = [$expanded_dir, $result] | path join
+        # Use display target for commandline insertion (preserves symlinks like ~/.nix-profile)
+        let target_dir = ($bookmark_target | str trim --right --char '/')
+        let full_display = [$target_dir, $result] | path join
         return (if $record {
-          { alias: $bookmark_name, path: $full_path, is_root: ($full_path == $bookmark_dir) }
+          { alias: $bookmark_name, path: $full_expanded, is_root: ($full_expanded == $expanded_dir) }
         } else {
-          $full_path
+          $full_display
         })
       }
 
@@ -614,19 +612,16 @@ export def --env fzf,smart [
   let before_cursor = ($line_buffer | str substring 0..<$cursor_pos)
   let after_cursor = ($line_buffer | str substring $cursor_pos..)
 
-  # Empty buffer: cd to dir bookmark, insert file bookmark
+  # Empty buffer: cd to dir, insert file
   if ($line_buffer | str trim | is-empty) {
     let result = f, --record --file=$file --directory=$directory $query
     if ($result | is-empty) { return }
 
-    if not ($result.is_root) {
-      insert-at-cursor (quote-path $result.path)
+    let expanded = ($result.path | path expand)
+    if ($expanded | path exists) and ($expanded | path type) == "dir" {
+      cd $expanded
     } else {
-      if ($result.path | path type) == "dir" {
-        cd $result.path
-      } else {
-        insert-at-cursor (quote-path $result.path)
-      }
+      insert-at-cursor (quote-path $result.path)
     }
     return
   }
@@ -652,7 +647,7 @@ export def --env fzf,smart [
     let result = (f, $bookmark_name)
     if not ($result | is-empty) {
       # Check if result is already a full path (from file search) or a bookmark name
-      let path = if ($result | str starts-with '/') {
+      let path = if ($result | str starts-with '/') or ($result | str starts-with '~') {
         quote-path $result
       } else {
         quote-path (p, $result)
@@ -667,7 +662,7 @@ export def --env fzf,smart [
   let result = (f,)
   if not ($result | is-empty) {
     # Check if result is already a full path (from file search) or a bookmark name
-    let path = if ($result | str starts-with '/') {
+    let path = if ($result | str starts-with '/') or ($result | str starts-with '~') {
       quote-path $result
     } else {
       quote-path (p, $result)
@@ -678,7 +673,7 @@ export def --env fzf,smart [
 
 # edits the current commandline to search for the path at the cursor position
 # using comark's file search with depth control
-export def fzf,path [] {
+export def --env fzf,path [] {
   let line_buffer = (commandline)
   let cursor_pos = (commandline get-cursor)
 
@@ -845,6 +840,15 @@ export def fzf,path [] {
   if not ($selected | is-empty) {
     # Result is already in display format from file-search
     let result = $selected
+
+    # Empty buffer + directory selected: cd instead of inserting
+    if ($line_buffer | str trim | is-empty) {
+      let expanded = ($result | path expand)
+      if ($expanded | path exists) and ($expanded | path type) == "dir" {
+        cd $expanded
+        return
+      }
+    }
 
     # Build the new buffer with the selected item replacing the current word
     # Re-add quotes if original was quoted (and close if it was unclosed)

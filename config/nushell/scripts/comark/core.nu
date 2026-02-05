@@ -1,8 +1,6 @@
 # Comark core - bookmark CRUD operations and helpers
 
-# TODO: store bookmarks in json file
 # TODO: configurable default bookmark
-# TODO: in l, and fzf, show direct symlink, not recursively expanded
 
 # Get the comark directory path
 export def comark-dir [] {
@@ -16,12 +14,55 @@ export def comark-dir [] {
   )
 }
 
-# Initialize comark directory
+# Get the path to the comark JSON database
+export def comark-db-path [] {
+  (comark-dir) | path join "comark.json"
+}
+
+# Initialize comark directory and database
 export def comark-init [] {
   let dir = (comark-dir)
   if not ($dir | path exists) {
     print $"Creating comark directory: ($dir)"
     mkdir $dir
+  }
+  let db = (comark-db-path)
+  if not ($db | path exists) {
+    '{"version": 1, "bookmarks": {}}' | save $db
+  }
+}
+
+# Load the bookmark database, returns the bookmarks record (alias -> target)
+export def comark-load [] {
+  comark-init
+  open (comark-db-path) | get bookmarks
+}
+
+# Save the bookmark database (accepts bookmarks record via pipeline)
+export def comark-save []: record -> nothing {
+  let bookmarks = $in
+  {version: 1, bookmarks: $bookmarks} | to json --indent 2 | save -f (comark-db-path)
+}
+
+# Collapse $HOME prefix to ~ for storage
+export def comark-collapse-home [p: string] {
+  let home = $env.HOME
+  if ($p | str starts-with $"($home)/") {
+    $"~($p | str substring ($home | str length)..)"
+  } else if $p == $home {
+    "~"
+  } else {
+    $p
+  }
+}
+
+# Append trailing / to a path if it points to a directory
+def trailing-slash [p: string] {
+  let expanded = ($p | path expand)
+  if ($expanded | path exists) and ($expanded | path type) == "dir" {
+    if ($p | str ends-with '/') { $p } else { $"($p)/" }
+  } else {
+    $p | str trim --right --char '/'
   }
 }
 
@@ -29,27 +70,6 @@ export def validate-alias [alias: string] {
   if not ($alias =~ '^[a-zA-Z0-9_,.][a-zA-Z0-9_,.-]*$') {
     error make -u {msg: $"invalid alias: ($alias)"}
   }
-}
-
-export def resolve-bookmark [
-  --direct (-d) # Resolve direct symlink only (not recursively)
-  alias: string
-] {
-  let bookmark_path = (comark-dir) | path join $alias
-  if not ($bookmark_path | path exists --no-symlink ) {
-    error make -u {msg: $"bookmark does not exist: ($alias)"}
-  }
-  # symlink exists but points to a non-existent file
-  # use realpath to resolve the symlink
-  if not ($bookmark_path | path exists) {
-    return (realpath -m $bookmark_path)
-  }
-  let target = ($bookmark_path | path expand)
-  let res = if $direct { readlink $bookmark_path } else { $target }
-  if ($target | path type) == "dir" {
-    return $"($res)/"
-  }
-  $res
 }
 
 export def complete-alias [] {
@@ -69,24 +89,18 @@ export def complete-alias [] {
 }
 
 # List all bookmarks
+# Returns table with columns: name, target (display path with ~), path (expanded absolute path)
 export def l, [pattern?: string] {
-  comark-init
-
-  let bookmarks = (
-    ls (comark-dir)
-    | where type == symlink
-    | par-each {|row|
-      let alias = ($row.name | path basename)
-      let target = (resolve-bookmark $alias)
-      if ($pattern | is-empty) or ($alias | str contains $pattern) {
-        {name: $alias, target: $target}
-      }
-    }
-    | compact
-    | sort-by name
-  )
-
+  let bookmarks = comark-load
   $bookmarks
+  | transpose name raw_target
+  | where { ($pattern | is-empty) or ($in.name | str contains $pattern) }
+  | each {|row|
+    let target = (trailing-slash $row.raw_target)
+    let path = (trailing-slash ($row.raw_target | path expand))
+    {name: $row.name, target: $target, path: $path}
+  }
+  | sort-by name
 }
 
 # Make a new bookmark
@@ -96,70 +110,81 @@ export def m, [
   --force (-f)            # Overwrite existing bookmark
   --expand-symlinks (-e)  # Expand symlinks in destination path (default: false)
 ] {
-  comark-init
   validate-alias $alias
-  let bookmark_path = ((comark-dir) | path join $alias)
+  let bookmarks = comark-load
   let target = if ($dest | is-empty) { $env.PWD } else { $dest | path expand --no-symlink=(not $expand_symlinks) }
+  let display_target = (comark-collapse-home $target)
 
-  if ($bookmark_path | path exists --no-symlink) {
+  if $alias in $bookmarks {
+    let existing = ($bookmarks | get $alias)
     if not $force {
-      print -e $"bookmark exists: ($alias) -> (resolve-bookmark $alias)"
-      let reply = (input $"Overwrite bookmark ($alias) with ($target)? \(Y/n) " | str trim | str downcase)
+      print -e $"bookmark exists: ($alias) -> ($existing)"
+      let reply = (input $"Overwrite bookmark ($alias) with ($display_target)? \(Y/n) " | str trim | str downcase)
       if $reply not-in ["y", "Y", ""] {
         print -e $"Cancelled"
         return
       }
     }
-    r, $alias
   }
 
-  ^ln -s $target $bookmark_path
-  print $"($alias) -> ($target)"
+  $bookmarks | upsert $alias $display_target | comark-save
+  print $"($alias) -> ($display_target)"
 }
 
 # Remove a bookmark
 export def r, [alias: string@complete-alias] {
-  comark-init
   validate-alias $alias
-  let bookmark_path = ((comark-dir) | path join $alias)
+  let bookmarks = comark-load
 
-  if not ($bookmark_path | path exists --no-symlink) {
+  if $alias not-in $bookmarks {
     error make -u {msg: $"bookmark does not exist: ($alias)"}
   }
 
-  let dest = (resolve-bookmark $alias)
-  rm $bookmark_path
+  let dest = ($bookmarks | get $alias)
+  $bookmarks | reject $alias | comark-save
   print $"removed bookmark ($alias) -> ($dest)"
 }
 
 # Rename a bookmark
 export def rename, [old: string, new: string] {
-  comark-init
   validate-alias $old
   validate-alias $new
-  let old_path = ((comark-dir) | path join $old)
-  let new_path = ((comark-dir) | path join $new)
+  let bookmarks = comark-load
 
-  if not ($old_path | path exists --no-symlink) {
+  if $old not-in $bookmarks {
     error make -u {msg: $"bookmark does not exist: ($old)"}
   }
 
-  if ($new_path | path exists --no-symlink) {
+  if $new in $bookmarks {
     error make -u {msg: $"bookmark exists: ($new)"}
   }
 
-  mv $old_path $new_path
+  let target = ($bookmarks | get $old)
+  $bookmarks | reject $old | upsert $new $target | comark-save
   print $"bookmark ($old) renamed to ($new)"
 }
 
 # Print bookmark destination path
-export def p, [alias: string] {
-  comark-init
+export def p, [
+  alias: string
+  --expand (-e) # Print the expanded absolute path instead of the display path
+] {
   validate-alias $alias
-  resolve-bookmark $alias
+  let bookmarks = comark-load
+
+  if $alias not-in $bookmarks {
+    error make -u {msg: $"bookmark does not exist: ($alias)"}
+  }
+
+  let raw = ($bookmarks | get $alias)
+  if $expand {
+    trailing-slash ($raw | path expand)
+  } else {
+    trailing-slash $raw
+  }
 }
 
-# Find bookmarks that contain the given path, sorted by closest match (longest target first)
+# Find bookmarks that contain the given path, sorted by closest match (longest path first)
 # With --direct, only direct ancestors are returned.
 # By default, if the path is in a git worktree, bookmarks under the git root are also included,
 # with sort order:
@@ -173,12 +198,12 @@ export def find, [
   let expanded_path = $path | path expand
   let bookmarks = l,
 
-  # Find direct ancestor bookmarks (path starts with bookmark target)
+  # Find direct ancestor bookmarks (path starts with bookmark path)
   let ancestors = (
     $bookmarks
     | each {|row|
-      let target_normalized = $row.target | str trim --right --char '/'
-      if ($expanded_path | str starts-with $target_normalized) {
+      let path_normalized = $row.path | str trim --right --char '/'
+      if ($expanded_path | str starts-with $path_normalized) {
         $row
       }
     }
@@ -186,7 +211,7 @@ export def find, [
   )
 
   if $direct {
-    return ($ancestors | sort-by { ($in.target | str length) } --reverse)
+    return ($ancestors | sort-by { ($in.path | str length) } --reverse)
   }
 
   use git/worktree.nu gw-parse
@@ -199,7 +224,7 @@ export def find, [
   }
   let git_info = do --ignore-errors { gw-parse $git_path }
   if ($git_info | is-empty) {
-    return ($ancestors | sort-by { ($in.target | str length) } --reverse)
+    return ($ancestors | sort-by { ($in.path | str length) } --reverse)
   }
 
   let git_root = $git_info.git_root
@@ -207,25 +232,25 @@ export def find, [
 
   # Split ancestors into those inside vs outside the git repo
   let ancestors_grouped = $ancestors | group-by {
-    $in.target | str trim --right --char '/' | str starts-with $git_root_normalized
+    $in.path | str trim --right --char '/' | str starts-with $git_root_normalized
   }
 
-  let ancestors_in_repo = $ancestors_grouped | get -o "true" | default [] | sort-by { $in.target | str length } --reverse
-  let ancestors_outside_repo = $ancestors_grouped | get -o "false" | default [] | sort-by { $in.target | str length } --reverse
+  let ancestors_in_repo = $ancestors_grouped | get -o "true" | default [] | sort-by { $in.path | str length } --reverse
+  let ancestors_outside_repo = $ancestors_grouped | get -o "false" | default [] | sort-by { $in.path | str length } --reverse
 
   # Find sibling bookmarks (under git root but not ancestors of the path)
   # Calculate relative distance: how many path components differ from the input path
-  let ancestor_targets = $ancestors | get target | each { $in | str trim --right --char '/' }
+  let ancestor_paths = $ancestors | get path | each { $in | str trim --right --char '/' }
 
   let siblings = (
     $bookmarks
     | each {|row|
-      let target_normalized = $row.target | str trim --right --char '/'
+      let path_normalized = $row.path | str trim --right --char '/'
       # Must be under git root but not already an ancestor
-      if ($target_normalized | str starts-with $git_root_normalized) and ($target_normalized not-in $ancestor_targets) {
+      if ($path_normalized | str starts-with $git_root_normalized) and ($path_normalized not-in $ancestor_paths) {
         # Calculate relative distance:
         # Find common prefix length, then count differing components in both paths
-        let target_parts = $target_normalized | path split
+        let target_parts = $path_normalized | path split
         let path_parts = $expanded_path | path split
 
         # Find the length of common prefix
@@ -254,58 +279,47 @@ export def find, [
 # Change directory to bookmark
 export def --env cd, [alias?: string@complete-alias]: nothing -> nothing {
   if ($alias | is-empty) {
-    cd ~ # TODO: cd to "default" bookmark (when JSON file is implemented)
+    cd ~
     return
   }
-  comark-init
   validate-alias $alias
-  let bookmark_path = ((comark-dir) | path join $alias)
+  let bookmarks = comark-load
 
-  if not ($bookmark_path | path exists --no-symlink) {
+  if $alias not-in $bookmarks {
     error make -u {msg: $"bookmark does not exist: ($alias)"}
   }
-  # symlink exists but points to a non-existent file
-  if not ($bookmark_path | path exists) {
-    error make -u  {msg: $"bookmark destination does not exist: ($alias)"}
+
+  let target = ($bookmarks | get $alias | path expand)
+  if not ($target | path exists) {
+    error make -u {msg: $"bookmark destination does not exist: ($alias)"}
   }
 
-  cd ($bookmark_path | path expand)
+  cd $target
 }
 
 # Remove bookmarks that point to non-existent files
 export def prune, [
   --force (-f)  # Skip confirmation prompt
 ] {
-  let bookmarks = (
-    ls (comark-dir)
-    | where type == symlink
-    | each {|row|
-      let alias = ($row.name | path basename)
-      let target = (resolve-bookmark $alias)
-      if not ($target | path exists) {
-        {name: $alias, target: $target}
-      }
-    }
-    | compact
-    | sort-by name
+  let dead = (
+    l,
+    | where { not ($in.path | str trim --right --char '/' | path exists) }
   )
 
-  if ($bookmarks | is-empty) {
+  if ($dead | is-empty) {
     print -e "No bookmarks to prune"
     return
   }
 
-  for $bookmark in $bookmarks {
-    let alias = ($bookmark.name | path basename)
-    let target = ($bookmark.target | path expand)
-    if not ($target | path exists) {
-      print -e $"($alias) -> ($target) \(does not exist)"
+  for $bookmark in $dead {
+    print -e $"($bookmark.name) -> ($bookmark.target) \(does not exist)"
+    if not $force {
       let reply = (input $"Remove bookmark? \(Y/n) " | str trim | str downcase)
       if $reply not-in ["y", "Y", ""] {
         continue
       }
-      r, $alias
-      print -e ""
     }
+    r, $bookmark.name
+    print -e ""
   }
 }

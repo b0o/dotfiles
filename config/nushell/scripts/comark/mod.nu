@@ -15,11 +15,7 @@ export def "comark generate-autoload" [] {
 
 export def "comark generate-autoload-hash" [] {
   try {
-    glob $"(comark-dir)/*"
-      | par-each { $in ++ ":" ++ ($in | path expand) }
-      | sort
-      | str join "\n"
-      | hash md5
+    open --raw (comark-db-path) | hash md5
   } catch {
     ""
   }
