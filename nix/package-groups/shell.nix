@@ -50,6 +50,11 @@ with pkgs; [
   gh # official GitHub CLI
   lazygit # terminal UI for git repositories
 
+  # System tools
+  htop # system monitor
+  btop # system monitor
+  bottom # system monitor
+
   # AI
   opencode # Terminal-based AI coding agent
 
