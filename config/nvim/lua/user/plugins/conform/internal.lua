@@ -33,11 +33,13 @@ M.formatters = {
 ---@type table<string, conform.FiletypeFormatterInternal|fun(bufnr: integer):conform.FiletypeFormatterInternal>
 -- TODO: Migrate language-specific config to Pruner config: ~/.config/pruner/config.toml
 M.formatters_by_ft = {
+  nix = { 'pruner' },
+  nu = { 'pruner' },
+
   cmake = { 'gersemi' },
   glsl = { 'clang_format' },
   go = { 'gofmt', 'goimports' },
   lua = { 'stylua' },
-  nix = { 'pruner' },
 
   javascript = { 'dprint' },
   javascriptreact = { 'dprint' },
