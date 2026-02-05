@@ -1,6 +1,5 @@
-{ pkgs, ... }:
-with pkgs;
-[
+{pkgs, ...}:
+with pkgs; [
   # Terminals
   # ghostty
 
@@ -53,8 +52,6 @@ with pkgs;
 
   # System tools
   htop # system monitor
-  # btop - managed by home-manager module
-  bottom # system monitor
 
   # AI
   opencode # Terminal-based AI coding agent
