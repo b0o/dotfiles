@@ -8,13 +8,15 @@
 # - nushell: no color_config set
 # - zathura: has stale non-lavi colors
 # - atuin: theme section commented out
-# - rofi, waybar, mako, niri, bottom, wlr-which-key: hand-themed with lavi colors
-{ inputs, pkgs, ... }:
-let
+# - rofi, waybar, mako, niri, wlr-which-key: hand-themed with lavi colors
+{
+  inputs,
+  pkgs,
+  ...
+}: let
   lavi-opencode-theme = pkgs.writeTextDir "share/opencode/themes/lavi.json" inputs.lavi.lib.themes.opencode;
   lavi-zellij-theme = pkgs.writeTextDir "share/zellij/themes/lavi.kdl" inputs.lavi.lib.themes.zellij;
-in
-{
+in {
   home.packages = [
     lavi-opencode-theme
     lavi-zellij-theme
