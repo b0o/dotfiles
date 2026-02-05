@@ -5,12 +5,12 @@ alias sup = banner --short # Show nushell startup time
 # shell
 
 alias core-cd = cd
-alias cd = core-cd --physical
+# alias cd = core-cd --physical
 alias cdp = cd -
 
 # comark
 
-alias "," = cd,
+alias "," = comark cd
 
 # system
 
@@ -45,3 +45,4 @@ alias md = gh markdown-preview -p 6419 --disable-auto-open
 alias serve = python -m http.server
 alias icat = kitty +kitten icat
 alias tev = kitty +kitten show_key # terminal event viewer
+# alias top =

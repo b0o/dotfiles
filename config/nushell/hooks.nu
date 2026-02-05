@@ -3,6 +3,7 @@ let config = $env.XDG_CONFIG_HOME? | default ($env.HOME | path join .config)
 let hm_session_vars = "~/.nix-profile/etc/profile.d/hm-session-vars.sh" | path expand
 let user_dirs = [$config "user-dirs.dirs"] | path join | path expand
 
+# topiary: disable
 hooks use --timeit {
   env: {
     enabled: true
@@ -59,14 +60,6 @@ hooks use --timeit {
   }
   comark: {
     enabled: true
-    hash_fn: {
-      use comark "comark generate-autoload-hash"
-      comark generate-autoload-hash
-    }
-    cmd: {
-      use comark "comark generate-autoload"
-      comark generate-autoload
-    }
     on_load: {
       $env.config.keybindings ++= [
         {
@@ -76,7 +69,7 @@ hooks use --timeit {
           mode: [emacs vi_insert vi_normal]
           event: {
             send: executehostcommand
-            cmd: "fzf,smart"
+            cmd: "comark fzf smart"
           }
         }
         {
@@ -86,10 +79,19 @@ hooks use --timeit {
           mode: [emacs vi_normal vi_insert]
           event: {
             send: executehostcommand
-            cmd: "fzf,path"
+            cmd: "comark fzf path"
           }
         }
       ]
+      $env.config.hooks.command_not_found = {|cmd_name|
+        use comark command-not-found
+        let result = (command-not-found $cmd_name)
+        if ($result | is-not-empty) {
+          $result
+        } else {
+          null
+        }
+      }
     }
   }
   # TODO: use atuin daemon
@@ -145,12 +147,7 @@ hooks use --timeit {
       $env.config.hooks.pre_prompt ++= [{ direnv export json | from json | default {} | load-env }]
     }
   }
-  formats: {
-    enabled: true
-    plugin: true
-    plugin_cmd: nu_plugin_formats
-    depends: nu_plugin_formats
-  }
+# topiary: disable
   skim: {
     enabled: true
     plugin: true
@@ -213,7 +210,8 @@ hooks use --timeit {
       FZF_DEFAULT_COMMAND: (
         'fd --type f --hidden --exclude .git'
       )
-      FZF_DEFAULT_OPTS: ([
+      FZF_DEFAULT_OPTS: (
+        [
         --layout reverse
         --bind ctrl-p:up
         --bind ctrl-n:down

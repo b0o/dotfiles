@@ -1,5 +1,8 @@
 # Comark fzf - interactive bookmark and file selection with fzf
 
+# Save a reference to the builtin cd before `use core.nu *` shadows it with comark's cd
+alias builtin-cd = cd
+
 use core.nu *
 
 # Quote a path for Nushell if it contains spaces or special characters
@@ -23,7 +26,7 @@ def parse-fzf-output [output: string] {
 
   # Check if first line is a selection (contains tab) or a key
   let is_selection = ($first_line | str contains "\t")
-  let first_is_key = $first_line in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i", "alt-u"]
+  let first_is_key = $first_line in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i"]
 
   # Determine query based on line structure
   let query = if $is_selection or ($line_count == 2 and $first_is_key) {
@@ -40,7 +43,7 @@ def parse-fzf-output [output: string] {
   # - ["query", "key"] -> key in line 1, no selection
   # - ["query", "key", "selection"] -> key in line 1, selection in line 2
   let second_line = ($lines | get 1? | default "")
-  let second_is_key = $second_line in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i", "alt-u"]
+  let second_is_key = $second_line in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i"]
   let second_is_selection = ($second_line | str contains "\t")
 
   let key = if $is_selection {
@@ -132,7 +135,6 @@ def file-search [
     )
 
     let depth_indicator = "󰙅 " + (if $search_depth == 999 { "∞" } else { $"($search_depth)" })
-    let dir_name = ($current_dir | path basename)
 
     let filter_indicator = match $current_filter {
       "dir" => "󰈲 dirs",
@@ -346,33 +348,23 @@ def file-search [
 }
 
 # Generate filtered bookmark list for fzf
-def generate-filtered-bookmarks [filter: string, parent_path?: oneof<string,nothing>] {
-  l,
+def generate-filtered-bookmarks [filter: string] {
+  list
   | where {|e|
-    # Apply type filter
-    let type_match = if $filter == "dir" {
+    if $filter == "dir" {
       ($e.target | str ends-with '/')
     } else if $filter == "file" {
       not ($e.target | str ends-with '/')
     } else {
       true
     }
-
-    # Apply parent path filter (parent_path uses display format with ~)
-    let parent_match = if ($parent_path | is-empty) {
-      true
-    } else {
-      ($e.target | str starts-with $parent_path)
-    }
-
-    $type_match and $parent_match
   }
   | each { $"($in.name)\t($in.target)\t($in.path)" }
   | str join "\n"
 }
 
 # Select bookmark with fzf
-export def f, [
+export def main [
   query?: string
   --directory (-d)          # Only show bookmarks that point to a directory
   --file (-f)               # Only show bookmarks that point to a file
@@ -380,7 +372,7 @@ export def f, [
   --display-base: string    # Base path for display in file search (e.g., "./" or "~/")
   --record                  # Output result as nushell record like { alias?: string, path: string, is_root: bool }|null
 ] {
-  comark-init
+  init
 
   if ($directory and $file) {
     error make -u {msg: "--directory and --file are mutually exclusive"}
@@ -405,12 +397,10 @@ export def f, [
 
   mut current_filter = if $directory { "dir" } else if $file { "file" } else { "all" }
   mut current_query = ($query | default "")
-  mut current_parent_path = null  # Filter to bookmarks under this path
-  mut current_parent_alias = null  # Alias of the parent bookmark
   mut search_mode = "alias"  # Can be "alias" (search alias only) or "full" (search alias and path)
 
   while true {
-    let bookmark_list = (generate-filtered-bookmarks $current_filter $current_parent_path)
+    let bookmark_list = (generate-filtered-bookmarks $current_filter)
 
     if ($bookmark_list | is-empty) {
       return null
@@ -422,12 +412,6 @@ export def f, [
       _ => " "
     }
 
-    let parent_indicator = if ($current_parent_alias | is-not-empty) {
-      $"󰉖 ($current_parent_alias)"
-    } else {
-      "Bookmarks"
-    }
-
     let search_indicator = if $search_mode == "full" {
       "󰍉 full"
     } else {
@@ -435,8 +419,8 @@ export def f, [
     }
 
     let info = [
-      "󰘵 , search mode     󰘵 d 󰈲 dirs    󰘵 u up dir"
-      "󰘵 / search inside   󰘵 f 󰈲 files   󰘵 i in dir"
+      "󰘵 , search mode   󰘵 d 󰈲 dirs"
+      "󰘵 /,i inside      󰘵 f 󰈲 files"
     ] | str join "\n"
 
     # Determine which columns to search based on search mode
@@ -463,9 +447,8 @@ export def f, [
       '
       --bind 'alt-/:accept'
       --bind 'alt-i:accept'
-      --bind 'alt-u:accept'
-      --expect 'alt-,,alt-/,alt-d,alt-f,alt-i,alt-u'
-      --prompt $"($parent_indicator)  ($filter_indicator)  ($search_indicator)   "
+      --expect 'alt-,,alt-/,alt-d,alt-f,alt-i'
+      --prompt $"($filter_indicator)  ($search_indicator)   "
       --footer $info
       | complete
     )
@@ -480,7 +463,7 @@ export def f, [
     if $sel.exit_code != 0 {
       # Check if we have a valid key in the output
       let parsed = (parse-fzf-output $sel.stdout)
-      if $parsed.key not-in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i", "alt-u"] {
+      if $parsed.key not-in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i"] {
         # User cancelled, exit
         return null
       }
@@ -507,37 +490,6 @@ export def f, [
       continue
     }
 
-    # Handle alt-i: filter by parent directory
-    if $parsed.key == "alt-i" {
-      # Need a selection to use as parent
-      if ($parsed.selection | is-empty) {
-        continue
-      }
-
-      let selection_parts = ($parsed.selection | split row "\t")
-      let bookmark_alias = ($selection_parts | get 0? | default "")
-      let bookmark_path = ($selection_parts | get 1? | default "")
-
-      # Only works for directories
-      if ($bookmark_path | str ends-with '/') {
-        $current_parent_path = $bookmark_path
-        $current_parent_alias = $bookmark_alias
-        $current_query = ""
-        continue
-      }
-
-      # If not a directory, just ignore
-      continue
-    }
-
-    # Handle alt-u: clear parent filter and return to all bookmarks
-    if $parsed.key == "alt-u" {
-      $current_parent_path = null
-      $current_parent_alias = null
-      $current_query = $parsed.query
-      continue
-    }
-
     # For non-filter keys, we need a selection to proceed
     if ($parsed.selection | is-empty) {
       return null
@@ -548,8 +500,8 @@ export def f, [
     let bookmark_target = ($selection_parts | get 1? | default "")  # Display path (with ~)
     let bookmark_path = ($selection_parts | get 2? | default $bookmark_target)  # Expanded absolute path
 
-    # If alt-/ was pressed, search for files in the bookmark directory
-    if $parsed.key == "alt-/" {
+    # If alt-/ or alt-i was pressed, search for files in the bookmark directory
+    if $parsed.key in ["alt-/", "alt-i"] {
       # If bookmark points to a file, just return it
       if not ($bookmark_target | str ends-with '/') {
         return (if $record {
@@ -602,7 +554,7 @@ def insert-at-cursor [text: string] {
 }
 
 # Smart fzf: cd if empty/dir, insert if file, expand ,bookmark pattern
-export def --env fzf,smart [
+export def --env "fzf smart" [
   query?: string    # Initial fzf query
   --directory (-d)  # Only show bookmarks that point to a directory
   --file (-f)       # Only show bookmarks that point to a file
@@ -614,12 +566,12 @@ export def --env fzf,smart [
 
   # Empty buffer: cd to dir, insert file
   if ($line_buffer | str trim | is-empty) {
-    let result = f, --record --file=$file --directory=$directory $query
+    let result = main --record --file=$file --directory=$directory $query
     if ($result | is-empty) { return }
 
     let expanded = ($result.path | path expand)
     if ($expanded | path exists) and ($expanded | path type) == "dir" {
-      cd $expanded
+      builtin-cd $expanded
     } else {
       insert-at-cursor (quote-path $result.path)
     }
@@ -633,7 +585,7 @@ export def --env fzf,smart [
     let match = ($matches | first)
     let prefix = ($match.capture0 | default "")
     let bookmark_name = $match.capture1
-    let bookmark_path = (do --ignore-errors { p, $bookmark_name })
+    let bookmark_path = (do --ignore-errors { path $bookmark_name })
 
     if not ($bookmark_path | is-empty) {
       # Expand existing bookmark
@@ -644,13 +596,13 @@ export def --env fzf,smart [
     }
 
     # Try fuzzy search with query
-    let result = (f, $bookmark_name)
+    let result = (main $bookmark_name)
     if not ($result | is-empty) {
       # Check if result is already a full path (from file search) or a bookmark name
       let path = if ($result | str starts-with '/') or ($result | str starts-with '~') {
         quote-path $result
       } else {
-        quote-path (p, $result)
+        quote-path (path $result)
       }
       commandline edit --replace ($prefix + $path + $after_cursor)
       commandline set-cursor (($prefix | str length) + ($path | str length))
@@ -659,13 +611,13 @@ export def --env fzf,smart [
   }
 
   # Default: insert at cursor
-  let result = (f,)
+  let result = (main)
   if not ($result | is-empty) {
     # Check if result is already a full path (from file search) or a bookmark name
     let path = if ($result | str starts-with '/') or ($result | str starts-with '~') {
       quote-path $result
     } else {
-      quote-path (p, $result)
+      quote-path (path $result)
     }
     insert-at-cursor $path
   }
@@ -673,7 +625,7 @@ export def --env fzf,smart [
 
 # edits the current commandline to search for the path at the cursor position
 # using comark's file search with depth control
-export def --env fzf,path [] {
+export def --env "fzf path" [] {
   let line_buffer = (commandline)
   let cursor_pos = (commandline get-cursor)
 
@@ -831,7 +783,7 @@ export def --env fzf,path [] {
 
   # Use comark's file search
   let selected = (
-    f, $search_info.query
+    main $search_info.query
       --path $search_info.dir
       --display-base $search_info.display_base
   )
@@ -845,7 +797,7 @@ export def --env fzf,path [] {
     if ($line_buffer | str trim | is-empty) {
       let expanded = ($result | path expand)
       if ($expanded | path exists) and ($expanded | path type) == "dir" {
-        cd $expanded
+        builtin-cd $expanded
         return
       }
     }

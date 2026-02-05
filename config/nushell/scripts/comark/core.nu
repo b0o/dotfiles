@@ -1,51 +1,37 @@
 # Comark core - bookmark CRUD operations and helpers
 
-# TODO: configurable default bookmark
+use db.nu [dir db-path]
 
-# Get the comark directory path
-export def comark-dir [] {
-  $env
-  | get -o COMARK_DIR
-  | default (
-    $env
-    | get -o XDG_CONFIG_HOME
-    | default ($env.HOME | path join ".config")
-    | path join "comark"
-  )
-}
-
-# Get the path to the comark JSON database
-export def comark-db-path [] {
-  (comark-dir) | path join "comark.json"
-}
+# Save a reference to the builtin cd before we shadow it with `export def cd`
+alias builtin-cd = cd
 
 # Initialize comark directory and database
-export def comark-init [] {
-  let dir = (comark-dir)
-  if not ($dir | path exists) {
-    print $"Creating comark directory: ($dir)"
-    mkdir $dir
+export def init [] {
+  let comark_dir = (dir)
+  if not ($comark_dir | path exists) {
+    print $"Creating comark directory: ($comark_dir)"
+    mkdir $comark_dir
   }
-  let db = (comark-db-path)
+  let db = (db-path)
   if not ($db | path exists) {
     '{"version": 1, "bookmarks": {}}' | save $db
   }
 }
 
 # Load the bookmark database, returns the bookmarks record (alias -> target)
-export def comark-load [] {
-  comark-init
-  open (comark-db-path) | get bookmarks
+export def load [] {
+  init
+  open (db-path) | get bookmarks
 }
 
 # Save the bookmark database (accepts bookmarks record via pipeline)
-export def comark-save []: record -> nothing {
+export def persist []: record -> nothing {
   let bookmarks = $in
-  {version: 1, bookmarks: $bookmarks} | to json --indent 2 | save -f (comark-db-path)
+  {version: 1 bookmarks: $bookmarks} | to json --indent 2 | save -f (db-path)
 }
 
 # Collapse $HOME prefix to ~ for storage
-export def comark-collapse-home [p: string] {
+export def collapse-home [p: string] {
   let home = $env.HOME
   if ($p | str starts-with $"($home)/") {
     $"~($p | str substring ($home | str length)..)"
@@ -73,15 +59,15 @@ export def validate-alias [alias: string] {
 }
 
 export def complete-alias [] {
-  l, | each { |row|
+  list | each {|row|
     {
       value: $row.name
       description: $row.target
       style: (
         if ($row.target | str ends-with '/') {
-          { fg: yellow attr: b }
+          {fg: yellow attr: b}
         } else {
-          { fg: green }
+          {fg: green}
         }
       )
     }
@@ -90,66 +76,66 @@ export def complete-alias [] {
 
 # List all bookmarks
 # Returns table with columns: name, target (display path with ~), path (expanded absolute path)
-export def l, [pattern?: string] {
-  let bookmarks = comark-load
+export def list [pattern?: string] {
+  let bookmarks = load
   $bookmarks
   | transpose name raw_target
   | where { ($pattern | is-empty) or ($in.name | str contains $pattern) }
   | each {|row|
     let target = (trailing-slash $row.raw_target)
     let path = (trailing-slash ($row.raw_target | path expand))
-    {name: $row.name, target: $target, path: $path}
+    {name: $row.name target: $target path: $path}
   }
   | sort-by name
 }
 
 # Make a new bookmark
-export def m, [
+export def new [
   alias: string
   dest?: string
-  --force (-f)            # Overwrite existing bookmark
-  --expand-symlinks (-e)  # Expand symlinks in destination path (default: false)
+  --force (-f) # Overwrite existing bookmark
+  --expand-symlinks (-e) # Expand symlinks in destination path (default: false)
 ] {
   validate-alias $alias
-  let bookmarks = comark-load
+  let bookmarks = load
   let target = if ($dest | is-empty) { $env.PWD } else { $dest | path expand --no-symlink=(not $expand_symlinks) }
-  let display_target = (comark-collapse-home $target)
+  let display_target = (collapse-home $target)
 
   if $alias in $bookmarks {
     let existing = ($bookmarks | get $alias)
     if not $force {
       print -e $"bookmark exists: ($alias) -> ($existing)"
       let reply = (input $"Overwrite bookmark ($alias) with ($display_target)? \(Y/n) " | str trim | str downcase)
-      if $reply not-in ["y", "Y", ""] {
+      if $reply not-in ["y" "Y" ""] {
         print -e $"Cancelled"
         return
       }
     }
   }
 
-  $bookmarks | upsert $alias $display_target | comark-save
+  $bookmarks | upsert $alias $display_target | persist
   print $"($alias) -> ($display_target)"
 }
 
 # Remove a bookmark
-export def r, [alias: string@complete-alias] {
+export def remove [alias: string@complete-alias] {
   validate-alias $alias
-  let bookmarks = comark-load
+  let bookmarks = load
 
   if $alias not-in $bookmarks {
     error make -u {msg: $"bookmark does not exist: ($alias)"}
   }
 
   let dest = ($bookmarks | get $alias)
-  $bookmarks | reject $alias | comark-save
+  $bookmarks | reject $alias | persist
   print $"removed bookmark ($alias) -> ($dest)"
 }
 
 # Rename a bookmark
-export def rename, [old: string, new: string] {
+export def rename [old: string new: string] {
   validate-alias $old
   validate-alias $new
-  let bookmarks = comark-load
+  let bookmarks = load
 
   if $old not-in $bookmarks {
     error make -u {msg: $"bookmark does not exist: ($old)"}
@@ -160,17 +146,17 @@ export def rename, [old: string, new: string] {
   }
 
   let target = ($bookmarks | get $old)
-  $bookmarks | reject $old | upsert $new $target | comark-save
+  $bookmarks | reject $old | upsert $new $target | persist
   print $"bookmark ($old) renamed to ($new)"
 }
 
 # Print bookmark destination path
-export def p, [
+export def path [
   alias: string
   --expand (-e) # Print the expanded absolute path instead of the display path
 ] {
   validate-alias $alias
-  let bookmarks = comark-load
+  let bookmarks = load
 
   if $alias not-in $bookmarks {
     error make -u {msg: $"bookmark does not exist: ($alias)"}
@@ -191,12 +177,12 @@ export def p, [
 #   1. Direct ancestors within the git repo (longest first)
 #   2. Siblings in the git repo (by relative distance, shorter is higher)
 #   3. Direct ancestors outside the git repo (longest first)
-export def find, [
+export def find [
   path: string
   --direct (-d) # Disable smart search functionality, only return direct ancestors
 ] {
   let expanded_path = $path | path expand
-  let bookmarks = l,
+  let bookmarks = list
 
   # Find direct ancestor bookmarks (path starts with bookmark path)
   let ancestors = (
@@ -232,8 +218,8 @@ export def find, [
 
   # Split ancestors into those inside vs outside the git repo
   let ancestors_grouped = $ancestors | group-by {
-    $in.path | str trim --right --char '/' | str starts-with $git_root_normalized
-  }
+      $in.path | str trim --right --char '/' | str starts-with $git_root_normalized
+    }
 
   let ancestors_in_repo = $ancestors_grouped | get -o "true" | default [] | sort-by { $in.path | str length } --reverse
   let ancestors_outside_repo = $ancestors_grouped | get -o "false" | default [] | sort-by { $in.path | str length } --reverse
@@ -277,13 +263,13 @@ export def find, [
 }
 
 # Change directory to bookmark
-export def --env cd, [alias?: string@complete-alias]: nothing -> nothing {
+def --env _cd [alias?: string@complete-alias]: nothing -> nothing {
   if ($alias | is-empty) {
-    cd ~
+    builtin-cd ~
     return
   }
   validate-alias $alias
-  let bookmarks = comark-load
+  let bookmarks = load
 
   if $alias not-in $bookmarks {
     error make -u {msg: $"bookmark does not exist: ($alias)"}
@@ -294,15 +280,18 @@ export def --env cd, [alias?: string@complete-alias]: nothing -> nothing {
     error make -u {msg: $"bookmark destination does not exist: ($alias)"}
   }
 
-  cd $target
+  builtin-cd $target
 }
 
+# Change directory to bookmark
+export alias cd = _cd
+
 # Remove bookmarks that point to non-existent files
-export def prune, [
-  --force (-f)  # Skip confirmation prompt
+export def prune [
+  --force (-f) # Skip confirmation prompt
 ] {
   let dead = (
-    l,
+    list
     | where { not ($in.path | str trim --right --char '/' | path exists) }
   )
 
@@ -315,11 +304,34 @@ export def prune, [
     print -e $"($bookmark.name) -> ($bookmark.target) \(does not exist)"
     if not $force {
       let reply = (input $"Remove bookmark? \(Y/n) " | str trim | str downcase)
-      if $reply not-in ["y", "Y", ""] {
+      if $reply not-in ["y" "Y" ""] {
         continue
       }
     }
-    r, $bookmark.name
+    remove $bookmark.name
     print -e ""
   }
+}
+
+export def command-not-found [cmd_name: string] {
+  if not ($cmd_name | str starts-with ",") {
+    return null
+  }
+  let bookmarks = load
+
+  # Try the full command name (e.g. ",app" as a bookmark alias)
+  # then the stripped version (e.g. "app")
+  let alias = if $cmd_name in $bookmarks {
+    $cmd_name
+  } else {
+    let stripped = ($cmd_name | str trim --left --char ',')
+    if $stripped in $bookmarks {
+      $stripped
+    } else {
+      return null
+    }
+  }
+
+  let target = ($bookmarks | get $alias)
+  $"(ansi yellow_italic)($cmd_name)(ansi reset) is a bookmark -> (ansi blue)($target)(ansi reset)\nrun: (ansi green)comark ($alias)(ansi reset)"
 }
