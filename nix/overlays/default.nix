@@ -13,6 +13,8 @@
     nushellHash = "sha256-iytTJZ70kg2Huwj/BSwDX4h9DVDTlJR2gEHAB2pGn/k=";
     nushellCargoHash = "sha256-a/N0a9ZVqXAjAl5Z7BdEsIp0He3h0S/owS0spEPb3KI=";
   in {
+    inherit system;
+
     opencode = import ./opencode.nix {inherit inputs final;};
     wlr-which-key-b0o = inputs.wlr-which-key-b0o.packages.${system}.default;
 
