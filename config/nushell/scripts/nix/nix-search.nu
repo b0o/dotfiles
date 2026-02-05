@@ -1,5 +1,3 @@
-#!/usr/bin/env -S nu --stdin
-
 export const indexes = [
   "nixos"
   "nixpkgs"
@@ -166,39 +164,4 @@ export module ns {
   ] {
     _main --indexes=$indexes --filter-mode=$filter_mode ...$query
   }
-}
-
-# Search nix packages
-def main [
-  --indexes (-i): string # Search indexes (comma-separated)
-  --filter-mode (-f) # Return matches for initial query without interactive TUI
-  ...query: string # Search query
-] {
-  use _main
-  _main --indexes=$indexes --filter-mode=$filter_mode ...$query
-}
-
-# Open package in browser
-def "main open" [
-  --index (-i): string # Package index
-  --mode (-m): string = "source" # Either "source" or "homepage"
-  package: string
-] {
-  use _main open-pkg
-  open-pkg --index=$index --mode=$mode $package
-}
-
-# List available indexes
-def "main indexes" [] {
-  use _main indexes
-  indexes
-}
-
-# Show package documentation
-def "main docs" [
-  --indexes (-i): string # Search indexes (comma-separated)
-  package: string # Package name
-] {
-  use _main docs
-  docs --indexes=$indexes $package
 }
