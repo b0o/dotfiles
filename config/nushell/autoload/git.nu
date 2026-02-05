@@ -15,6 +15,7 @@ alias gd = git diff
 alias ga = git add
 alias gaa = git add --all
 alias gai = git add --interactive
+alias gaia = git add --intent-to-add
 
 alias gp = git p
 alias gpa = git pa
