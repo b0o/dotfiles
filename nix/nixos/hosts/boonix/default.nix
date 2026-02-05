@@ -2,13 +2,15 @@
   config,
   lib,
   ...
-}: let
+}:
+let
   username = "boo";
   uid = 1000;
 
-  zfsLib = import ../../lib/zfs.nix {inherit lib;};
+  zfsLib = import ../../../lib/zfs.nix { inherit lib; };
   inherit (zfsLib) mkDataset snapshotDataset;
-in {
+in
+{
   imports = [
     ./hardware-configuration.nix
     ../../modules/base.nix
@@ -129,13 +131,18 @@ in {
     modesetting.enable = true;
     open = true;
   };
-  services.xserver.videoDrivers = ["nvidia"];
+  services.xserver.videoDrivers = [ "nvidia" ];
 
   users.users.${username} = {
     inherit uid;
     isNormalUser = true;
     home = "/home/${username}";
-    extraGroups = ["wheel" "networkmanager" "video" "audio"];
+    extraGroups = [
+      "wheel"
+      "networkmanager"
+      "video"
+      "audio"
+    ];
     hashedPasswordFile = "${config.custom.secrets.directory}/${username}.password";
   };
 }
