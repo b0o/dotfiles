@@ -1,19 +1,17 @@
-{pkgs, ...}:
-with pkgs; {
+{ pkgs, ... }:
+with pkgs;
+{
   # NOTE: Nix-managed niri is broken on non-NixOS with nvidia-open-dkms with nigGl
   # nixGL doesn't work for compositors due to EGL_EXT_device_query incompatibility.
   # SEE: https://github.com/YaLTeR/niri/issues/1780
-  niri = [niri];
-  niri-unstable = [niri-unstable];
+  niri = [ niri ];
+  niri-unstable = [ niri-unstable ];
 
   graphical = [
     # UI
     waybar
     rofi
     wlr-which-key-b0o # modal keybindings (b0o fork)
-
-    # Terminals
-    ghostty
   ];
 
   other = [

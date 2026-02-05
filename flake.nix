@@ -22,10 +22,26 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Lavi colorscheme
+    lavi = {
+      url = "github:b0o/lavi.nvim";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Neovim
     # TODO: Switch back to nix-community once PR #1166 is merged
     # See: https://github.com/nix-community/neovim-nightly-overlay/issues/1164
     neovim-nightly-overlay.url = "github:Prince213/neovim-nightly-overlay/push-nttnuzwkprtq";
+    blink-cmp = {
+      url = "github:saghen/blink.cmp";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Language Support
+    topiary-nushell = {
+      url = "github:blindFS/topiary-nushell";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # Niri
     niri = {
@@ -115,7 +131,7 @@
           system = "x86_64-linux";
           specialArgs = { inherit inputs; };
           modules = [
-            ./nix/hosts/boonix
+            ./nix/nixos/hosts/boonix
           ];
         };
       };
@@ -125,8 +141,9 @@
           pkgs = legacyPackages."x86_64-linux";
           extraSpecialArgs = { inherit inputs; };
           modules = [
-            ./nix/home/arch-maddy.nix
+            ./nix/home/hosts/arch-maddy.nix
             inputs.sops-nix.homeManagerModules.sops
+            inputs.lavi.homeManagerModules.lavi
           ];
         };
       };
