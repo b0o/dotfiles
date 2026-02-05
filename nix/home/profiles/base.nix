@@ -2,6 +2,8 @@
 { pkgs, ... }:
 {
   imports = [
+    ../modules/btop.nix
+    ../modules/lavi-themes.nix
     ../modules/stow.nix
   ];
 
