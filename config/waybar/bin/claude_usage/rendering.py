@@ -11,6 +11,7 @@ from .constants import (
     COLOR_SUBDUED,
     HOURGLASS_FRAMES,
     PROGRESS_CHARS,
+    VELOCITY_FRAMES,
 )
 
 
@@ -260,6 +261,305 @@ def get_compact_usage_bar(percentage: int, width: int = 10) -> str:
 def get_compact_time_bar(percentage: int, width: int = 10) -> str:
     """Get a compact time progress bar (styled like tooltip time bar)."""
     return get_time_bar(percentage, width)
+
+
+# Velocity gauge functions
+
+
+def _velocity_gradient_color(position: float) -> str:
+    """Return a hex color for a position 0.0-1.0 along the velocity gauge.
+
+    Left (0.0) = cool green (under budget), center (0.5) = neutral,
+    right (1.0) = hot red/pink (over budget, risk of running out).
+    """
+    colors = [
+        (0xB3, 0xE8, 0xA0),  # #B3E8A0 - cool green (well under budget)
+        (0xB3, 0xE8, 0xA0),
+        (0xDB, 0xFF, 0xB3),  # #DBFFB3 - light green
+        (0xDB, 0xFF, 0xB3),
+        (0xC4, 0xAE, 0x7A),  # #C4AE7A - gold (neutral zone)
+        (0xF7, 0x95, 0x68),  # #F79568 - orange (slightly over)
+        (0xF7, 0x95, 0x68),
+        (0xED, 0x6E, 0x86),  # #ED6E86 - pink/red (danger)
+        (0xED, 0x6E, 0x86),
+    ]
+    return _interpolate_colors(colors, position)
+
+
+def get_velocity_icon(ratio: float) -> str:
+    """Get the velocity icon frame based on the current ratio.
+
+    Lower ratio -> first frame (slow), higher ratio -> last frame (fast).
+    """
+    num_frames = len(VELOCITY_FRAMES)
+    # Map ratio 0.0-2.0 to frame index
+    normalized = min(ratio / 2.0, 1.0)
+    frame_index = int(normalized * (num_frames - 1))
+    frame_index = max(0, min(num_frames - 1, frame_index))
+    return VELOCITY_FRAMES[frame_index]
+
+
+def calculate_velocity_ratio(
+    snapshots: list[tuple[float, float]],
+    reset_time: int,
+    window_hours: float = 5.0,
+    recent_window_seconds: float = 60.0 * 15.0,
+    blend_recent: float = 0.6,
+) -> float:
+    """Calculate a blended velocity ratio for usage vs time.
+
+    The ratio represents how fast you're consuming tokens relative to the
+    ideal pace. 1.0 = on pace, >1.0 = risk of running out, <1.0 = under budget.
+
+    Uses a blend of:
+    - Recent slope: usage rate over the last few minutes
+    - Remaining-budget rate: remaining_usage / remaining_time
+
+    Args:
+        snapshots: List of (timestamp, utilization) tuples, utilization 0.0-1.0
+        reset_time: Unix timestamp when the session resets
+        window_hours: Session window duration in hours (default 5.0)
+        recent_window_seconds: How far back to look for recent slope (default 300s = 5min)
+        blend_recent: Weight for recent slope (default 0.6, remainder goes to overall)
+
+    Returns:
+        Velocity ratio (0.0+). 1.0 = on pace, >1.0 = over budget rate.
+        Returns 0.0 if insufficient data.
+    """
+    if not snapshots or reset_time <= 0:
+        return 0.0
+
+    now = time.time()
+    window_seconds = window_hours * 3600
+    session_start = reset_time - window_seconds
+    time_elapsed = now - session_start
+    time_remaining = reset_time - now
+
+    # Guard against edge cases
+    if time_elapsed <= 0 or time_remaining <= 0:
+        return 0.0
+
+    # Current utilization (last snapshot)
+    sorted_snaps = sorted(snapshots, key=lambda x: x[0])
+    current_util = sorted_snaps[-1][1]
+
+    time_elapsed_frac = time_elapsed / window_seconds
+
+    # --- Overall rate ---
+    # Simple: usage% / time% gives the overall velocity
+    if time_elapsed_frac > 0:
+        overall_ratio = current_util / time_elapsed_frac
+    else:
+        overall_ratio = 0.0
+
+    # --- Recent slope ---
+    # Look at snapshots within the recent window
+    # Compare recent consumption rate against the uniform pace rate
+    # (what rate would use exactly 100% over the full window)
+    uniform_pace_rate = 1.0 / window_seconds  # usage fraction per second at 1.0x
+
+    recent_cutoff = now - recent_window_seconds
+    recent_snaps = [(t, u) for t, u in sorted_snaps if t >= recent_cutoff]
+
+    if len(recent_snaps) >= 2:
+        # Use the earliest and latest in the recent window
+        t_start, u_start = recent_snaps[0]
+        t_end, u_end = recent_snaps[-1]
+        dt = t_end - t_start
+        du = u_end - u_start
+
+        if dt > 0:
+            # Recent usage rate (usage fraction per second)
+            recent_rate = du / dt
+            # Ratio vs uniform pace: >1.0 means consuming faster than even distribution
+            recent_ratio = recent_rate / uniform_pace_rate
+        else:
+            recent_ratio = overall_ratio
+    else:
+        # Not enough recent data, fall back to overall
+        recent_ratio = overall_ratio
+
+    # --- Blend ---
+    blend_overall = 1.0 - blend_recent
+    blended = (blend_recent * recent_ratio) + (blend_overall * overall_ratio)
+
+    # Clamp to a reasonable range (0 to ~3.0 for display purposes)
+    return max(0.0, min(3.0, blended))
+
+
+def render_velocity_gauge_colored(
+    ratio: float, width: int, chart_mode: str = "cycle"
+) -> tuple[str, str]:
+    """Render a velocity gauge bar showing usage pace relative to ideal.
+
+    The gauge maps ratio 0.0-2.0 across the bar width:
+    - Left edge = 0.0 (no usage)
+    - Center = 1.0 (on pace)
+    - Right edge = 2.0+ (double the sustainable rate)
+
+    Returns both plain text and Pango markup versions.
+
+    Args:
+        ratio: Velocity ratio (0.0+, where 1.0 = on pace)
+        width: Bar width in characters
+        chart_mode: "cycle" or "stacked" — affects which icon set to use
+
+    Returns:
+        Tuple of (plain_text, pango_markup)
+    """
+    # Map ratio to indicator position on the bar
+    # ratio 0.0 -> left edge, ratio 2.0 -> right edge
+    # Indicator is 2 chars (full_left + full_right), so start ranges from 0 to width-2
+    gauge_position = min(ratio / 2.0, 1.0)
+    ind_start = int(gauge_position * (width - 2))
+    ind_start = max(0, min(width - 2, ind_start))
+
+    # Center marker (1.0x) occupies 3 positions: [center-1, center, center+1]
+    center = width // 2
+
+    # Start with empty bar
+    slots = ["empty_mid"] * width
+    slots[0] = "empty_left"
+    slots[width - 1] = "empty_right"
+
+    # Place center marker
+    slots[center - 1] = "empty_right"
+    slots[center] = "centerline"
+    slots[center + 1] = "empty_left"
+
+    # Place indicator (overwrites whatever it covers)
+    is_indicator = [False] * width
+    slots[ind_start] = "full_left"
+    slots[ind_start + 1] = "full_right"
+    is_indicator[ind_start] = True
+    is_indicator[ind_start + 1] = True
+
+    # Build output — indicator chars share a single color based on gauge position
+    indicator_color = _velocity_gradient_color(gauge_position)
+    plain_parts = []
+    markup_parts = []
+
+    for i in range(width):
+        char = PROGRESS_CHARS[slots[i]]
+        plain_parts.append(char)
+
+        if is_indicator[i]:
+            markup_parts.append(
+                f'<span color="{indicator_color}" alpha="70%">{char}</span>'
+            )
+        elif slots[i] == "centerline":
+            markup_parts.append(f'<span color="{COLOR_DIM}" alpha="80%">{char}</span>')
+        else:
+            markup_parts.append(f'<span color="{COLOR_DIM}">{char}</span>')
+
+    plain_text = "".join(plain_parts)
+    pango_markup = "".join(markup_parts)
+
+    return (plain_text, pango_markup)
+
+
+def calculate_velocity_ratio_7d(
+    history: Dict[str, Any],
+    reset_time_7d: int,
+    current_utilization_7d: float,
+    recent_session_count: int = 3,
+    blend_recent: float = 0.6,
+) -> float:
+    """Calculate a blended velocity ratio for the 7-day window.
+
+    Similar to the 5h velocity but uses archived 5h sessions as data points
+    instead of per-minute snapshots.
+
+    Args:
+        history: The full history dict from load_history()
+        reset_time_7d: Unix timestamp when the 7d window resets
+        current_utilization_7d: Current 7d utilization (0.0-1.0) from API
+        recent_session_count: Number of recent sessions to use for recent slope
+        blend_recent: Weight for recent slope (default 0.6)
+
+    Returns:
+        Velocity ratio (0.0+). 1.0 = on pace, >1.0 = over budget rate.
+    """
+    if reset_time_7d <= 0:
+        return 0.0
+
+    now = time.time()
+    window_seconds = 7 * 24 * 3600
+    window_start = reset_time_7d - window_seconds
+    time_elapsed = now - window_start
+    time_remaining = reset_time_7d - now
+
+    if time_elapsed <= 0 or time_remaining <= 0:
+        return 0.0
+
+    time_elapsed_frac = time_elapsed / window_seconds
+
+    # --- Overall rate ---
+    if time_elapsed_frac > 0:
+        overall_ratio = current_utilization_7d / time_elapsed_frac
+    else:
+        overall_ratio = 0.0
+
+    # --- Recent slope from archived sessions ---
+    active_account = history.get("active_account")
+    if not active_account:
+        return max(0.0, min(3.0, overall_ratio))
+
+    account = history.get("accounts", {}).get(active_account, {})
+    sessions_5h = account.get("history", {}).get("sessions_5h", [])
+
+    # Filter sessions within the 7d window, sorted by time
+    window_sessions = sorted(
+        [
+            (s.get("reset_at", 0), s.get("utilization", 0))
+            for s in sessions_5h
+            if s.get("reset_at", 0) > window_start
+        ],
+        key=lambda x: x[0],
+    )
+
+    # Include the current session
+    current_5h = account.get("current", {}).get("session_5h")
+    if current_5h:
+        last_updated = current_5h.get("last_updated", 0)
+        util = current_5h.get("utilization", 0)
+        if last_updated > window_start:
+            window_sessions.append((last_updated, util))
+            window_sessions.sort(key=lambda x: x[0])
+
+    # Compare recent session rate against uniform pace rate.
+    # Each 5h session's utilization represents usage within that session (0.0-1.0).
+    # Its contribution to the 7d budget is approximately session_util * (5h / 168h).
+    session_weight = 5.0 * 3600 / window_seconds  # ~0.0298
+
+    if len(window_sessions) >= 2:
+        # Use the last N sessions to estimate recent rate
+        recent = window_sessions[-recent_session_count:]
+        if len(recent) >= 2:
+            # Weighted sum: each session contributes session_util * session_weight
+            # to the 7d utilization, over the time span covered
+            recent_7d_contribution = sum(u * session_weight for _, u in recent)
+            t_first = recent[0][0]
+            t_last = recent[-1][0]
+            dt = t_last - t_first
+
+            if dt > 0:
+                # Rate of 7d-budget consumption per second
+                recent_rate = recent_7d_contribution / dt
+                # Uniform pace: 1.0 (full budget) / window_seconds
+                uniform_pace_rate = 1.0 / window_seconds
+                recent_ratio = recent_rate / uniform_pace_rate
+            else:
+                recent_ratio = overall_ratio
+        else:
+            recent_ratio = overall_ratio
+    else:
+        recent_ratio = overall_ratio
+
+    # --- Blend ---
+    blend_overall = 1.0 - blend_recent
+    blended = (blend_recent * recent_ratio) + (blend_overall * overall_ratio)
+    return max(0.0, min(3.0, blended))
 
 
 # Chart rendering functions

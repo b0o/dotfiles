@@ -11,10 +11,13 @@ from .rendering import (
     _cumulative_gradient_color,
     _gradient_color,
     _time_gradient_color,
+    _velocity_gradient_color,
     calculate_7d_buckets_from_history,
     calculate_cumulative_7d_buckets,
     calculate_cumulative_buckets,
     calculate_usage_buckets,
+    calculate_velocity_ratio,
+    calculate_velocity_ratio_7d,
     get_compact_time_bar,
     get_compact_usage_bar,
     get_hourglass_icon,
@@ -23,10 +26,12 @@ from .rendering import (
     get_time_bar,
     get_time_bar_colored,
     get_time_elapsed_percentage,
+    get_velocity_icon,
     render_5h_time_labels,
     render_7d_day_labels,
     render_cumulative_chart_colored,
     render_usage_timeline_chart_colored,
+    render_velocity_gauge_colored,
 )
 
 
@@ -270,6 +275,28 @@ def format_tooltip(
     lines.append(f"<b>{centered_title}</b>")
     lines.append(f'<span line_height="0.60">{" "}</span>')
     lines.append(header_5h)
+
+    # Calculate and render velocity gauge (5h session only)
+    velocity_ratio = calculate_velocity_ratio(
+        usage_snapshots or [], data["5h_reset"], 5.0
+    )
+    if velocity_ratio > 0 and len(usage_snapshots or []) >= 2:
+        velocity_icon = get_velocity_icon(velocity_ratio)
+        _vel_plain, vel_markup = render_velocity_gauge_colored(
+            velocity_ratio, BAR_WIDTH, chart_mode
+        )
+        # Color the ratio text: subdued if <=1.09, gradient color if >1.0
+        vel_gauge_pos = min(velocity_ratio / 2.0, 1.09)
+        vel_ratio_color = (
+            _velocity_gradient_color(vel_gauge_pos)
+            if velocity_ratio > 1.09
+            else COLOR_SUBDUED
+        )
+        vel_icon_color = _velocity_gradient_color(vel_gauge_pos)
+        lines.append(f'<span line_height="0.60">{" "}</span>')
+        velocity_line_markup = f'<span color="{vel_icon_color}" alpha="85%">{velocity_icon}</span> {vel_markup} <span color="{vel_ratio_color}">{velocity_ratio:3.1f}x</span>'
+        lines.append(velocity_line_markup)
+
     # Calculate chart data
     buckets, raw_buckets = calculate_usage_buckets(
         usage_snapshots or [], data["5h_reset"], BAR_WIDTH
@@ -349,8 +376,29 @@ def format_tooltip(
     lines.append("")
 
     lines.append(header_7d)
-    # Calculate 7d chart data
+
+    # Calculate and render velocity gauge (7d window)
     history = load_history()
+    velocity_ratio_7d = calculate_velocity_ratio_7d(
+        history, data["7d_reset"], data["7d_utilization"]
+    )
+    if velocity_ratio_7d > 0:
+        velocity_icon_7d = get_velocity_icon(velocity_ratio_7d)
+        _vel_plain_7d, vel_markup_7d = render_velocity_gauge_colored(
+            velocity_ratio_7d, BAR_WIDTH, chart_mode
+        )
+        vel_gauge_pos_7d = min(velocity_ratio_7d / 2.0, 1.09)
+        vel_ratio_color_7d = (
+            _velocity_gradient_color(vel_gauge_pos_7d)
+            if velocity_ratio_7d > 1.09
+            else COLOR_SUBDUED
+        )
+        vel_icon_color_7d = _velocity_gradient_color(vel_gauge_pos_7d)
+        lines.append(f'<span line_height="0.60">{" "}</span>')
+        velocity_line_7d_markup = f'<span color="{vel_icon_color_7d}" alpha="85%">{velocity_icon_7d}</span> {vel_markup_7d} <span color="{vel_ratio_color_7d}">{velocity_ratio_7d:3.1f}x</span>'
+        lines.append(velocity_line_7d_markup)
+
+    # Calculate 7d chart data
     buckets_7d, raw_buckets_7d = calculate_7d_buckets_from_history(
         history, data["7d_reset"], BAR_WIDTH
     )

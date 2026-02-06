@@ -3,7 +3,7 @@
 import os
 
 # Timing
-CHECK_INTERVAL = 60.0
+CHECK_INTERVAL = 30.0
 OUTPUT_INTERVAL = 5.0
 
 # Display
@@ -34,6 +34,7 @@ PROGRESS_CHARS = {
     "full_left": "",
     "full_mid": "",
     "full_right": "",
+    "centerline": "┃",
 }
 
 # Hourglass animation frames
@@ -57,6 +58,12 @@ HOURGLASS_FRAMES = [
     "",
     "",
     "",
+]
+
+VELOCITY_FRAMES = [
+    "󰾆 ",
+    "󰾅 ",
+    "󰓅 ",
 ]
 
 # Icons
