@@ -464,15 +464,9 @@ def format_waybar_output(
 
     # Use the representative claim to determine which utilization to show
     # "five_hour" means the 5h limit is the active constraint
-    is_5h_active = data["representative_claim"] == "five_hour"
-    if is_5h_active:
-        primary_util = data["5h_utilization"]
-        reset_time = data["5h_reset"]
-        time_elapsed_pct = get_time_elapsed_percentage(reset_time, 5.0)
-    else:
-        primary_util = data["7d_utilization"]
-        reset_time = data["7d_reset"]
-        time_elapsed_pct = get_time_elapsed_percentage(reset_time, 7 * 24.0)
+    primary_util = data["5h_utilization"]
+    reset_time = data["5h_reset"]
+    time_elapsed_pct = get_time_elapsed_percentage(reset_time, 5.0)
 
     percentage = int(primary_util * 100)
     reset_short = format_reset_short(reset_time)
@@ -485,7 +479,7 @@ def format_waybar_output(
         or data["7d_status"] != "allowed"
     ):
         css_class = "critical"
-    elif not is_5h_active:
+    elif not data["representative_claim"] == "five_hour":
         css_class = "inactive"
     elif percentage == 0:
         css_class = "inactive"
@@ -514,7 +508,7 @@ def format_waybar_output(
 
     # Format text based on display mode
     if display_mode == "compact":
-        if show_alternate and is_5h_active:
+        if show_alternate:
             text = f"{ICONS['zap']} {reset_short}"
         else:
             text = f"{ICONS['zap']} {percentage}%"
@@ -522,7 +516,7 @@ def format_waybar_output(
         hourglass = get_hourglass_icon(time_elapsed_pct)
         text = f"{ICONS['zap']} {percentage}%  {hourglass} {int(time_elapsed_pct)}%"
     elif display_mode == "expanded":
-        if show_alternate and is_5h_active:
+        if show_alternate:
             hourglass = get_hourglass_icon(time_elapsed_pct)
             bar = get_compact_time_bar(int(time_elapsed_pct))
             text = f"{ICONS['zap']} {bar}  {hourglass} {int(time_elapsed_pct):2d}%"
