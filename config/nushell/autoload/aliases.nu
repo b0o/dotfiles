@@ -10,7 +10,7 @@ alias cdp = cd -
 
 # comark
 
-alias "," = comark cd
+alias "," = comark go
 
 # system
 

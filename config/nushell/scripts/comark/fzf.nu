@@ -1,8 +1,5 @@
 # Comark fzf - interactive bookmark and file selection with fzf
 
-# Save a reference to the builtin cd before `use core.nu *` shadows it with comark's cd
-alias builtin-cd = cd
-
 use core.nu *
 
 # Quote a path for Nushell if it contains spaces or special characters
@@ -26,7 +23,7 @@ def parse-fzf-output [output: string] {
 
   # Check if first line is a selection (contains tab) or a key
   let is_selection = ($first_line | str contains "\t")
-  let first_is_key = $first_line in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i"]
+  let first_is_key = $first_line in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i", "f12", "ctrl-j"]
 
   # Determine query based on line structure
   let query = if $is_selection or ($line_count == 2 and $first_is_key) {
@@ -43,7 +40,7 @@ def parse-fzf-output [output: string] {
   # - ["query", "key"] -> key in line 1, no selection
   # - ["query", "key", "selection"] -> key in line 1, selection in line 2
   let second_line = ($lines | get 1? | default "")
-  let second_is_key = $second_line in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i"]
+  let second_is_key = $second_line in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i", "f12", "ctrl-j"]
   let second_is_selection = ($second_line | str contains "\t")
 
   let key = if $is_selection {
@@ -71,7 +68,7 @@ def parse-fzf-output [output: string] {
 }
 
 # File search with depth control
-# Returns the selected file path or empty string
+# Returns {path: string, key: string} where key is "" (enter), "ctrl-j", or "f12"
 def file-search [
   directory: string     # Directory to search in (absolute path for fd)
   saved_query: string   # Initial query
@@ -148,7 +145,7 @@ def file-search [
     let info = [
       "󰘵 a ignore    󰘵 d 󰈲 dirs    󰘵 u up dir   󰘵 / depth+"
       "󰘵 , go back   󰘵 f 󰈲 files   󰘵 i in dir   󰘵 . depth-"
-      "󰘵 o cur dir   󰘵 e abs/rel"
+      "󰘵 o cur dir   󰘵 e abs/rel   ⇧↵ insert    F12 cd"
     ] | str join "\n"
 
     let file_sel = (
@@ -157,7 +154,7 @@ def file-search [
       --delimiter '\t'
       --with-nth 1
       --query $file_query
-      --expect='alt-,,alt-/,alt-.,alt-a,alt-d,alt-e,alt-f,alt-i,alt-o,alt-u,alt-1,alt-2,alt-3,alt-4,alt-5,alt-6,alt-7,alt-8,alt-9'
+      --expect='alt-,,alt-/,alt-.,alt-a,alt-d,alt-e,alt-f,alt-i,alt-o,alt-u,f12,ctrl-j,alt-1,alt-2,alt-3,alt-4,alt-5,alt-6,alt-7,alt-8,alt-9'
       --print-query
       --no-exit-0
       --with-shell 'nu -c'
@@ -177,7 +174,7 @@ def file-search [
 
     if ($file_sel.stdout | is-empty) {
       # User cancelled file search
-      return ""
+      return {path: "", key: ""}
     }
 
     let file_lines = ($file_sel.stdout | str trim | split row "\n")
@@ -188,8 +185,8 @@ def file-search [
     let line2 = ($file_lines | get 2? | default "")
 
     # Check if line0 or line1 is a key we expect
-    let line0_is_key = $line0 in ["alt-,", "alt-/", "alt-.", "alt-a", "alt-d", "alt-e", "alt-f", "alt-i", "alt-o", "alt-u", "alt-1", "alt-2", "alt-3", "alt-4", "alt-5", "alt-6", "alt-7", "alt-8", "alt-9"]
-    let line1_is_key = $line1 in ["alt-,", "alt-/", "alt-.", "alt-a", "alt-d", "alt-e", "alt-f", "alt-i", "alt-o", "alt-u", "alt-1", "alt-2", "alt-3", "alt-4", "alt-5", "alt-6", "alt-7", "alt-8", "alt-9"]
+    let line0_is_key = $line0 in ["alt-,", "alt-/", "alt-.", "alt-a", "alt-d", "alt-e", "alt-f", "alt-i", "alt-o", "alt-u", "f12", "ctrl-j", "alt-1", "alt-2", "alt-3", "alt-4", "alt-5", "alt-6", "alt-7", "alt-8", "alt-9"]
+    let line1_is_key = $line1 in ["alt-,", "alt-/", "alt-.", "alt-a", "alt-d", "alt-e", "alt-f", "alt-i", "alt-o", "alt-u", "f12", "ctrl-j", "alt-1", "alt-2", "alt-3", "alt-4", "alt-5", "alt-6", "alt-7", "alt-8", "alt-9"]
 
     let file_query_out = if $line0_is_key { "" } else { $line0 }
     let file_key = if $line0_is_key { $line0 } else if $line1_is_key { $line1 } else { "" }
@@ -214,12 +211,21 @@ def file-search [
 
     # If alt-, pressed, exit file search and return to bookmarks
     if $file_key == "alt-," {
-      return ""
+      return {path: "", key: ""}
     }
 
     # If alt-o pressed, accept current directory
     if $file_key == "alt-o" {
-      return (if $show_absolute { $current_dir } else { $current_display_base })
+      return {path: (if $show_absolute { $current_dir } else { $current_display_base }), key: $file_key}
+    }
+
+    # ctrl-j / f12: accept selection with key override
+    if $file_key in ["ctrl-j", "f12"] {
+      if not ($file_selection | is-empty) {
+        return {path: $file_selection, key: $file_key}
+      }
+      $file_query = $file_query_out
+      continue
     }
 
     # Handle show ignored files toggle
@@ -314,7 +320,7 @@ def file-search [
           continue
         } else {
           # It's a file - accept it
-          return $file_selection
+          return {path: $file_selection, key: ""}
         }
       }
       # No selection, just continue
@@ -342,7 +348,7 @@ def file-search [
 
     # Otherwise return the selected file/directory
     if not ($file_selection | is-empty) {
-      return $file_selection
+      return {path: $file_selection, key: ""}
     }
   }
 }
@@ -370,7 +376,7 @@ export def main [
   --file (-f)               # Only show bookmarks that point to a file
   --path (-p): string       # Start directly in file search mode for this path
   --display-base: string    # Base path for display in file search (e.g., "./" or "~/")
-  --record                  # Output result as nushell record like { alias?: string, path: string, is_root: bool }|null
+  --record                  # Output result as nushell record like { alias?: string, path: string, is_root: bool, key: string }|null
 ] {
   init
 
@@ -386,9 +392,9 @@ export def main [
       let base = if ($display_base | is-not-empty) { $display_base } else { $path }
       let result = (file-search $expanded_path ($query | default "") $base)
       if $record {
-        return { alias: null, path: $result, is_root: false }
+        return { alias: null, path: $result.path, is_root: false, key: $result.key }
       } else {
-        return $result
+        return $result.path
       }
     } else {
       error make -u {msg: $"path does not exist or is not a directory: ($path)"}
@@ -419,8 +425,8 @@ export def main [
     }
 
     let info = [
-      "󰘵 , search mode   󰘵 d 󰈲 dirs"
-      "󰘵 /,i inside      󰘵 f 󰈲 files"
+      "󰘵 , search mode   󰘵 d 󰈲 dirs    ⇧↵ insert"
+      "󰘵 /,i inside      󰘵 f 󰈲 files   F12 cd"
     ] | str join "\n"
 
     # Determine which columns to search based on search mode
@@ -447,7 +453,7 @@ export def main [
       '
       --bind 'alt-/:accept'
       --bind 'alt-i:accept'
-      --expect 'alt-,,alt-/,alt-d,alt-f,alt-i'
+      --expect 'alt-,,alt-/,alt-d,alt-f,alt-i,f12,ctrl-j'
       --prompt $"($filter_indicator)  ($search_indicator)   "
       --footer $info
       | complete
@@ -463,7 +469,7 @@ export def main [
     if $sel.exit_code != 0 {
       # Check if we have a valid key in the output
       let parsed = (parse-fzf-output $sel.stdout)
-      if $parsed.key not-in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i"] {
+      if $parsed.key not-in ["alt-,", "alt-d", "alt-f", "alt-/", "alt-i", "f12", "ctrl-j"] {
         # User cancelled, exit
         return null
       }
@@ -500,12 +506,21 @@ export def main [
     let bookmark_target = ($selection_parts | get 1? | default "")  # Display path (with ~)
     let bookmark_path = ($selection_parts | get 2? | default $bookmark_target)  # Expanded absolute path
 
+    # ctrl-j / f12: accept selection with key override
+    if $parsed.key in ["ctrl-j", "f12"] {
+      return (if $record {
+        { alias: $bookmark_name, path: $bookmark_path, is_root: true, key: $parsed.key }
+      } else {
+        $bookmark_name
+      })
+    }
+
     # If alt-/ or alt-i was pressed, search for files in the bookmark directory
     if $parsed.key in ["alt-/", "alt-i"] {
       # If bookmark points to a file, just return it
       if not ($bookmark_target | str ends-with '/') {
         return (if $record {
-          { alias: $bookmark_name, path: $bookmark_path, is_root: true }
+          { alias: $bookmark_name, path: $bookmark_path, is_root: true, key: "" }
         } else {
           $bookmark_path
         })
@@ -515,16 +530,16 @@ export def main [
       let header_path = ($bookmark_target | str trim --right --char '/')
       let result = (file-search $bookmark_path "" "" --header $header_path)
 
-      if not ($result | is-empty) {
+      if not ($result.path | is-empty) {
         # Build paths from file search result
         # Use expanded path for filesystem operations (cd, path type)
         let expanded_dir = ($bookmark_path | str trim --right --char '/')
-        let full_expanded = [$expanded_dir, $result] | path join
+        let full_expanded = [$expanded_dir, $result.path] | path join
         # Use display target for commandline insertion (preserves symlinks like ~/.nix-profile)
         let target_dir = ($bookmark_target | str trim --right --char '/')
-        let full_display = [$target_dir, $result] | path join
+        let full_display = [$target_dir, $result.path] | path join
         return (if $record {
-          { alias: $bookmark_name, path: $full_expanded, is_root: ($full_expanded == $expanded_dir) }
+          { alias: $bookmark_name, path: $full_expanded, is_root: ($full_expanded == $expanded_dir), key: $result.key }
         } else {
           $full_display
         })
@@ -536,7 +551,7 @@ export def main [
     }
 
     return (if $record {
-      { alias: $bookmark_name, path: $bookmark_path, is_root: true }
+      { alias: $bookmark_name, path: $bookmark_path, is_root: true, key: "" }
     } else {
       $bookmark_name
     })
@@ -553,7 +568,7 @@ def insert-at-cursor [text: string] {
   commandline set-cursor (($before | str length) + ($text | str length))
 }
 
-# Smart fzf: cd if empty/dir, insert if file, expand ,bookmark pattern
+# Smart fzf: go if empty/dir, insert if file, expand ,bookmark pattern
 export def --env "fzf smart" [
   query?: string    # Initial fzf query
   --directory (-d)  # Only show bookmarks that point to a directory
@@ -564,14 +579,23 @@ export def --env "fzf smart" [
   let before_cursor = ($line_buffer | str substring 0..<$cursor_pos)
   let after_cursor = ($line_buffer | str substring $cursor_pos..)
 
-  # Empty buffer: cd to dir, insert file
+  # Empty buffer: go to dir, insert file
+  # ctrl-j: always insert, f12: always cd
   if ($line_buffer | str trim | is-empty) {
     let result = main --record --file=$file --directory=$directory $query
     if ($result | is-empty) { return }
 
     let expanded = ($result.path | path expand)
-    if ($expanded | path exists) and ($expanded | path type) == "dir" {
-      builtin-cd $expanded
+    if $result.key == "ctrl-j" {
+      insert-at-cursor (quote-path $result.path)
+    } else if $result.key == "f12" {
+      if ($expanded | path exists) and ($expanded | path type) == "dir" {
+        cd $expanded
+      } else {
+        cd ($expanded | path dirname)
+      }
+    } else if ($expanded | path exists) and ($expanded | path type) == "dir" {
+      cd $expanded
     } else {
       insert-at-cursor (quote-path $result.path)
     }
@@ -596,30 +620,53 @@ export def --env "fzf smart" [
     }
 
     # Try fuzzy search with query
-    let result = (main $bookmark_name)
+    let result = (main --record $bookmark_name)
     if not ($result | is-empty) {
-      # Check if result is already a full path (from file search) or a bookmark name
-      let path = if ($result | str starts-with '/') or ($result | str starts-with '~') {
-        quote-path $result
-      } else {
-        quote-path (path $result)
+      if $result.key == "f12" {
+        let expanded = ($result.path | path expand)
+        if ($expanded | path exists) and ($expanded | path type) == "dir" {
+          cd $expanded
+        } else {
+          cd ($expanded | path dirname)
+        }
+        return
       }
-      commandline edit --replace ($prefix + $path + $after_cursor)
-      commandline set-cursor (($prefix | str length) + ($path | str length))
+      # Check if result is already a full path (from file search) or a bookmark name
+      let resolved = if ($result.path | str starts-with '/') {
+        $result.path
+      } else if $result.alias != null {
+        path $result.alias
+      } else {
+        $result.path
+      }
+      let quoted = (quote-path $resolved)
+      commandline edit --replace ($prefix + $quoted + $after_cursor)
+      commandline set-cursor (($prefix | str length) + ($quoted | str length))
     }
     return
   }
 
   # Default: insert at cursor
-  let result = (main)
+  let result = (main --record)
   if not ($result | is-empty) {
-    # Check if result is already a full path (from file search) or a bookmark name
-    let path = if ($result | str starts-with '/') or ($result | str starts-with '~') {
-      quote-path $result
-    } else {
-      quote-path (path $result)
+    if $result.key == "f12" {
+      let expanded = ($result.path | path expand)
+      if ($expanded | path exists) and ($expanded | path type) == "dir" {
+        cd $expanded
+      } else {
+        cd ($expanded | path dirname)
+      }
+      return
     }
-    insert-at-cursor $path
+    # Check if result is already a full path (from file search) or a bookmark name
+    let resolved = if ($result.path | str starts-with '/') {
+      $result.path
+    } else if $result.alias != null {
+      path $result.alias
+    } else {
+      $result.path
+    }
+    insert-at-cursor (quote-path $resolved)
   }
 }
 
@@ -786,18 +833,28 @@ export def --env "fzf path" [] {
     main $search_info.query
       --path $search_info.dir
       --display-base $search_info.display_base
+      --record
   )
 
   # If something was selected, update the commandline
-  if not ($selected | is-empty) {
+  if not ($selected | is-empty) and not ($selected.path | is-empty) {
     # Result is already in display format from file-search
-    let result = $selected
+    let result = $selected.path
+    let key = $selected.key
 
-    # Empty buffer + directory selected: cd instead of inserting
-    if ($line_buffer | str trim | is-empty) {
+    # ctrl-j: always insert, f12: always cd
+    # Default (empty buffer + directory): cd
+    if ($line_buffer | str trim | is-empty) and $key != "ctrl-j" {
       let expanded = ($result | path expand)
-      if ($expanded | path exists) and ($expanded | path type) == "dir" {
-        builtin-cd $expanded
+      if $key == "f12" {
+        if ($expanded | path exists) and ($expanded | path type) == "dir" {
+          cd $expanded
+        } else {
+          cd ($expanded | path dirname)
+        }
+        return
+      } else if ($expanded | path exists) and ($expanded | path type) == "dir" {
+        cd $expanded
         return
       }
     }

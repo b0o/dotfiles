@@ -4,11 +4,11 @@
 export use core.nu *
 export use fzf.nu *
 
-# comark [alias] - with no args, opens fzf smart; with an alias, cd to bookmark
+# comark [alias] - with no args, opens fzf smart; with an alias, go to bookmark
 export def --env main [alias?: string@complete-alias] {
   if ($alias | is-empty) {
     fzf smart
   } else {
-    cd $alias
+    go $alias
   }
 }

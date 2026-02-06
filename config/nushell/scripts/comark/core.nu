@@ -2,9 +2,6 @@
 
 use db.nu [dir db-path]
 
-# Save a reference to the builtin cd before we shadow it with `export def cd`
-alias builtin-cd = cd
-
 # Initialize comark directory and database
 export def init [] {
   let comark_dir = (dir)
@@ -262,10 +259,10 @@ export def find [
   | append $ancestors_outside_repo
 }
 
-# Change directory to bookmark
-def --env _cd [alias?: string@complete-alias]: nothing -> nothing {
+# Go to bookmark directory
+export def --env go [alias?: string@complete-alias]: nothing -> nothing {
   if ($alias | is-empty) {
-    builtin-cd ~
+    cd ~
     return
   }
   validate-alias $alias
@@ -280,11 +277,8 @@ def --env _cd [alias?: string@complete-alias]: nothing -> nothing {
     error make -u {msg: $"bookmark destination does not exist: ($alias)"}
   }
 
-  builtin-cd $target
+  cd $target
 }
-
-# Change directory to bookmark
-export alias cd = _cd
 
 # Remove bookmarks that point to non-existent files
 export def prune [
