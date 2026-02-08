@@ -15,6 +15,15 @@ HISTORY_FILE = os.path.expanduser("~/.local/share/claude-usage.json")
 CLAUDE_CREDS_PATH = os.path.expanduser("~/.claude/.credentials.json")
 OPENCODE_CREDS_PATH = os.path.expanduser("~/.local/share/opencode/auth.json")
 
+
+def get_history_file(provider: str) -> str:
+    """Return provider-specific history/state file path."""
+    if provider == "claude":
+        return HISTORY_FILE
+    # TODO: switch filename to agent-usage-monitor-{provider}.json.
+    return os.path.expanduser(f"~/.local/share/claude-usage-{provider}.json")
+
+
 # OAuth
 OAUTH_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token"
 OAUTH_PROFILE_URL = "https://api.anthropic.com/api/oauth/profile"
@@ -60,19 +69,21 @@ HOURGLASS_FRAMES = [
     "",
 ]
 
-VELOCITY_FRAMES = [
-    "󰾆 ",
-    "󰾅 ",
-    "󰓅 ",
-]
-
 # Icons
 ICONS = {
     "star": "󰛄",
+    "iris": "󰄄",
     "bullet": "·",
     "zap": "",
     "allowed_warning": "",
     "rejected": "",
     "delta": "𝚫",
     "epsilon": "𝚺",
+    "multiply": "×",
+    "velocity": "󰞱",
+}
+
+PROVIDER_ICONS = {
+    "claude": ICONS["star"],
+    "codex": ICONS["iris"],
 }

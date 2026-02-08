@@ -167,6 +167,7 @@ def refresh_opencode_token() -> tuple[Optional[str], Optional[str]]:
 
 def get_valid_token(
     prefer: Optional[str] = None,
+    provider: str = "claude",
 ) -> tuple[Optional[str], Optional[str], bool, Optional[str]]:
     """Get a valid OAuth token from Claude CLI or OpenCode credentials.
 
@@ -184,6 +185,30 @@ def get_valid_token(
     """
     now = time.time()
     errors: list[str] = []
+
+    def try_openai() -> tuple[Optional[str], Optional[str]]:
+        if not os.path.exists(OPENCODE_CREDS_PATH):
+            return None, "no credentials file"
+        try:
+            with open(OPENCODE_CREDS_PATH) as f:
+                data = json.load(f)
+            openai = data.get("openai", {})
+            token = openai.get("access")
+            expires_at = openai.get("expires")
+            if token and expires_at:
+                expires_at_sec = expires_at / 1000
+                if expires_at_sec > now:
+                    return token, None
+                return None, "token expired"
+            return None, "missing token"
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            return None, f"credentials error: {e}"
+
+    if provider == "codex":
+        token, err = try_openai()
+        if token:
+            return token, "oa", False, None
+        return None, None, False, f"oa: {err}" if err else "no credentials found"
 
     def check_token_valid(
         path: str, token_key: str, expires_key: str, data_key: Optional[str] = None

@@ -11,8 +11,9 @@
       "niri/window",
     ],
     "modules-right": [
-      "custom/linear",
+      // "custom/linear",
       "custom/claude-usage",
+      "custom/codex-usage",
       "mpris",
       "pulseaudio",
       "bluetooth",

@@ -111,6 +111,7 @@ tooltip {
 #custom-linear,
 #custom-command-center,
 #custom-claude-usage,
+#custom-codex-usage,
 #custom-mullvad,
 #custom-sun-times,
 #idle_inhibitor,
@@ -129,6 +130,7 @@ tooltip {
 #custom-linear,
 #custom-command-center,
 #custom-claude-usage,
+#custom-codex-usage,
 #custom-mullvad,
 #custom-sun-times,
 #idle_inhibitor,
@@ -144,6 +146,7 @@ tooltip {
 #custom-linear:hover,
 #custom-command-center:hover,
 #custom-claude-usage:hover,
+#custom-codex-usage:hover,
 #custom-mullvad:hover,
 #custom-sun-times:hover,
 #idle_inhibitor:hover,
@@ -236,6 +239,10 @@ label:focus {
   color: @dark_fg_dim;
 }
 
+#custom-codex-usage {
+  color: #c4c8ea;
+}
+
 #custom-claude-usage.inactive {
   color: @velvet;
 }
@@ -254,6 +261,26 @@ label:focus {
 
 #custom-claude-usage.critical {
   color: #ff6953;
+}
+
+#custom-codex-usage.inactive {
+  color: #8f8cb3;
+}
+
+#custom-codex-usage.low {
+  color: #c7c5ea;
+}
+
+#custom-codex-usage.med {
+  color: #b5b2e2;
+}
+
+#custom-codex-usage.high {
+  color: #9d9adb;
+}
+
+#custom-codex-usage.critical {
+  color: #c58fbf;
 }
 
 #custom-command-center {

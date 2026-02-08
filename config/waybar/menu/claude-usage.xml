@@ -9,7 +9,7 @@
     </child>
     <child>
       <object class="GtkMenuItem" id="credentials-menu">
-        <property name="label">Credentials</property>
+        <property name="label">Credentials (Claude)</property>
         <property name="submenu">credentials-submenu</property>
       </object>
     </child>
@@ -29,7 +29,7 @@
     </child>
     <child>
       <object class="GtkMenuItem" id="open-usage">
-        <property name="label">Open Usage Webpage</property>
+        <property name="label">Open Provider Usage</property>
       </object>
     </child>
   </object>

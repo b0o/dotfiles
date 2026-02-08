@@ -7,7 +7,16 @@ import sys
 import time
 from typing import Any, Dict, Optional
 
-from .constants import HISTORY_FILE
+from .constants import HISTORY_FILE, get_history_file
+
+
+_history_file = HISTORY_FILE
+
+
+def configure_history_file(provider: str) -> None:
+    """Set provider-specific state file for this process."""
+    global _history_file
+    _history_file = get_history_file(provider)
 
 
 def empty_account_data() -> Dict[str, Any]:
@@ -36,11 +45,11 @@ def load_history() -> Dict[str, Any]:
         "active_account": None,
     }
 
-    if not os.path.exists(HISTORY_FILE):
+    if not os.path.exists(_history_file):
         return empty
 
     try:
-        with open(HISTORY_FILE) as f:
+        with open(_history_file) as f:
             data = json.load(f)
         # Ensure config section exists
         if "config" not in data:
@@ -53,10 +62,10 @@ def load_history() -> Dict[str, Any]:
 def save_history(history: Dict[str, Any]) -> None:
     """Save usage history to disk."""
     # Ensure directory exists
-    os.makedirs(os.path.dirname(HISTORY_FILE), exist_ok=True)
+    os.makedirs(os.path.dirname(_history_file), exist_ok=True)
 
     try:
-        with open(HISTORY_FILE, "w") as f:
+        with open(_history_file, "w") as f:
             json.dump(history, f, indent=2)
     except IOError as e:
         print(f"Failed to save history: {e}", file=sys.stderr)
