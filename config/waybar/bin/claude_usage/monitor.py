@@ -58,6 +58,16 @@ def monitor(
     usage_snapshots: list[tuple[float, float]] = loaded_snapshots
     last_5h_reset: int = loaded_reset
 
+    def _stabilize_codex_reset(
+        new_reset: int, prev_reset: int, jitter_seconds: int
+    ) -> int:
+        """Treat small Codex reset timestamp drift as the same window."""
+        if prev_reset <= 0 or new_reset <= 0:
+            return new_reset
+        if abs(new_reset - prev_reset) <= jitter_seconds:
+            return prev_reset
+        return new_reset
+
     def get_prefer_source() -> Optional[str]:
         """Get prefer_source from override or config."""
         if prefer_source_override:
@@ -145,6 +155,17 @@ def monitor(
                         has_token = token_valid
                         token_error = err
                         if data is not None:
+                            if provider == "codex":
+                                data["5h_reset"] = _stabilize_codex_reset(
+                                    data["5h_reset"], last_5h_reset, 300
+                                )
+                                previous_7d_reset = (
+                                    usage_data["7d_reset"] if usage_data else 0
+                                )
+                                data["7d_reset"] = _stabilize_codex_reset(
+                                    data["7d_reset"], previous_7d_reset, 300
+                                )
+
                             # Check if 5h session reset (new session started)
                             if data["5h_reset"] != last_5h_reset:
                                 usage_snapshots.clear()

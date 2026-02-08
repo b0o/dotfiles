@@ -645,6 +645,7 @@ def calculate_7d_buckets_from_history(
     if width <= 0 or reset_time_7d <= 0:
         return ([0.0] * width, [0.0] * width)
 
+    now = time.time()
     window_start = reset_time_7d - 7 * 24 * 3600
     bucket_duration = 7 * 24 * 3600 / width
     raw_buckets = [0.0] * width
@@ -665,7 +666,8 @@ def calculate_7d_buckets_from_history(
     for session in sessions_5h:
         reset_at = session.get("reset_at", 0)
         utilization = session.get("utilization", 0)
-        if reset_at > window_start:
+        # Historical sessions should be in the past; ignore future resets.
+        if reset_at > window_start and reset_at <= now:
             # Use the middle of the session for bucketing (reset_at - 2.5h)
             session_mid = reset_at - 2.5 * 3600
             all_sessions.append((session_mid, utilization))
@@ -847,7 +849,8 @@ def calculate_cumulative_7d_buckets(
     for session in sessions_5h:
         reset_at = session.get("reset_at", 0)
         utilization = session.get("utilization", 0)
-        if reset_at > window_start:
+        # Historical sessions should be in the past; ignore future resets.
+        if reset_at > window_start and reset_at <= now:
             all_sessions.append((reset_at, utilization))
 
     # Sort by timestamp
@@ -867,17 +870,22 @@ def calculate_cumulative_7d_buckets(
     # The total from historical sessions
     historical_total = running_sum
 
-    # For each bucket up to current time, interpolate the cumulative value
-    for i in range(width):
+    if now <= window_start:
+        return (buckets, -1)
+
+    current_index = int((now - window_start) / bucket_duration)
+    current_index = max(0, min(width - 1, current_index))
+
+    # For each bucket up to the current bucket, interpolate cumulative value.
+    # Use "now" for the active partial bucket so fresh windows render immediately.
+    for i in range(current_index + 1):
         bucket_end = window_start + (i + 1) * bucket_duration
-        if bucket_end > now:
-            # Future bucket - no data yet
-            break
+        bucket_time = min(bucket_end, now)
 
         # Find cumulative usage up to this bucket
         cumulative = 0.0
         for ts, cum_util in cumulative_at_sessions:
-            if ts <= bucket_end:
+            if ts <= bucket_time:
                 cumulative = cum_util
             else:
                 break
@@ -888,11 +896,8 @@ def calculate_cumulative_7d_buckets(
             # Scale historical data to match current utilization
             buckets[i] = (cumulative / historical_total) * current_utilization
         else:
-            # No historical data, just use current utilization for the current bucket
-            buckets[i] = (
-                current_utilization if bucket_end >= now - bucket_duration else 0.0
-            )
-        current_index = i
+            # No historical data: show current utilization in active bucket only.
+            buckets[i] = current_utilization if i == current_index else 0.0
 
     return (buckets, current_index)
 
