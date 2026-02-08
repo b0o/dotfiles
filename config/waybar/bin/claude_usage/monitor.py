@@ -15,6 +15,7 @@ from .formatting import format_waybar_output
 from .history import (
     check_existing_instance,
     clear_pid,
+    configure_history_file,
     load_current_snapshots,
     load_history,
     save_pid,
@@ -24,7 +25,9 @@ from .history import (
 )
 
 
-def monitor(prefer_source_override: Optional[str] = None) -> None:
+def monitor(
+    prefer_source_override: Optional[str] = None, provider: str = "claude"
+) -> None:
     """Main monitoring loop."""
     # Check if another instance is already running
     existing_pid = check_existing_instance()
@@ -94,7 +97,12 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
         result_container: list, lock: threading.Lock, prev_token: Optional[str]
     ) -> None:
         try:
-            result = fetch_usage_data(prev_token, get_prefer_source())
+            if provider != "claude":
+                result = fetch_usage_data(prev_token, None, provider=provider)
+            else:
+                result = fetch_usage_data(
+                    prev_token, get_prefer_source(), provider=provider
+                )
             with lock:
                 result_container[0] = result
         except Exception as e:
@@ -189,9 +197,8 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
             ):
                 start_check()
 
-            # Determine alternation cycle: 15s primary, 15s alternate
-            cycle_position = int(current_time) % 30
-            show_alternate = cycle_position >= 15
+            # Determine text rotation cycle: usage, time, rate (10s each)
+            rotation_index = (int(current_time) % 30) // 10
 
             # Determine chart mode and cycle position
             chart_mode = get_chart_mode()
@@ -205,7 +212,7 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
             output = format_waybar_output(
                 usage_data,
                 last_check_time,
-                show_alternate,
+                rotation_index,
                 has_token,
                 profile_data,
                 cred_source,
@@ -217,6 +224,7 @@ def monitor(prefer_source_override: Optional[str] = None) -> None:
                 token_error,
                 chart_mode,
                 chart_height,
+                provider,
             )
             if output:
                 output_json = json.dumps(output)
@@ -236,6 +244,12 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Claude usage monitor for Waybar")
+    parser.add_argument(
+        "--provider",
+        choices=["claude", "codex"],
+        default="claude",
+        help="Usage provider to monitor (default: claude)",
+    )
 
     # Runtime preference override (for the monitor)
     runtime_group = parser.add_mutually_exclusive_group()
@@ -314,8 +328,38 @@ def main() -> None:
         metavar="N",
         help="Set chart height in rows (2, 4, 6, or 8)",
     )
+    action_group.add_argument(
+        "--test-codex-api",
+        action="store_true",
+        help="Test Codex usage API connectivity and print parsed usage",
+    )
 
     args = parser.parse_args()
+
+    configure_history_file(args.provider)
+
+    if args.test_codex_api:
+        data, profile, _token, source, _fallback, has_token, err = fetch_usage_data(
+            provider="codex"
+        )
+        if not has_token:
+            print(f"Codex token unavailable: {err}")
+            return
+        if not data:
+            print("Codex API request failed or returned no usage payload")
+            return
+        print(
+            json.dumps(
+                {
+                    "provider": "codex",
+                    "source": source,
+                    "usage": data,
+                    "profile": profile,
+                },
+                indent=2,
+            )
+        )
+        return
 
     # Handle one-shot config commands
     if args.set_prefer_cc:
@@ -384,4 +428,4 @@ def main() -> None:
     elif args.prefer_oc:
         prefer_source = "oc"
 
-    monitor(prefer_source)
+    monitor(prefer_source, provider=args.provider)

@@ -10,8 +10,8 @@ from .constants import (
     COLOR_SHADOW,
     COLOR_SUBDUED,
     HOURGLASS_FRAMES,
+    ICONS,
     PROGRESS_CHARS,
-    VELOCITY_FRAMES,
 )
 
 
@@ -287,16 +287,9 @@ def _velocity_gradient_color(position: float) -> str:
 
 
 def get_velocity_icon(ratio: float) -> str:
-    """Get the velocity icon frame based on the current ratio.
-
-    Lower ratio -> first frame (slow), higher ratio -> last frame (fast).
-    """
-    num_frames = len(VELOCITY_FRAMES)
-    # Map ratio 0.0-2.0 to frame index
-    normalized = min(ratio / 2.0, 1.0)
-    frame_index = int(normalized * (num_frames - 1))
-    frame_index = max(0, min(num_frames - 1, frame_index))
-    return VELOCITY_FRAMES[frame_index]
+    """Get the velocity icon for the current ratio."""
+    _ = ratio
+    return ICONS["velocity"]
 
 
 def calculate_velocity_ratio(
@@ -587,10 +580,12 @@ def calculate_usage_buckets(
     bucket_duration = 5 * 3600 / width
     delta_buckets = [0.0] * width
 
+    sorted_snapshots = sorted(snapshots, key=lambda x: x[0])
+
     # Calculate deltas between consecutive snapshots and assign to buckets
-    for i in range(1, len(snapshots)):
-        t_prev, u_prev = snapshots[i - 1]
-        t_curr, u_curr = snapshots[i]
+    for i in range(1, len(sorted_snapshots)):
+        t_prev, u_prev = sorted_snapshots[i - 1]
+        t_curr, u_curr = sorted_snapshots[i]
         delta = u_curr - u_prev
 
         # Skip negative deltas (shouldn't happen, but defensive)
@@ -601,6 +596,15 @@ def calculate_usage_buckets(
         bucket_idx = int((t_curr - session_start) / bucket_duration)
         bucket_idx = max(0, min(width - 1, bucket_idx))
         delta_buckets[bucket_idx] += delta
+
+    # If we only have baseline snapshots (no observed delta), still show current
+    # utilization in the current bucket so freshly started providers render charts.
+    if max(delta_buckets) == 0 and sorted_snapshots:
+        latest_t, latest_u = sorted_snapshots[-1]
+        if latest_u > 0:
+            current_idx = int((latest_t - session_start) / bucket_duration)
+            current_idx = max(0, min(width - 1, current_idx))
+            delta_buckets[current_idx] = latest_u
 
     # Calculate cumulative utilization for each bucket (for coloring)
     # This represents the total usage up to and including that bucket
@@ -781,22 +785,25 @@ def calculate_cumulative_buckets(
     # Sort snapshots by timestamp
     sorted_snapshots = sorted(snapshots, key=lambda x: x[0])
 
-    # For each bucket, find the utilization at that point in time
-    # Buckets in the future (after now) stay at 0
-    for i in range(width):
+    if now <= session_start:
+        return (buckets, -1)
+
+    current_index = int((now - session_start) / bucket_duration)
+    current_index = max(0, min(width - 1, current_index))
+
+    # For each bucket up to the current bucket, find utilization at that point.
+    # Use "now" for the active partial bucket so recent snapshots render immediately.
+    for i in range(current_index + 1):
         bucket_end = session_start + (i + 1) * bucket_duration
-        if bucket_end > now:
-            # Future bucket - no data yet
-            break
+        bucket_time = min(bucket_end, now)
         # Find the last snapshot before or at bucket_end
         last_util = 0.0
         for ts, util in sorted_snapshots:
-            if ts <= bucket_end:
+            if ts <= bucket_time:
                 last_util = util
             else:
                 break
         buckets[i] = last_util
-        current_index = i
 
     return (buckets, current_index)
 

@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from .constants import BAR_WIDTH, COLOR_DIM, COLOR_SUBDUED, ICONS
+from .constants import BAR_WIDTH, COLOR_DIM, COLOR_SUBDUED, ICONS, PROVIDER_ICONS
 from .history import load_history
 from .rendering import (
     _chart_gradient_color,
@@ -107,6 +107,11 @@ def format_plan_name(profile: Optional[Dict[str, Any]]) -> Optional[str]:
         "claude_pro": "Pro",
         "claude_enterprise": "Enterprise",
         "claude_team": "Team",
+        "codex_free": "Free",
+        "codex_plus": "Plus",
+        "codex_pro": "Pro",
+        "codex_team": "Team",
+        "codex_enterprise": "Enterprise",
     }
     plan = plan_names.get(
         org_type, org_type.replace("claude_", "").title() if org_type else ""
@@ -149,6 +154,7 @@ def format_tooltip(
     show_cumulative_chart: bool = True,
     chart_mode: str = "cycle",
     chart_height: int = 4,
+    provider: str = "claude",
 ) -> str:
     """Format the tooltip with usage information."""
     util_5h = data["5h_utilization"] * 100
@@ -238,12 +244,15 @@ def format_tooltip(
     # Footer with credential source, user info and last check time
     footer_parts = []
     if cred_source:
+        source_label = {"cc": "claude-code", "oc": "opencode", "oa": "openai"}.get(
+            cred_source, cred_source
+        )
         if prefer_source is None:
-            footer_parts.append(cred_source)
+            footer_parts.append(source_label)
         elif cred_is_fallback:
-            footer_parts.append(f"{cred_source} (fallback)")
+            footer_parts.append(f"{source_label} (fallback)")
         else:
-            footer_parts.append(f"[{cred_source}]")
+            footer_parts.append(f"[{source_label}]")
     if profile:
         email = profile.get("account", {}).get("email")
         if email:
@@ -254,14 +263,15 @@ def format_tooltip(
 
     plan_name = format_plan_name(profile)
     bullet = f'<span color="{COLOR_SUBDUED}">{ICONS["bullet"]}</span>'
+    provider_name = "Claude" if provider == "claude" else "Codex"
     if plan_name:
-        title_plain = (
-            f"Claude {ICONS['bullet']} Usage Monitor {ICONS['bullet']} {plan_name} Plan"
+        title_plain = f"{provider_name} {ICONS['bullet']} Usage Monitor {ICONS['bullet']} {plan_name} Plan"
+        title_markup = (
+            f"{provider_name} {bullet} Usage Monitor {bullet} {plan_name} Plan"
         )
-        title_markup = f"Claude {bullet} Usage Monitor {bullet} {plan_name} Plan"
     else:
-        title_plain = f"Claude {ICONS['bullet']} Usage Monitor"
-        title_markup = f"Claude {bullet} Usage Monitor"
+        title_plain = f"{provider_name} {ICONS['bullet']} Usage Monitor"
+        title_markup = f"{provider_name} {bullet} Usage Monitor"
 
     max_width = max(len(line) for line in plain_lines)
     # Center based on plain text width, then apply markup
@@ -294,7 +304,7 @@ def format_tooltip(
         )
         vel_icon_color = _velocity_gradient_color(vel_gauge_pos)
         lines.append(f'<span line_height="0.60">{" "}</span>')
-        velocity_line_markup = f'<span color="{vel_icon_color}" alpha="85%">{velocity_icon}</span> {vel_markup} <span color="{vel_ratio_color}">{velocity_ratio:3.1f}x</span>'
+        velocity_line_markup = f'<span color="{vel_icon_color}" alpha="85%">{velocity_icon}</span> {vel_markup} <span color="{vel_ratio_color}">{velocity_ratio:3.1f}{ICONS["multiply"]}</span>'
         lines.append(velocity_line_markup)
 
     # Calculate chart data
@@ -395,7 +405,7 @@ def format_tooltip(
         )
         vel_icon_color_7d = _velocity_gradient_color(vel_gauge_pos_7d)
         lines.append(f'<span line_height="0.60">{" "}</span>')
-        velocity_line_7d_markup = f'<span color="{vel_icon_color_7d}" alpha="85%">{velocity_icon_7d}</span> {vel_markup_7d} <span color="{vel_ratio_color_7d}">{velocity_ratio_7d:3.1f}x</span>'
+        velocity_line_7d_markup = f'<span color="{vel_icon_color_7d}" alpha="85%">{velocity_icon_7d}</span> {vel_markup_7d} <span color="{vel_ratio_color_7d}">{velocity_ratio_7d:3.1f}{ICONS["multiply"]}</span>'
         lines.append(velocity_line_7d_markup)
 
     # Calculate 7d chart data
@@ -476,7 +486,7 @@ def format_tooltip(
 def format_waybar_output(
     data: Optional[Dict[str, Any]],
     last_check_time: Optional[datetime] = None,
-    show_alternate: bool = False,
+    rotation_index: int = 0,
     has_token: bool = True,
     profile: Optional[Dict[str, Any]] = None,
     cred_source: Optional[str] = None,
@@ -488,20 +498,23 @@ def format_waybar_output(
     token_error: Optional[str] = None,
     chart_mode: str = "cycle",
     chart_height: int = 4,
+    provider: str = "claude",
 ) -> Optional[Dict[str, Any]]:
     """Format output for Waybar.
 
     Display modes:
-    - compact: alternates between "{icon} {pct}%" and "{icon} {time}"
-    - normal: "{icon} {pct}% ({time})"
-    - expanded: "{icon} {bar} {pct}%" alternating bar between usage and time elapsed
+    - compact: rotates usage %, time %, and rate x
+    - normal: shows usage %, time %, and rate x
+    - expanded: rotates usage bar, time bar, and rate bar
     """
+    provider_icon = PROVIDER_ICONS.get(provider, ICONS["star"])
+
     if not has_token:
         tooltip = "No active token"
         if token_error:
             tooltip += f"\n\n{token_error}"
         return {
-            "text": ICONS["star"],
+            "text": provider_icon,
             "tooltip": tooltip,
             "percentage": 0,
             "class": "inactive",
@@ -517,7 +530,9 @@ def format_waybar_output(
     time_elapsed_pct = get_time_elapsed_percentage(reset_time, 5.0)
 
     percentage = int(primary_util * 100)
-    reset_short = format_reset_short(reset_time)
+    rate_ratio = calculate_velocity_ratio(usage_snapshots or [], reset_time, 5.0)
+    rate_icon = get_velocity_icon(rate_ratio)
+    rate_percent = int(max(0, min(100, round((rate_ratio / 2.0) * 100))))
 
     # Determine CSS class based on status and usage percentage
     # Check if any status is not allowed - that's critical
@@ -552,27 +567,43 @@ def format_waybar_output(
         show_cumulative_chart,
         chart_mode,
         chart_height,
+        provider,
     )
 
     # Format text based on display mode
+    compact_rotation = rotation_index % 3
+
     if display_mode == "compact":
-        if show_alternate:
-            text = f"{ICONS['zap']} {reset_short}"
+        if compact_rotation == 0:
+            text = f"{provider_icon}  {ICONS['zap']} {percentage}%"
+        elif compact_rotation == 1:
+            hourglass = get_hourglass_icon(time_elapsed_pct)
+            text = f"{provider_icon}  {hourglass} {int(time_elapsed_pct)}%"
         else:
-            text = f"{ICONS['zap']} {percentage}%"
+            text = f"{provider_icon}  {rate_icon} {rate_ratio:.1f}{ICONS['multiply']}"
     elif display_mode == "normal":
         hourglass = get_hourglass_icon(time_elapsed_pct)
-        text = f"{ICONS['zap']} {percentage}%  {hourglass} {int(time_elapsed_pct)}%"
+        text = (
+            f"{provider_icon}  {ICONS['zap']} {percentage}%"
+            f"  {hourglass} {int(time_elapsed_pct)}%"
+            f"  {rate_icon} {rate_ratio:.1f}{ICONS['multiply']}"
+        )
     elif display_mode == "expanded":
-        if show_alternate:
+        if compact_rotation == 0:
+            bar = get_compact_usage_bar(percentage)
+            text = f"{provider_icon}  {ICONS['zap']} {bar}  {ICONS['zap']} {percentage:2d}%"
+        elif compact_rotation == 1:
             hourglass = get_hourglass_icon(time_elapsed_pct)
             bar = get_compact_time_bar(int(time_elapsed_pct))
-            text = f"{ICONS['zap']} {bar}  {hourglass} {int(time_elapsed_pct):2d}%"
+            text = (
+                f"{provider_icon}  {ICONS['zap']} {bar}"
+                f"  {hourglass} {int(time_elapsed_pct):2d}%"
+            )
         else:
-            bar = get_compact_usage_bar(percentage)
-            text = f"{ICONS['zap']} {bar}  {ICONS['zap']} {percentage:2d}%"
+            bar = get_compact_usage_bar(rate_percent)
+            text = f"{provider_icon}  {ICONS['zap']} {bar}  {rate_icon} {rate_ratio:.1f}{ICONS['multiply']}"
     else:
-        text = f"{ICONS['zap']} {percentage}%"
+        text = f"{provider_icon}  {ICONS['zap']} {percentage}%"
 
     return {
         "text": text,
