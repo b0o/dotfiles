@@ -345,9 +345,8 @@ def main() -> None:
     action_group.add_argument(
         "--set-chart-height",
         type=int,
-        choices=[2, 4, 6, 8],
         metavar="N",
-        help="Set chart height in rows (2, 4, 6, or 8)",
+        help="Set chart height in rows",
     )
     action_group.add_argument(
         "--test-codex-api",

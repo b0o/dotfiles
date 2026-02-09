@@ -272,6 +272,9 @@ def _velocity_gradient_color(position: float) -> str:
     Left (0.0) = cool green (under budget), center (0.5) = neutral,
     right (1.0) = hot red/pink (over budget, risk of running out).
     """
+    if position == 0.0:
+        return COLOR_SUBDUED
+
     colors = [
         (0xB3, 0xE8, 0xA0),  # #B3E8A0 - cool green (well under budget)
         (0xB3, 0xE8, 0xA0),
@@ -400,13 +403,6 @@ def render_velocity_gauge_colored(
     Returns:
         Tuple of (plain_text, pango_markup)
     """
-    # Map ratio to indicator position on the bar
-    # ratio 0.0 -> left edge, ratio 2.0 -> right edge
-    # Indicator is 2 chars (full_left + full_right), so start ranges from 0 to width-2
-    gauge_position = min(ratio / 2.0, 1.0)
-    ind_start = int(gauge_position * (width - 2))
-    ind_start = max(0, min(width - 2, ind_start))
-
     # Center marker (1.0x) occupies 3 positions: [center-1, center, center+1]
     center = width // 2
 
@@ -420,12 +416,18 @@ def render_velocity_gauge_colored(
     slots[center] = "centerline"
     slots[center + 1] = "empty_left"
 
-    # Place indicator (overwrites whatever it covers)
+    # Map ratio to indicator position on the bar
+    # ratio 0.0 -> left edge, ratio 2.0 -> right edge
+    # Indicator is 2 chars (full_left + full_right), so start ranges from 0 to width-2
+    gauge_position = min(ratio / 2.0, 1.0)
     is_indicator = [False] * width
-    slots[ind_start] = "full_left"
-    slots[ind_start + 1] = "full_right"
-    is_indicator[ind_start] = True
-    is_indicator[ind_start + 1] = True
+    if gauge_position > 0.0:
+        ind_start = int(gauge_position * (width - 2))
+        ind_start = max(0, min(width - 2, ind_start))
+        slots[ind_start] = "full_left"
+        slots[ind_start + 1] = "full_right"
+        is_indicator[ind_start] = True
+        is_indicator[ind_start + 1] = True
 
     # Build output — indicator chars share a single color based on gauge position
     indicator_color = _velocity_gradient_color(gauge_position)

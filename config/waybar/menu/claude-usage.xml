@@ -90,8 +90,18 @@
   </object>
   <object class="GtkMenu" id="charts-height-submenu">
     <child>
+      <object class="GtkMenuItem" id="charts-height-1">
+        <property name="label">1 rows</property>
+      </object>
+    </child>
+    <child>
       <object class="GtkMenuItem" id="charts-height-2">
         <property name="label">2 rows</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="charts-height-3">
+        <property name="label">3 rows</property>
       </object>
     </child>
     <child>
@@ -100,8 +110,18 @@
       </object>
     </child>
     <child>
+      <object class="GtkMenuItem" id="charts-height-5">
+        <property name="label">5 rows</property>
+      </object>
+    </child>
+    <child>
       <object class="GtkMenuItem" id="charts-height-6">
         <property name="label">6 rows</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkMenuItem" id="charts-height-7">
+        <property name="label">7 rows</property>
       </object>
     </child>
     <child>

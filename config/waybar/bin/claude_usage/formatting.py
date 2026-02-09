@@ -211,15 +211,15 @@ def format_tooltip(
     icon_5h, icon_5h_color = _get_status_icon_and_color(data["5h_status"])
     icon_7d, icon_7d_color = _get_status_icon_and_color(data["7d_status"])
 
-    bar_line_5h_plain = f"{icon_5h}  {bar_5h} {util_5h:4.1f}%"
-    bar_line_5h_markup = f'<span color="{icon_5h_color}" alpha="85%">{icon_5h}</span>  {bar_5h_colored} <span color="{usage_5h_pct_color}">{util_5h:4.1f}%</span>'
-    time_line_5h_plain = f"{hourglass_5h}  {time_bar_5h} {time_elapsed_5h:4.1f}%"
-    time_line_5h_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_5h}</span>  {time_bar_5h_colored} <span color="{time_5h_pct_color}">{time_elapsed_5h:4.1f}%</span>'
+    bar_line_5h_plain = f"{icon_5h}  {bar_5h} {util_5h:04.1f}%"
+    bar_line_5h_markup = f'<span color="{icon_5h_color}" alpha="85%">{icon_5h}</span>  {bar_5h_colored} <span color="{usage_5h_pct_color}">{util_5h:04.1f}%</span>'
+    time_line_5h_plain = f"{hourglass_5h}  {time_bar_5h} {time_elapsed_5h:04.1f}%"
+    time_line_5h_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_5h}</span>  {time_bar_5h_colored} <span color="{time_5h_pct_color}">{time_elapsed_5h:04.1f}%</span>'
 
-    bar_line_7d_plain = f"{icon_7d}  {bar_7d} {util_7d:4.1f}%"
-    bar_line_7d_markup = f'<span color="{icon_7d_color}" alpha="85%">{icon_7d}</span>  {bar_7d_colored} <span color="{usage_7d_pct_color}">{util_7d:4.1f}%</span>'
-    time_line_7d_plain = f"{hourglass_7d}  {time_bar_7d} {time_elapsed_7d:4.1f}%"
-    time_line_7d_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_7d}</span>  {time_bar_7d_colored} <span color="{time_7d_pct_color}">{time_elapsed_7d:4.1f}%</span>'
+    bar_line_7d_plain = f"{icon_7d}  {bar_7d} {util_7d:04.1f}%"
+    bar_line_7d_markup = f'<span color="{icon_7d_color}" alpha="85%">{icon_7d}</span>  {bar_7d_colored} <span color="{usage_7d_pct_color}">{util_7d:04.1f}%</span>'
+    time_line_7d_plain = f"{hourglass_7d}  {time_bar_7d} {time_elapsed_7d:04.1f}%"
+    time_line_7d_markup = f'<span color="{COLOR_SUBDUED}" alpha="85%">{hourglass_7d}</span>  {time_bar_7d_colored} <span color="{time_7d_pct_color}">{time_elapsed_7d:04.1f}%</span>'
 
     # Build header plain text for width calculation
     header_5h_plain = (
@@ -290,22 +290,25 @@ def format_tooltip(
     velocity_ratio = calculate_velocity_ratio(
         usage_snapshots or [], data["5h_reset"], 5.0
     )
-    if velocity_ratio > 0 and len(usage_snapshots or []) >= 2:
-        velocity_icon = get_velocity_icon(velocity_ratio)
-        _vel_plain, vel_markup = render_velocity_gauge_colored(
-            velocity_ratio, BAR_WIDTH, chart_mode
-        )
-        # Color the ratio text: subdued if <=1.09, gradient color if >1.0
-        vel_gauge_pos = min(velocity_ratio / 2.0, 1.09)
-        vel_ratio_color = (
-            _velocity_gradient_color(vel_gauge_pos)
-            if velocity_ratio > 1.09
-            else COLOR_SUBDUED
-        )
-        vel_icon_color = _velocity_gradient_color(vel_gauge_pos)
-        lines.append(f'<span line_height="0.60">{" "}</span>')
-        velocity_line_markup = f'<span color="{vel_icon_color}" alpha="85%">{velocity_icon}</span> {vel_markup} <span color="{vel_ratio_color}">{velocity_ratio:3.1f}{ICONS["multiply"]}</span>'
-        lines.append(velocity_line_markup)
+    velocity_icon = get_velocity_icon(velocity_ratio)
+    _vel_plain, vel_markup = render_velocity_gauge_colored(
+        velocity_ratio, BAR_WIDTH, chart_mode
+    )
+    # Color the ratio text: subdued if <=1.09, gradient color if >1.0
+    vel_gauge_pos = min(velocity_ratio / 2.0, 1.09)
+    vel_ratio_color = (
+        _velocity_gradient_color(vel_gauge_pos)
+        if velocity_ratio > 1.09
+        else COLOR_SUBDUED
+    )
+    vel_icon_color = (
+        _velocity_gradient_color(vel_gauge_pos)
+        if vel_gauge_pos > 0.5
+        else COLOR_SUBDUED
+    )
+    lines.append(f'<span line_height="0.60">{" "}</span>')
+    velocity_line_markup = f'<span color="{vel_icon_color}" alpha="85%">{velocity_icon}</span>  {vel_markup} <span color="{vel_ratio_color}">{velocity_ratio:3.1f}{ICONS["multiply"]}</span>'
+    lines.append(velocity_line_markup)
 
     # Calculate chart data
     buckets, raw_buckets = calculate_usage_buckets(
@@ -322,20 +325,18 @@ def format_tooltip(
     )
 
     # Icons for chart types
-    bucketed_icon = (
-        f'<span color="{_chart_gradient_color(0.7)}">{ICONS["delta"]}</span>'
-    )
-    cumulative_icon = (
-        f'<span color="{_cumulative_gradient_color(0.7)}">{ICONS["epsilon"]}</span>'
-    )
+    bucketed_icon = f'<span color="{COLOR_SUBDUED}">{ICONS["delta"]}</span>'
+    cumulative_icon = f'<span color="{COLOR_SUBDUED}">{ICONS["epsilon"]}</span>'
 
     if chart_mode == "stacked":
         # Stacked: bucketed chart above usage bar, cumulative below
         lines.append(f'<span line_height="0.40">{" "}</span>')
         bucketed_lines_5h = []
         for idx, row in enumerate(bucketed_rows_5h):
-            if (len(bucketed_rows_5h) > 3 and idx == 2) or (
-                len(bucketed_rows_5h) <= 3 and idx == 0
+            if (
+                (len(bucketed_rows_5h) == 3 and idx == 1)
+                or (len(bucketed_rows_5h) > 3 and idx == 2)
+                or (len(bucketed_rows_5h) <= 2 and idx == 0)
             ):
                 bucketed_lines_5h.append(f"   {row} {bucketed_icon}")
             else:
@@ -347,8 +348,10 @@ def format_tooltip(
         lines.append(f'<span line_height="0.40">{" "}</span>')
         cumulative_lines_5h = []
         for idx, row in enumerate(cumulative_rows_5h):
-            if (len(cumulative_rows_5h) > 3 and idx == 2) or (
-                len(cumulative_rows_5h) <= 3 and idx == 0
+            if (
+                (len(cumulative_rows_5h) == 3 and idx == 1)
+                or (len(cumulative_rows_5h) > 3 and idx == 2)
+                or (len(cumulative_rows_5h) <= 2 and idx == 0)
             ):
                 cumulative_lines_5h.append(f"   {row} {cumulative_icon}")
             else:
@@ -362,15 +365,8 @@ def format_tooltip(
         chart_rows_5h = (
             cumulative_rows_5h if show_cumulative_chart else bucketed_rows_5h
         )
-        # Highlight the active chart's icon, dim the other
-        bucketed_color = (
-            _chart_gradient_color(0.7) if not show_cumulative_chart else COLOR_DIM
-        )
-        cumulative_color = (
-            _cumulative_gradient_color(0.7) if show_cumulative_chart else COLOR_DIM
-        )
-        icon_top = f'<span color="{bucketed_color}">𝚫</span>'
-        icon_bottom = f'<span color="{cumulative_color}">𝚺</span>'
+        icon_top = f'<span color="{COLOR_SUBDUED}">𝚫</span>'
+        icon_bottom = f'<span color="{COLOR_SUBDUED}">𝚺</span>'
         chart_lines_5h = []
         for idx, row in enumerate(chart_rows_5h):
             if idx == 0:
@@ -392,21 +388,24 @@ def format_tooltip(
     velocity_ratio_7d = calculate_velocity_ratio_7d(
         history, data["7d_reset"], data["7d_utilization"]
     )
-    if velocity_ratio_7d > 0:
-        velocity_icon_7d = get_velocity_icon(velocity_ratio_7d)
-        _vel_plain_7d, vel_markup_7d = render_velocity_gauge_colored(
-            velocity_ratio_7d, BAR_WIDTH, chart_mode
-        )
-        vel_gauge_pos_7d = min(velocity_ratio_7d / 2.0, 1.09)
-        vel_ratio_color_7d = (
-            _velocity_gradient_color(vel_gauge_pos_7d)
-            if velocity_ratio_7d > 1.09
-            else COLOR_SUBDUED
-        )
-        vel_icon_color_7d = _velocity_gradient_color(vel_gauge_pos_7d)
-        lines.append(f'<span line_height="0.60">{" "}</span>')
-        velocity_line_7d_markup = f'<span color="{vel_icon_color_7d}" alpha="85%">{velocity_icon_7d}</span> {vel_markup_7d} <span color="{vel_ratio_color_7d}">{velocity_ratio_7d:3.1f}{ICONS["multiply"]}</span>'
-        lines.append(velocity_line_7d_markup)
+    velocity_icon_7d = get_velocity_icon(velocity_ratio_7d)
+    _vel_plain_7d, vel_markup_7d = render_velocity_gauge_colored(
+        velocity_ratio_7d, BAR_WIDTH, chart_mode
+    )
+    vel_gauge_pos_7d = min(velocity_ratio_7d / 2.0, 1.09)
+    vel_ratio_color_7d = (
+        _velocity_gradient_color(vel_gauge_pos_7d)
+        if velocity_ratio_7d > 1.09
+        else COLOR_SUBDUED
+    )
+    vel_icon_color_7d = (
+        _velocity_gradient_color(vel_gauge_pos_7d)
+        if vel_gauge_pos_7d > 0.5
+        else COLOR_SUBDUED
+    )
+    lines.append(f'<span line_height="0.60">{" "}</span>')
+    velocity_line_7d_markup = f'<span color="{vel_icon_color_7d}" alpha="85%">{velocity_icon_7d}</span>  {vel_markup_7d} <span color="{vel_ratio_color_7d}">{velocity_ratio_7d:3.1f}{ICONS["multiply"]}</span>'
+    lines.append(velocity_line_7d_markup)
 
     # Calculate 7d chart data
     buckets_7d, raw_buckets_7d = calculate_7d_buckets_from_history(
@@ -427,8 +426,10 @@ def format_tooltip(
         lines.append(f'<span line_height="0.40">{" "}</span>')
         bucketed_lines_7d = []
         for idx, row in enumerate(bucketed_rows_7d):
-            if (len(bucketed_rows_7d) > 3 and idx == 2) or (
-                len(bucketed_rows_7d) <= 3 and idx == 0
+            if (
+                (len(bucketed_rows_7d) == 3 and idx == 1)
+                or (len(bucketed_rows_7d) > 3 and idx == 2)
+                or (len(bucketed_rows_7d) <= 2 and idx == 0)
             ):
                 bucketed_lines_7d.append(f"   {row} {bucketed_icon}")
             else:
@@ -440,8 +441,10 @@ def format_tooltip(
         lines.append(f'<span line_height="0.40">{" "}</span>')
         cumulative_lines_7d = []
         for idx, row in enumerate(cumulative_rows_7d):
-            if (len(cumulative_rows_7d) > 3 and idx == 2) or (
-                len(cumulative_rows_7d) <= 3 and idx == 0
+            if (
+                (len(cumulative_rows_7d) == 3 and idx == 1)
+                or (len(cumulative_rows_7d) > 3 and idx == 2)
+                or (len(cumulative_rows_7d) <= 2 and idx == 0)
             ):
                 cumulative_lines_7d.append(f"   {row} {cumulative_icon}")
             else:
@@ -531,7 +534,6 @@ def format_waybar_output(
 
     percentage = int(primary_util * 100)
     rate_ratio = calculate_velocity_ratio(usage_snapshots or [], reset_time, 5.0)
-    rate_icon = get_velocity_icon(rate_ratio)
     rate_percent = int(max(0, min(100, round((rate_ratio / 2.0) * 100))))
 
     # Determine CSS class based on status and usage percentage
@@ -580,13 +582,13 @@ def format_waybar_output(
             hourglass = get_hourglass_icon(time_elapsed_pct)
             text = f"{provider_icon}  {hourglass} {int(time_elapsed_pct)}%"
         else:
-            text = f"{provider_icon}  {rate_icon} {rate_ratio:.1f}{ICONS['multiply']}"
+            text = f"{provider_icon} {rate_ratio:.1f}{ICONS['multiply']}"
     elif display_mode == "normal":
         hourglass = get_hourglass_icon(time_elapsed_pct)
         text = (
             f"{provider_icon}  {ICONS['zap']} {percentage}%"
             f"  {hourglass} {int(time_elapsed_pct)}%"
-            f"  {rate_icon} {rate_ratio:.1f}{ICONS['multiply']}"
+            f" {rate_ratio:.1f}{ICONS['multiply']}"
         )
     elif display_mode == "expanded":
         if compact_rotation == 0:
@@ -601,7 +603,7 @@ def format_waybar_output(
             )
         else:
             bar = get_compact_usage_bar(rate_percent)
-            text = f"{provider_icon}  {ICONS['zap']} {bar}  {rate_icon} {rate_ratio:.1f}{ICONS['multiply']}"
+            text = f"{provider_icon}  {ICONS['zap']} {bar} {rate_ratio:.1f}{ICONS['multiply']}"
     else:
         text = f"{provider_icon}  {ICONS['zap']} {percentage}%"
 
