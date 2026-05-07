@@ -1,5 +1,5 @@
 -- Originally based on https://github.com/lukahartwig/pnpm.nvim
--- Copyright 2023 Maddison Hellstrom
+-- Copyright 2023 Maddison Cohodas
 -- Copyright 2023 Luka Hartwig
 -- MIT License
 
